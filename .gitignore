@@ -9,6 +9,9 @@ coverage/
 .env.*
 !.env.example
 *.log
+__pycache__/
+*.py[cod]
+*.egg-info/
 apps/**/dist/
 packages/**/dist/
 services/api/dist/
