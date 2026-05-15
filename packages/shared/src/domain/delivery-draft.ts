@@ -1,4 +1,5 @@
 import { calculateDeliveryQuote, type QuoteInput, type ServiceType, type SizeTier, type StationId } from "./pricing";
+import type { DeliveryStatus } from "./state-machine";
 
 export type PaymentStatus =
   | "pending"
@@ -6,6 +7,8 @@ export type PaymentStatus =
   | "failed"
   | "refund_pending"
   | "refunded";
+
+export type DeliveryCustodyRole = "station_operator" | "driver" | "final_mile_courier";
 
 export interface DeliveryReceiverInput {
   name: string;
@@ -49,17 +52,17 @@ export interface DeliveryDraft {
   serviceType: ServiceType;
   doorstepRequested: boolean;
   doorstepDistanceKm?: number;
-  currentStatus: "created";
-  paymentStatus: "pending";
+  currentStatus: DeliveryStatus;
+  paymentStatus: PaymentStatus;
   quote: {
     currency: "GHS";
     amount: number;
   };
-  paymentRequiredBeforeDispatch: true;
-  currentCustodyRole: null;
-  currentCustodyActorId: null;
+  paymentRequiredBeforeDispatch: boolean;
+  currentCustodyRole: DeliveryCustodyRole | null;
+  currentCustodyActorId: string | null;
   latestEvent: {
-    type: "delivery_created";
+    type: string;
     occurredAt: string;
   };
   createdAt: string;
