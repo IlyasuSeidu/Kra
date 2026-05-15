@@ -14,3 +14,4 @@ export const apiHealthContract = {
   livenessChecks: ["process", "configuration"]
 };
 
+export * from "./routes";

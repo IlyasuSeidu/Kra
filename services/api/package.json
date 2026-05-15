@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm --filter @kra/shared build && tsc -p tsconfig.build.json",
     "lint": "eslint src",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "pnpm --filter @kra/shared build && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@kra/shared": "workspace:*"
   }
 }
-

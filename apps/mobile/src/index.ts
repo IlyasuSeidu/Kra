@@ -1,3 +1,5 @@
+export const mobileImplementationStatus = "contract_only" as const;
+
 export const mobileRoleShells = {
   sender: ["SenderHome", "CreateDelivery", "TrackingTimeline", "SupportThread"],
   driver: ["DriverHome", "DriverManifest", "DriverRoute", "DriverHandoff"],
@@ -14,4 +16,3 @@ export const mobileRoleShells = {
     "CourierFailureReason"
   ]
 } as const;
-

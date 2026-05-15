@@ -1,6 +1,10 @@
-export type StationId = "ST-ACC-01" | "ST-KMS-01" | "ST-TML-01";
-export type SizeTier = "standard" | "bulky" | "oversized";
-export type ServiceType = "standard" | "express" | "doorstep";
+export const stationIds = ["ST-ACC-01", "ST-KMS-01", "ST-TML-01"] as const;
+export const sizeTiers = ["standard", "bulky", "oversized"] as const;
+export const serviceTypes = ["standard", "express"] as const;
+
+export type StationId = (typeof stationIds)[number];
+export type SizeTier = (typeof sizeTiers)[number];
+export type ServiceType = (typeof serviceTypes)[number];
 
 export interface QuoteInput {
   originStationId: StationId;
@@ -8,6 +12,7 @@ export interface QuoteInput {
   weightKg: number;
   sizeTier: SizeTier;
   serviceType: ServiceType;
+  doorstepRequested: boolean;
   isFragile: boolean;
   declaredValueGhs: number;
   doorstepDistanceKm?: number;
@@ -55,6 +60,10 @@ export function getBaseRouteFee(
 }
 
 export function calculateDeliveryQuote(input: QuoteInput): number {
+  if (input.declaredValueGhs > 5000) {
+    throw new Error("Declared value above GHS 5,000 is not self-serve in v1.");
+  }
+
   const baseFee = getBaseRouteFee(input.originStationId, input.destinationStationId);
   const weightSurcharge = getWeightSurcharge(input.weightKg);
   const sizeSurcharge = getSizeSurcharge(input.sizeTier);
@@ -63,7 +72,7 @@ export function calculateDeliveryQuote(input: QuoteInput): number {
   const expressSurcharge =
     input.serviceType === "express" ? Math.max(Math.ceil(baseFee * 0.4), 15) : 0;
   const doorstepSurcharge =
-    input.serviceType === "doorstep" ? getDoorstepSurcharge(input.doorstepDistanceKm) : 0;
+    input.doorstepRequested ? getDoorstepSurcharge(input.doorstepDistanceKm) : 0;
 
   return (
     baseFee +
@@ -75,4 +84,3 @@ export function calculateDeliveryQuote(input: QuoteInput): number {
     doorstepSurcharge
   );
 }
-

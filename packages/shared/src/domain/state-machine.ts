@@ -1,22 +1,25 @@
-export type DeliveryStatus =
-  | "draft"
-  | "created"
-  | "received_at_origin"
-  | "awaiting_driver_assignment"
-  | "assigned_to_driver"
-  | "dispatched_from_origin"
-  | "in_transit"
-  | "received_at_destination"
-  | "awaiting_receiver_pickup"
-  | "awaiting_final_mile_assignment"
-  | "assigned_for_final_mile"
-  | "out_for_delivery"
-  | "delivered"
-  | "issue_reported"
-  | "on_hold"
-  | "delivery_failed"
-  | "cancelled"
-  | "closed";
+export const deliveryStatuses = [
+  "draft",
+  "created",
+  "received_at_origin",
+  "awaiting_driver_assignment",
+  "assigned_to_driver",
+  "dispatched_from_origin",
+  "in_transit",
+  "received_at_destination",
+  "awaiting_receiver_pickup",
+  "awaiting_final_mile_assignment",
+  "assigned_for_final_mile",
+  "out_for_delivery",
+  "delivered",
+  "issue_reported",
+  "on_hold",
+  "delivery_failed",
+  "cancelled",
+  "closed"
+] as const;
+
+export type DeliveryStatus = (typeof deliveryStatuses)[number];
 
 const transitions: Record<DeliveryStatus, DeliveryStatus[]> = {
   draft: ["created"],
@@ -64,4 +67,3 @@ export function isTerminalStatus(status: DeliveryStatus): boolean {
 export function getNextStatuses(status: DeliveryStatus): readonly DeliveryStatus[] {
   return transitions[status];
 }
-

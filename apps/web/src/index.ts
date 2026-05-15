@@ -103,6 +103,7 @@ export const landingSections: LandingSection[] = [
 
 export const publicSurface = {
   app: "web",
+  implementationStatus: "contract_only",
   pages: publicPages,
   landingSections,
   seoBaseline: {
