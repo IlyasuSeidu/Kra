@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kra — Sender Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:#E2E2E7;display:flex;align-items:flex-start;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;padding:40px 20px}
+:root{
+--blue:#2563EB;--blue-bg:#EFF6FF;--blue-dark:#1D4ED8;
+--green:#16A34A;--green-bg:#F0FDF4;
+--amber:#D97706;--amber-bg:#FFFBEB;--amber-dark:#B45309;
+--red:#DC2626;--red-bg:#FEF2F2;
+--t1:#111827;--t2:#374151;--t3:#6B7280;--t4:#9CA3AF;
+--border:#E5E7EB;--border2:#D1D5DB;
+--surf:#F9FAFB;--surf2:#F3F4F6;--white:#FFFFFF;
+--sh:0 1px 3px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.05);
+--sh2:0 8px 32px rgba(0,0,0,.18);
+--r:12px;--rs:8px;--rp:100px;
+}
+.page-wrap{display:flex;flex-direction:column;align-items:center;gap:32px}
+/* PHONE SHELL */
+.phone-wrap{position:relative;width:393px;height:852px;border-radius:54px;background:#111;box-shadow:0 0 0 1.5px #2A2A2A,0 0 0 3px #0A0A0A,var(--sh2);flex-shrink:0}
+.phone-screen{position:absolute;top:5px;left:5px;right:5px;bottom:5px;border-radius:49px;overflow:hidden;background:var(--surf);display:flex;flex-direction:column}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:34px;background:#111;border-radius:0 0 18px 18px;z-index:200}
+/* STATUS BAR */
+.status-bar{height:52px;background:var(--white);display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 8px;flex-shrink:0;position:relative;z-index:10}
+.sb-time{font-size:15px;font-weight:600;color:var(--t1);letter-spacing:-.2px}
+.sb-icons{display:flex;align-items:center;gap:5px}
+/* APP HEADER */
+.app-hdr{background:var(--white);padding:8px 18px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
+.hdr-brand{font-size:22px;font-weight:800;color:var(--blue);letter-spacing:-.5px}
+.hdr-right{display:flex;align-items:center;gap:9px}
+.bell-btn{position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--surf2);border:none;cursor:pointer;transition:background .15s;color:var(--t2)}
+.bell-btn:active{background:var(--border)}
+.notif-dot{position:absolute;top:5px;right:5px;width:14px;height:14px;background:var(--red);border-radius:50%;border:2px solid var(--white);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;cursor:pointer;flex-shrink:0}
+/* SCROLL AREA */
+.scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.scroll-area::-webkit-scrollbar{display:none}
+/* TAB SCREENS */
+.screen{display:none;flex-direction:column;min-height:100%}
+.screen.active{display:flex}
+/* COMMON LAYOUT */
+.sect{padding:18px 18px 0}
+.sect-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+.sect-title{font-size:15px;font-weight:700;color:var(--t1)}
+.sect-link{font-size:13px;font-weight:500;color:var(--blue);cursor:pointer}
+/* HOME */
+.greeting{padding:16px 18px 0}
+.greeting-name{font-size:23px;font-weight:700;color:var(--t1);letter-spacing:-.3px}
+.greeting-sub{font-size:12px;color:var(--t3);margin-top:2px}
+/* SEARCH */
+.search-wrap{padding:12px 18px 0}
+.search-bar{display:flex;align-items:center;gap:9px;background:var(--white);border:1.5px solid var(--border2);border-radius:var(--rs);padding:0 13px;height:42px}
+.search-bar input{flex:1;border:none;outline:none;font-size:13px;color:var(--t1);background:transparent}
+.search-bar input::placeholder{color:var(--t4)}
+/* STATS */
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 18px 0}
+.stat-tile{background:var(--white);border:1px solid var(--border);border-radius:var(--rs);padding:11px 8px;text-align:center;box-shadow:var(--sh)}
+.stat-n{font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1}
+.stat-n.bl{color:var(--blue)}
+.stat-n.gr{color:var(--green)}
+.stat-n.ne{color:var(--t1);font-size:18px}
+.stat-lbl{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--t3);margin-top:3px}
+/* ATTENTION BANNER */
+.attn{margin:14px 18px 0;background:var(--amber-bg);border:1.5px solid #FDE68A;border-radius:var(--r);padding:11px 13px;display:flex;align-items:flex-start;gap:9px;transition:transform .3s ease,opacity .3s ease}
+.attn-ico{flex-shrink:0;color:var(--amber);margin-top:1px}
+.attn-body{flex:1}
+.attn-ttl{font-size:13px;font-weight:700;color:var(--amber-dark)}
+.attn-sub{font-size:11px;color:var(--amber-dark);opacity:.85;margin-top:1px}
+.attn-acts{display:flex;align-items:center;gap:7px;margin-top:1px}
+.attn-pay{background:var(--amber);color:#fff;border:none;border-radius:6px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.attn-pay:active{background:var(--amber-dark)}
+.attn-x{background:none;border:none;cursor:pointer;color:var(--amber-dark);opacity:.7;padding:3px;display:flex}
+/* DELIVERY CARDS */
+.del-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:13px 13px 13px 16px;box-shadow:var(--sh);cursor:pointer;position:relative;overflow:hidden;margin-bottom:9px;transition:transform .12s ease}
+.del-card:active{transform:scale(.97)}
+.del-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.stripe-bl::before{background:var(--blue)}
+.stripe-ne::before{background:var(--t4)}
+.stripe-am::before{background:var(--amber)}
+.stripe-gr::before{background:var(--green)}
+.cr1{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.c-ref{font-size:13px;font-weight:700;color:var(--t1)}
+.cr2{font-size:12px;color:var(--t2);margin-bottom:3px}
+.cr2 .arr{color:var(--t4);margin:0 3px}
+.cr3{display:flex;align-items:center;justify-content:space-between}
+.c-evt{font-size:11px;color:var(--t3)}
+.c-svc{font-size:9px;font-weight:600;color:var(--t3);background:var(--surf2);border:1px solid var(--border);border-radius:var(--rp);padding:2px 7px;letter-spacing:.2px}
+.c-act-row{margin-top:7px;padding-top:7px;border-top:1px solid var(--border)}
+.c-act-lnk{font-size:11px;font-weight:700;color:var(--amber)}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;border-radius:var(--rp);padding:3px 8px}
+.b-bl{background:var(--blue-bg);color:var(--blue)}
+.b-gr{background:var(--green-bg);color:var(--green)}
+.b-am{background:var(--amber-bg);color:var(--amber-dark)}
+.b-ne{background:var(--surf2);color:var(--t2)}
+.b-rd{background:var(--red-bg);color:var(--red)}
+/* QUICK ACTIONS */
+.qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.qa-tile{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:13px;cursor:pointer;transition:transform .12s;box-shadow:var(--sh)}
+.qa-tile:active{transform:scale(.96)}
+.qa-ico{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:9px}
+.qi-bl{background:var(--blue-bg);color:var(--blue)}
+.qi-gr{background:var(--green-bg);color:var(--green)}
+.qi-ne{background:var(--surf2);color:var(--t2)}
+.qi-rd{background:var(--red-bg);color:var(--red)}
+.qa-lbl{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:1px}
+.qa-sub{font-size:10px;color:var(--t3)}
+/* WALLET STRIP */
+.wlt-strip{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:13px 15px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--sh)}
+.wlt-l{display:flex;align-items:center;gap:9px}
+.wlt-ico{width:34px;height:34px;background:var(--blue-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--blue);flex-shrink:0}
+.wlt-lbl{font-size:10px;color:var(--t3);margin-bottom:1px}
+.wlt-amt{font-size:18px;font-weight:700;color:var(--green);letter-spacing:-.3px}
+.wlt-r{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.wlt-pend{font-size:10px;font-weight:600;color:var(--amber-dark)}
+.wlt-top{background:none;border:1.5px solid var(--blue);border-radius:6px;padding:5px 11px;font-size:11px;font-weight:600;color:var(--blue);cursor:pointer}
+.wlt-top:active{background:var(--blue-bg)}
+/* RECENT SHIPMENTS */
+.ship-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.ship-row:last-child{border-bottom:none}
+.ship-ref{font-size:11px;font-weight:700;color:var(--t1)}
+.ship-meta{font-size:10px;color:var(--t3);margin-top:1px}
+.ship-r{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.ship-amt{font-size:12px;font-weight:700;color:var(--t1)}
+/* TAB BAR */
+.tab-bar{flex-shrink:0;background:var(--white);border-top:1px solid var(--border);display:flex;align-items:stretch;padding-bottom:env(safe-area-inset-bottom,0)}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 2px 5px;cursor:pointer;border:none;background:none;gap:3px;color:var(--t4);min-height:54px;transition:color .15s}
+.tab-btn.active{color:var(--blue)}
+.tab-lbl{font-size:9px;font-weight:600;letter-spacing:.1px}
+.tab-create-ico{background:var(--blue);border-radius:9px;padding:4px 6px;color:#fff;display:flex;align-items:center;justify-content:center}
+/* HISTORY */
+.filter-row{display:flex;gap:7px;padding:12px 18px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.filter-row::-webkit-scrollbar{display:none}
+.f-chip{border:1.5px solid var(--border2);border-radius:var(--rp);padding:5px 13px;font-size:12px;font-weight:500;color:var(--t2);background:var(--white);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.f-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.hist-grp{padding:0 18px 16px}
+.hist-grp-lbl{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--t3);margin-bottom:9px}
+.hist-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.hist-row:last-child{border-bottom:none}
+.hist-ref{font-size:13px;font-weight:700;color:var(--t1)}
+.hist-route{font-size:11px;color:var(--t3);margin-top:1px}
+.hist-r{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.hist-amt{font-size:12px;font-weight:700;color:var(--t1)}
+/* WALLET SCREEN */
+.wlt-hero{margin:14px 18px 0;background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh)}
+.wlt-hero-lbl{font-size:11px;color:var(--t3);margin-bottom:3px}
+.wlt-hero-bal{font-size:34px;font-weight:700;color:var(--green);letter-spacing:-.8px;line-height:1}
+.wlt-hero-sub{font-size:11px;color:var(--t3);margin-top:3px}
+.wlt-hero-cta{margin-top:13px;display:flex;gap:9px}
+.wlt-btn{flex:1;padding:11px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;border:none}
+.wlt-btn:active{opacity:.8}
+.btn-p{background:var(--blue);color:#fff}
+.btn-o{background:none;border:1.5px solid var(--blue);color:var(--blue)}
+.wlt-pend-bar{margin:9px 18px 0;background:var(--amber-bg);border:1px solid #FDE68A;border-radius:var(--rs);padding:9px 13px;display:flex;justify-content:space-between;align-items:center}
+.wlt-pend-txt{font-size:12px;font-weight:600;color:var(--amber-dark)}
+.wlt-pend-amt{font-size:12px;font-weight:700;color:var(--amber-dark)}
+.txn-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.txn-row:last-child{border-bottom:none}
+.txn-l{display:flex;align-items:center;gap:9px}
+.txn-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.txn-ref{font-size:12px;font-weight:600;color:var(--t1)}
+.txn-meta{font-size:10px;color:var(--t3);margin-top:1px}
+.txn-amt{font-size:12px;font-weight:700;color:var(--t1)}
+.txn-st{font-size:10px;text-align:right;margin-top:2px}
+/* SUPPORT */
+.sup-hero{padding:16px 18px 0}
+.sup-h{font-size:19px;font-weight:700;color:var(--t1);margin-bottom:3px}
+.sup-sub{font-size:12px;color:var(--t3)}
+.sup-opts{padding:14px 18px 0;display:flex;flex-direction:column;gap:9px}
+.sup-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;box-shadow:var(--sh);transition:transform .12s}
+.sup-card:active{transform:scale(.97)}
+.sup-card-ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sup-card-ttl{font-size:14px;font-weight:700;color:var(--t1)}
+.sup-card-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.sup-footer{margin:13px 18px 0;padding:12px 13px;background:var(--green-bg);border:1px solid #BBF7D0;border-radius:var(--rs);display:flex;justify-content:space-between;align-items:center}
+/* CREATE SCREEN */
+.cr-hdr{padding:12px 18px;display:flex;align-items:center;gap:10px;background:var(--white);border-bottom:1px solid var(--border)}
+.back-btn{display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px;font-weight:500}
+.cr-ttl{font-size:16px;font-weight:700;color:var(--t1)}
+.step-pills{display:flex;gap:5px;padding:13px 18px}
+.s-pill{flex:1;height:3px;border-radius:2px;background:var(--border2)}
+.s-pill.on{background:var(--blue)}
+.form-lbl{font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--t3);margin-bottom:7px}
+.form-field{display:flex;align-items:center;justify-content:space-between;background:var(--white);border:1.5px solid var(--border2);border-radius:var(--rs);padding:12px 13px;cursor:pointer;margin-bottom:7px}
+.form-field:active{border-color:var(--blue)}
+.ff-val{font-size:14px;font-weight:500;color:var(--t1)}
+.ff-ph{font-size:14px;color:var(--t4)}
+.price-est{background:var(--blue-bg);border:1px solid #BFDBFE;border-radius:var(--rs);padding:11px 13px;margin-bottom:18px}
+.pe-lbl{font-size:10px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.pe-val{font-size:18px;font-weight:700;color:var(--blue)}
+.pe-note{font-size:10px;color:var(--blue);opacity:.7;margin-top:1px}
+.cta-btn{width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;transition:background .15s}
+.cta-btn:active{background:var(--blue-dark)}
+/* TRACK SCREEN */
+.trk-srch{display:flex;align-items:center;gap:9px;background:var(--white);border:1.5px solid var(--blue);border-radius:var(--rs);padding:0 13px;height:46px;margin:13px 18px 0}
+.trk-srch input{flex:1;border:none;outline:none;font-size:13px;color:var(--t1);background:transparent}
+.trk-tip{margin:0 18px;background:var(--blue-bg);border-radius:var(--rs);padding:9px 13px;font-size:11px;color:var(--blue)}
+.trk-lbl{padding:14px 18px 9px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3)}
+.trk-row{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border);cursor:pointer}
+.trk-row:active{background:var(--surf2)}
+.trk-dot{width:8px;height:8px;border-radius:50%;margin-right:9px;flex-shrink:0}
+.trk-info{}
+.trk-ref{font-size:12px;font-weight:600;color:var(--t1)}
+.trk-rt{font-size:10px;color:var(--t3)}
+/* OVERLAY & SHEETS */
+.overlay{position:absolute;inset:0;background:rgba(0,0,0,0);z-index:200;display:none;border-radius:49px;cursor:pointer;transition:background .3s}
+.overlay.on{display:block;background:rgba(0,0,0,.48)}
+.sheet{position:absolute;bottom:0;left:0;right:0;background:var(--white);border-radius:26px 26px 0 0;z-index:300;transform:translateY(100%);transition:transform .32s cubic-bezier(0.4,0,0.2,1);max-height:92%;overflow-y:auto;scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.sheet.open{transform:translateY(0)}
+.s-handle{width:38px;height:4px;background:var(--border2);border-radius:2px;margin:11px auto 0}
+.s-hdr{padding:14px 18px 11px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.s-ttl{font-size:16px;font-weight:700;color:var(--t1)}
+.s-close{width:28px;height:28px;border-radius:50%;background:var(--surf2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t2)}
+.s-body{padding:15px 18px 30px}
+/* DETAIL SHEET */
+.d-ref{font-size:19px;font-weight:800;color:var(--t1);letter-spacing:-.3px;margin-bottom:5px}
+.d-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:12px 0}
+.d-cell{background:var(--surf);border-radius:var(--rs);padding:9px 7px;text-align:center}
+.d-c-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--t3);margin-bottom:2px}
+.d-c-val{font-size:12px;font-weight:700;color:var(--t1)}
+.rcvr-row{display:flex;align-items:center;justify-content:space-between;background:var(--surf);border-radius:var(--rs);padding:11px 13px;margin-bottom:13px;cursor:pointer}
+.rcvr-name{font-size:13px;font-weight:600;color:var(--t1)}
+.rcvr-ph{font-size:11px;color:var(--t3);margin-top:1px}
+/* TIMELINE */
+.tl-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);margin-bottom:9px}
+.tl-item{display:flex;gap:11px;margin-bottom:0}
+.tl-left{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:14px}
+.tl-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.tl-dot.filled{background:var(--blue)}
+.tl-dot.empty{border:2px solid var(--border2);background:var(--white)}
+.tl-line{width:2px;flex:1;background:var(--border);margin:3px 0;min-height:18px}
+.tl-r{padding-bottom:13px}
+.tl-stat{font-size:13px;font-weight:700;color:var(--t1)}
+.tl-desc{font-size:11px;color:var(--t3);margin-top:1px}
+.tl-time{font-size:10px;color:var(--t4);margin-top:1px}
+.d-acts{display:flex;gap:9px;margin-top:4px}
+.d-btn{flex:1;padding:11px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;border:none;text-align:center}
+.d-btn:active{opacity:.8}
+.d-share{background:var(--blue-bg);color:var(--blue)}
+.d-issue{background:var(--red-bg);color:var(--red)}
+/* PAYMENT SHEET */
+.momo-ico{width:52px;height:52px;border-radius:50%;background:#FFCB05;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto 12px}
+.momo-mtn{font-size:11px;font-weight:900;color:#000;letter-spacing:.5px}
+.momo-sub{font-size:7px;font-weight:700;color:#000;letter-spacing:1px}
+.pay-del{font-size:11px;color:var(--t3);text-align:center;margin-bottom:3px}
+.pay-amt{font-size:34px;font-weight:800;color:var(--t1);text-align:center;letter-spacing:-.8px;margin-bottom:3px}
+.pay-bkdn{font-size:11px;color:var(--t3);text-align:center;margin-bottom:14px}
+.pay-f-lbl{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:5px}
+.pay-field{display:flex;align-items:center;gap:9px;background:var(--surf);border:1.5px solid var(--border2);border-radius:var(--rs);padding:11px 13px;margin-bottom:14px}
+.pay-field input{flex:1;border:none;outline:none;font-size:14px;font-weight:500;color:var(--t1);background:transparent}
+.pay-hint{font-size:11px;color:var(--t3);margin-bottom:18px;font-style:italic;text-align:center}
+.pay-cta{width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px}
+.pay-cta:active{background:var(--blue-dark)}
+.pay-cta:disabled{background:var(--t4)}
+.pay-ok{text-align:center;padding:18px 0}
+.pay-ok-ico{width:58px;height:58px;background:var(--green-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:var(--green)}
+.pay-ok-ttl{font-size:17px;font-weight:700;color:var(--t1);margin-bottom:5px}
+.pay-ok-sub{font-size:12px;color:var(--t3)}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* TOPUP */
+.topup-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}
+.tu-chip{padding:13px;border:1.5px solid var(--border2);border-radius:var(--rs);text-align:center;cursor:pointer;background:var(--white)}
+.tu-chip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+.tu-amt{font-size:16px;font-weight:700}
+.tu-chip:not(.on) .tu-amt{color:var(--t1)}
+/* PENDING BANNER IN SHEET */
+.pend-bar{background:var(--amber-bg);border:1px solid #FDE68A;border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;display:flex;align-items:flex-start;gap:9px}
+.pend-bar-txt{font-size:12px;color:var(--amber-dark)}
+.pend-cta{width:100%;padding:11px;background:var(--amber);color:#fff;border:none;border-radius:var(--rs);font-size:13px;font-weight:700;cursor:pointer;margin-top:9px}
+/* RECEIPT */
+.rcpt-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+.rcpt-row:last-child{border-bottom:none}
+.rcpt-lbl{font-size:12px;color:var(--t3)}
+.rcpt-val{font-size:12px;font-weight:600;color:var(--t1)}
+.rcpt-paid{display:flex;align-items:center;gap:6px;margin:12px 0;background:var(--green-bg);border-radius:var(--rs);padding:9px 13px}
+.rcpt-paid-txt{font-size:12px;font-weight:600;color:var(--green)}
+/* ROUTE PICKER */
+.route-opt{padding:13px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);cursor:pointer}
+.route-opt:active{background:var(--surf)}
+.route-opt:last-child{border-bottom:none}
+.route-opt-name{font-size:14px;font-weight:600;color:var(--t1)}
+.route-opt-city{font-size:11px;color:var(--t3)}
+/* NOTIF SHEET */
+.notif-row{display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.notif-row:last-child{border-bottom:none}
+.notif-unread{width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:4px}
+.notif-txt{font-size:12px;color:var(--t1);line-height:1.4}
+.notif-time{font-size:10px;color:var(--t3);margin-top:2px}
+/* TOAST */
+.toast{position:absolute;bottom:72px;left:50%;transform:translateX(-50%);background:#1C1C1E;color:#fff;padding:9px 18px;border-radius:var(--rp);font-size:12px;font-weight:500;z-index:500;opacity:0;pointer-events:none;transition:opacity .2s;white-space:nowrap}
+.toast.on{opacity:1}
+/* DESIGN NOTES */
+.notes{max-width:540px;width:100%;background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.notes h2{font-size:17px;font-weight:700;color:#111;margin-bottom:16px}
+.n-sec{margin-bottom:14px}
+.n-sec h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6B7280;margin-bottom:7px}
+.n-item{font-size:12px;color:#374151;line-height:1.6;padding-left:12px;position:relative}
+.n-item::before{content:'·';position:absolute;left:0;color:#9CA3AF}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+<!-- ═══ PHONE ═══ -->
+<div class="phone-wrap">
+<div class="phone-screen" id="ps">
+<div class="notch"></div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <span class="sb-time">9:41</span>
+  <div class="sb-icons">
+    <svg width="16" height="11" viewBox="0 0 17 12"><rect x="0" y="7" width="3" height="5" rx="1" fill="#111827"/><rect x="4.5" y="5" width="3" height="7" rx="1" fill="#111827"/><rect x="9" y="2.5" width="3" height="9.5" rx="1" fill="#111827"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="#111827"/></svg>
+    <svg width="15" height="11" viewBox="0 0 16 12"><path d="M8 9.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" fill="#111827"/><path d="M3.5 6.5a6.5 6.5 0 019 0" stroke="#111827" stroke-width="1.5" stroke-linecap="round"/><path d="M1 4A10 10 0 0115 4" stroke="#111827" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <svg width="24" height="11" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" stroke="#111827" stroke-opacity=".35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="#111827"/><path d="M23 4.5v3a1.5 1.5 0 000-3z" fill="#111827" fill-opacity=".4"/></svg>
+  </div>
+</div>
+
+<!-- APP HEADER -->
+<div class="app-hdr">
+  <span class="hdr-brand">Kra</span>
+  <div class="hdr-right">
+    <button class="bell-btn" id="bellBtn" onclick="openSheet('notifSheet');clearBell()">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span class="notif-dot" id="notifDot">2</span>
+    </button>
+    <div class="avatar">AM</div>
+  </div>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="scroll-area" id="scrollArea">
+
+  <!-- ══ HOME ══ -->
+  <div class="screen active" id="sc-home">
+
+    <div class="greeting">
+      <div class="greeting-name">Good morning, Ama.</div>
+      <div class="greeting-sub">3 active deliveries · Mon, Apr 28, 2026</div>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Search by package ID, receiver, or route…" readonly>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-tile"><div class="stat-n bl">3</div><div class="stat-lbl">Active</div></div>
+      <div class="stat-tile"><div class="stat-n gr">7</div><div class="stat-lbl">Delivered</div></div>
+      <div class="stat-tile"><div class="stat-n ne">GHS 382</div><div class="stat-lbl">This month</div></div>
+    </div>
+
+    <!-- Attention banner -->
+    <div class="attn" id="attnBanner">
+      <svg class="attn-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <div class="attn-body">
+        <div class="attn-ttl">Payment pending · DEL-2026-0043</div>
+        <div class="attn-sub">Confirm via MTN MoMo to allow dispatch.</div>
+      </div>
+      <div class="attn-acts">
+        <button class="attn-pay" onclick="openSheet('paySheet')">Pay GHS 80.00</button>
+        <button class="attn-x" onclick="dismissBanner()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+    </div>
+
+    <!-- Active Deliveries -->
+    <div class="sect">
+      <div class="sect-hdr">
+        <span class="sect-title">Active Deliveries</span>
+        <span class="sect-link" onclick="switchTab('history')">See all →</span>
+      </div>
+
+      <div class="del-card stripe-bl" onclick="openDetail('0041')">
+        <div class="cr1"><span class="c-ref">DEL-2026-0041</span><span class="badge b-bl">In transit</span></div>
+        <div class="cr2">Accra Central<span class="arr">→</span>Kumasi Adum</div>
+        <div class="cr3"><span class="c-evt">Left Accra Central station · 2h ago</span><span class="c-svc">Standard</span></div>
+      </div>
+
+      <div class="del-card stripe-ne" onclick="openDetail('0042')">
+        <div class="cr1"><span class="c-ref">DEL-2026-0042</span><span class="badge b-ne">Awaiting dispatch</span></div>
+        <div class="cr2">Kumasi Adum<span class="arr">→</span>Tamale Central</div>
+        <div class="cr3"><span class="c-evt">Received at Kumasi Adum · 45 min ago</span><span class="c-svc">Express</span></div>
+      </div>
+
+      <div class="del-card stripe-am" onclick="openDetail('0043')">
+        <div class="cr1">
+          <span class="c-ref">DEL-2026-0043</span>
+          <span class="badge b-am"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Payment pending</span>
+        </div>
+        <div class="cr2">Accra Central<span class="arr">→</span>Tamale Central</div>
+        <div class="cr3"><span class="c-evt">Payment not yet confirmed · Just now</span><span class="c-svc">Doorstep</span></div>
+        <div class="c-act-row"><span class="c-act-lnk" onclick="event.stopPropagation();openSheet('paySheet')">Confirm payment to allow dispatch →</span></div>
+      </div>
+
+      <div class="del-card stripe-gr" onclick="openDetail('0039')">
+        <div class="cr1"><span class="c-ref">DEL-2026-0039</span><span class="badge b-gr">Delivered</span></div>
+        <div class="cr2">Accra Central<span class="arr">→</span>Kumasi Adum</div>
+        <div class="cr3"><span class="c-evt">Delivered Apr 25, 2026 · 3:14 PM</span><span class="c-svc">Doorstep</span></div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="sect">
+      <div class="sect-hdr"><span class="sect-title">Quick Actions</span></div>
+      <div class="qa-grid">
+        <div class="qa-tile" onclick="switchTab('create')">
+          <div class="qa-ico qi-bl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
+          <div class="qa-lbl">Create Delivery</div><div class="qa-sub">Ship a new package</div>
+        </div>
+        <div class="qa-tile" onclick="switchTab('track')">
+          <div class="qa-ico qi-gr"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+          <div class="qa-lbl">Track Package</div><div class="qa-sub">Enter tracking ID</div>
+        </div>
+        <div class="qa-tile" onclick="showToast('Quote tool coming in v1.1')">
+          <div class="qa-ico qi-ne"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+          <div class="qa-lbl">Get a Quote</div><div class="qa-sub">Estimate cost</div>
+        </div>
+        <div class="qa-tile" onclick="switchTab('support')">
+          <div class="qa-ico qi-rd"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg></div>
+          <div class="qa-lbl">Contact Support</div><div class="qa-sub">Report an issue</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wallet Strip -->
+    <div class="sect">
+      <div class="wlt-strip">
+        <div class="wlt-l">
+          <div class="wlt-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+          <div><div class="wlt-lbl">MoMo Wallet</div><div class="wlt-amt">GHS 340.00</div></div>
+        </div>
+        <div class="wlt-r">
+          <span class="wlt-pend">GHS 35.00 pending</span>
+          <button class="wlt-top" onclick="openSheet('topupSheet')">Top Up</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Shipments -->
+    <div class="sect">
+      <div class="sect-hdr">
+        <span class="sect-title">Recent Shipments</span>
+        <span class="sect-link" onclick="switchTab('history')">Full History →</span>
+      </div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:0 13px;box-shadow:var(--sh)">
+        <div class="ship-row" onclick="openReceipt('0038')">
+          <div><div class="ship-ref">DEL-2026-0038</div><div class="ship-meta">Accra → Kumasi · Standard · Apr 23</div></div>
+          <div class="ship-r"><span class="ship-amt">GHS 35.00</span><span class="badge b-gr" style="font-size:9px;padding:2px 7px">Delivered</span></div>
+        </div>
+        <div class="ship-row" onclick="openReceipt('0035')">
+          <div><div class="ship-ref">DEL-2026-0035</div><div class="ship-meta">Kumasi → Accra · Standard · Apr 19</div></div>
+          <div class="ship-r"><span class="ship-amt">GHS 35.00</span><span class="badge b-gr" style="font-size:9px;padding:2px 7px">Delivered</span></div>
+        </div>
+        <div class="ship-row" onclick="openReceipt('0031')">
+          <div><div class="ship-ref">DEL-2026-0031</div><div class="ship-meta">Accra → Tamale · Express · Apr 14</div></div>
+          <div class="ship-r"><span class="ship-amt">GHS 78.00</span><span class="badge b-gr" style="font-size:9px;padding:2px 7px">Delivered</span></div>
+        </div>
+      </div>
+    </div>
+    <div style="height:18px"></div>
+  </div><!-- /home -->
+
+  <!-- ══ CREATE ══ -->
+  <div class="screen" id="sc-create">
+    <div class="cr-hdr">
+      <button class="back-btn" onclick="switchTab('home')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Home
+      </button>
+      <span class="cr-ttl">Create Delivery</span>
+      <span style="width:56px"></span>
+    </div>
+    <div class="step-pills">
+      <div class="s-pill on"></div><div class="s-pill"></div><div class="s-pill"></div><div class="s-pill"></div><div class="s-pill"></div>
+    </div>
+    <div style="padding:0 18px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--t3)">Step 1 of 5 — Select Route</div>
+    <div style="padding:0 18px 18px">
+      <div class="form-lbl" style="margin-top:14px">From</div>
+      <div class="form-field" onclick="openSheet('fromSheet')">
+        <span class="ff-val">Accra Central</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="form-lbl" style="margin-top:10px">To</div>
+      <div class="form-field" id="toField" onclick="openSheet('toSheet')">
+        <span class="ff-ph" id="toTxt">Select destination</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="price-est" style="margin-top:14px">
+        <div class="pe-lbl">Estimated price</div>
+        <div class="pe-val">From GHS 35.00</div>
+        <div class="pe-note">Standard · 0–2 kg · exact total confirmed at station intake</div>
+      </div>
+      <div style="background:var(--surf2);border:1px solid var(--border);border-radius:var(--rs);padding:13px;margin-bottom:18px;opacity:.5">
+        <div style="font-size:11px;font-weight:700;color:var(--t3);margin-bottom:4px">Package Details</div>
+        <div style="font-size:12px;color:var(--t3)">Select a destination to unlock package details.</div>
+      </div>
+      <button class="cta-btn" onclick="showToast('Select a destination to continue')">Continue →</button>
+    </div>
+  </div><!-- /create -->
+
+  <!-- ══ TRACK ══ -->
+  <div class="screen" id="sc-track">
+    <div style="padding:14px 18px 0">
+      <div style="font-size:19px;font-weight:700;color:var(--t1);margin-bottom:3px">Track Package</div>
+      <div style="font-size:12px;color:var(--t3)">Search by ID, receiver name, or phone number.</div>
+    </div>
+    <div class="trk-srch" style="margin-bottom:10px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="e.g. DEL-2026-0041">
+    </div>
+    <div class="trk-tip">Share a tracking link with your receiver — they don't need a Kra account.</div>
+    <div class="trk-lbl">Your active deliveries</div>
+    <div class="trk-row" onclick="openDetail('0041')">
+      <div style="display:flex;align-items:center"><div class="trk-dot" style="background:var(--blue)"></div><div><div class="trk-ref">DEL-2026-0041</div><div class="trk-rt">Accra → Kumasi · Left station 2h ago</div></div></div>
+      <span class="badge b-bl" style="font-size:9px">In transit</span>
+    </div>
+    <div class="trk-row" onclick="openDetail('0042')">
+      <div style="display:flex;align-items:center"><div class="trk-dot" style="background:var(--t4)"></div><div><div class="trk-ref">DEL-2026-0042</div><div class="trk-rt">Kumasi → Tamale · At origin station</div></div></div>
+      <span class="badge b-ne" style="font-size:9px">Awaiting dispatch</span>
+    </div>
+    <div class="trk-row" onclick="openSheet('paySheet')">
+      <div style="display:flex;align-items:center"><div class="trk-dot" style="background:var(--amber)"></div><div><div class="trk-ref">DEL-2026-0043</div><div class="trk-rt">Accra → Tamale · Payment required</div></div></div>
+      <span class="badge b-am" style="font-size:9px">Pay now</span>
+    </div>
+    <div style="height:18px"></div>
+  </div><!-- /track -->
+
+  <!-- ══ HISTORY ══ -->
+  <div class="screen" id="sc-history">
+    <div style="padding:14px 18px 0;font-size:19px;font-weight:700;color:var(--t1)">Delivery History</div>
+    <div class="filter-row">
+      <div class="f-chip on" onclick="fChip(this)">All</div>
+      <div class="f-chip" onclick="fChip(this)">Active</div>
+      <div class="f-chip" onclick="fChip(this)">Delivered</div>
+      <div class="f-chip" onclick="fChip(this)">Issues</div>
+    </div>
+    <div class="hist-grp">
+      <div class="hist-grp-lbl">April 2026</div>
+      <div class="hist-row" onclick="openDetail('0043')">
+        <div><div class="hist-ref">DEL-2026-0043</div><div class="hist-route">Accra → Tamale · Doorstep · Apr 28</div></div>
+        <div class="hist-r"><span class="hist-amt">GHS 80.00</span><span class="badge b-am" style="font-size:9px;padding:2px 7px">Pay now</span></div>
+      </div>
+      <div class="hist-row" onclick="openDetail('0042')">
+        <div><div class="hist-ref">DEL-2026-0042</div><div class="hist-route">Kumasi → Tamale · Express · Apr 28</div></div>
+        <div class="hist-r"><span class="hist-amt">GHS 84.00</span><span class="badge b-ne" style="font-size:9px;padding:2px 7px">Dispatching</span></div>
+      </div>
+      <div class="hist-row" onclick="openDetail('0041')">
+        <div><div class="hist-ref">DEL-2026-0041</div><div class="hist-route">Accra → Kumasi · Standard · Apr 28</div></div>
+        <div class="hist-r"><span class="hist-amt">GHS 35.00</span><span class="badge b-bl" style="font-size:9px;padding:2px 7px">In transit</span></div>
+      </div>
+      <div class="hist-row" onclick="openDetail('0039')">
+        <div><div class="hist-ref">DEL-2026-0039</div><div class="hist-route">Accra → Kumasi · Doorstep · Apr 25</div></div>
+        <div class="hist-r"><span class="hist-amt">GHS 50.00</span><span class="badge b-gr" style="font-size:9px;padding:2px 7px">Delivered</span></div>
+      </div>
+      <div class="hist-row" onclick="openReceipt('0038')">
+        <div><div class="hist-ref">DEL-2026-0038</div><div class="hist-route">Accra → Kumasi · Standard · Apr 23</div></div>
+        <div class="hist-r"><span class="hist-amt">GHS 35.00</span><span class="badge b-gr" style="font-size:9px;padding:2px 7px">Delivered</span></div>
+      </div>
+      <div class="hist-row" onclick="openReceipt('0035')">
+        <div><div class="hist-ref">DEL-2026-0035</div><div class="hist-route">Kumasi → Accra · Standard · Apr 19</div></div>
+        <div class="hist-r"><span class="hist-amt">GHS 35.00</span><span class="badge b-gr" style="font-size:9px;padding:2px 7px">Delivered</span></div>
+      </div>
+      <div class="hist-row" onclick="openReceipt('0031')">
+        <div><div class="hist-ref">DEL-2026-0031</div><div class="hist-route">Accra → Tamale · Express · Apr 14</div></div>
+        <div class="hist-r"><span class="hist-amt">GHS 78.00</span><span class="badge b-gr" style="font-size:9px;padding:2px 7px">Delivered</span></div>
+      </div>
+    </div>
+  </div><!-- /history -->
+
+  <!-- ══ WALLET ══ -->
+  <div class="screen" id="sc-wallet">
+    <div class="wlt-hero">
+      <div class="wlt-hero-lbl">Available balance</div>
+      <div class="wlt-hero-bal">GHS 340.00</div>
+      <div class="wlt-hero-sub">MTN MoMo · 055 123 4567</div>
+      <div class="wlt-hero-cta">
+        <button class="wlt-btn btn-p" onclick="openSheet('topupSheet')">Top Up</button>
+        <button class="wlt-btn btn-o" onclick="showToast('Withdrawal available after pilot launch')">Withdraw</button>
+      </div>
+    </div>
+    <div class="wlt-pend-bar">
+      <span class="wlt-pend-txt">Pending charge</span>
+      <span class="wlt-pend-amt">GHS 35.00 · DEL-2026-0043</span>
+    </div>
+    <div class="sect">
+      <div class="sect-hdr" style="margin-bottom:0"><span class="sect-title">Transactions</span></div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:0 13px;box-shadow:var(--sh);margin-top:11px">
+        <div class="txn-row">
+          <div class="txn-l"><div class="txn-dot" style="background:var(--amber)"></div><div><div class="txn-ref">DEL-2026-0043</div><div class="txn-meta">Accra → Tamale · Today, 9:39 AM</div></div></div>
+          <div style="text-align:right"><div class="txn-amt">−GHS 80.00</div><div class="txn-st" style="color:var(--amber-dark)">Pending</div></div>
+        </div>
+        <div class="txn-row">
+          <div class="txn-l"><div class="txn-dot" style="background:var(--blue)"></div><div><div class="txn-ref">DEL-2026-0041</div><div class="txn-meta">Accra → Kumasi · Today, 6:55 AM</div></div></div>
+          <div style="text-align:right"><div class="txn-amt">−GHS 35.00</div><div class="txn-st" style="color:var(--green)">Paid</div></div>
+        </div>
+        <div class="txn-row">
+          <div class="txn-l"><div class="txn-dot" style="background:var(--t4)"></div><div><div class="txn-ref">DEL-2026-0042</div><div class="txn-meta">Kumasi → Tamale · Today, 8:12 AM</div></div></div>
+          <div style="text-align:right"><div class="txn-amt">−GHS 84.00</div><div class="txn-st" style="color:var(--green)">Paid</div></div>
+        </div>
+        <div class="txn-row">
+          <div class="txn-l"><div class="txn-dot" style="background:var(--green)"></div><div><div class="txn-ref">DEL-2026-0039</div><div class="txn-meta">Accra → Kumasi · Apr 25, 2026</div></div></div>
+          <div style="text-align:right"><div class="txn-amt">−GHS 50.00</div><div class="txn-st" style="color:var(--green)">Paid</div></div>
+        </div>
+        <div class="txn-row">
+          <div class="txn-l"><div class="txn-dot" style="background:var(--green)"></div><div><div class="txn-ref">DEL-2026-0038</div><div class="txn-meta">Accra → Kumasi · Apr 23, 2026</div></div></div>
+          <div style="text-align:right"><div class="txn-amt">−GHS 35.00</div><div class="txn-st" style="color:var(--green)">Paid</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="height:18px"></div>
+  </div><!-- /wallet -->
+
+  <!-- ══ SUPPORT ══ -->
+  <div class="screen" id="sc-support">
+    <div class="sup-hero">
+      <div class="sup-h">How can we help, Ama?</div>
+      <div class="sup-sub">Mon–Sat 7AM–9PM · Urgent response within 15 min</div>
+    </div>
+    <div class="sup-opts">
+      <div class="sup-card" onclick="showToast('Opening issue tracker…')">
+        <div class="sup-card-ico" style="background:var(--blue-bg);color:var(--blue)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
+        <div><div class="sup-card-ttl">Track an issue</div><div class="sup-card-sub">Check the status of an open report</div></div>
+        <svg style="margin-left:auto;color:var(--t4)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="sup-card" onclick="showToast('Select a delivery to report a problem')">
+        <div class="sup-card-ico" style="background:var(--amber-bg);color:var(--amber)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <div><div class="sup-card-ttl">Report a problem</div><div class="sup-card-sub">Damage, delay, or missing package</div></div>
+        <svg style="margin-left:auto;color:var(--t4)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="sup-card" onclick="showToast('Calling: 030 000 5729')">
+        <div class="sup-card-ico" style="background:var(--green-bg);color:var(--green)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 11a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></div>
+        <div><div class="sup-card-ttl">Call support</div><div class="sup-card-sub">030 000 5729 · For urgent issues</div></div>
+        <svg style="margin-left:auto;color:var(--t4)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+    <div class="sup-footer">
+      <div>
+        <span class="badge b-gr" style="font-size:10px;margin-bottom:4px;display:inline-flex">0 open issues</span>
+        <div style="font-size:10px;color:var(--t3)">P1 acknowledgement within 10 min during hours</div>
+      </div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div style="height:18px"></div>
+  </div><!-- /support -->
+
+</div><!-- /scroll-area -->
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tb-home" onclick="switchTab('home')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="tab-lbl">Home</span>
+  </button>
+  <button class="tab-btn" id="tb-create" onclick="switchTab('create')">
+    <div class="tab-create-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+    <span class="tab-lbl" style="color:var(--blue)">Create</span>
+  </button>
+  <button class="tab-btn" id="tb-track" onclick="switchTab('track')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <span class="tab-lbl">Track</span>
+  </button>
+  <button class="tab-btn" id="tb-history" onclick="switchTab('history')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <span class="tab-lbl">History</span>
+  </button>
+  <button class="tab-btn" id="tb-wallet" onclick="switchTab('wallet')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    <span class="tab-lbl">Wallet</span>
+  </button>
+  <button class="tab-btn" id="tb-support" onclick="switchTab('support')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg>
+    <span class="tab-lbl">Support</span>
+  </button>
+</div>
+
+<!-- OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeAll()"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ═══ SHEETS ═══ -->
+
+<!-- Detail Sheet -->
+<div class="sheet" id="detailSheet"><div class="s-handle"></div><div id="detailContent"></div></div>
+
+<!-- Payment Sheet -->
+<div class="sheet" id="paySheet">
+  <div class="s-handle"></div>
+  <div class="s-hdr">
+    <span class="s-ttl">Confirm Payment</span>
+    <button class="s-close" onclick="closeSheet('paySheet')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="s-body" id="payBody">
+    <div class="momo-ico"><span class="momo-mtn">MTN</span><span class="momo-sub">MoMo</span></div>
+    <div class="pay-del">DEL-2026-0043 · Accra Central → Tamale Central · Doorstep</div>
+    <div class="pay-amt">GHS 80.00</div>
+    <div class="pay-bkdn">Base GHS 65.00 + Doorstep surcharge GHS 15.00</div>
+    <div class="pay-f-lbl">MoMo number</div>
+    <div class="pay-field">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 11a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+      <input type="tel" value="055 123 4567">
+    </div>
+    <div class="pay-hint">A payment prompt will be sent to your MTN MoMo number. Approve it on your phone to confirm.</div>
+    <button class="pay-cta" id="payCta" onclick="doPayment()">Send Payment Prompt</button>
+  </div>
+</div>
+
+<!-- Top Up Sheet -->
+<div class="sheet" id="topupSheet">
+  <div class="s-handle"></div>
+  <div class="s-hdr">
+    <span class="s-ttl">Top Up Wallet</span>
+    <button class="s-close" onclick="closeSheet('topupSheet')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="s-body">
+    <div style="font-size:12px;color:var(--t3);margin-bottom:13px">Current balance: <strong style="color:var(--green)">GHS 340.00</strong></div>
+    <div class="form-lbl">Select amount</div>
+    <div class="topup-grid">
+      <div class="tu-chip" onclick="pickTopup(this)"><div class="tu-amt">GHS 50</div></div>
+      <div class="tu-chip on" onclick="pickTopup(this)"><div class="tu-amt">GHS 100</div></div>
+      <div class="tu-chip" onclick="pickTopup(this)"><div class="tu-amt">GHS 200</div></div>
+      <div class="tu-chip" onclick="pickTopup(this)"><div class="tu-amt">Custom</div></div>
+    </div>
+    <div class="form-lbl">MoMo number</div>
+    <div class="pay-field" style="margin-bottom:18px"><input type="tel" value="055 123 4567"></div>
+    <button class="cta-btn" onclick="closeSheet('topupSheet');showToast('Top up prompt sent to 055 123 4567')">Proceed · GHS 100.00</button>
+  </div>
+</div>
+
+<!-- Notifications Sheet -->
+<div class="sheet" id="notifSheet">
+  <div class="s-handle"></div>
+  <div class="s-hdr">
+    <span class="s-ttl">Notifications</span>
+    <button class="s-close" onclick="closeSheet('notifSheet')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="s-body">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:11px"><span style="font-size:12px;color:var(--blue);font-weight:500;cursor:pointer" onclick="clearBell()">Mark all read</span></div>
+    <div class="notif-row" onclick="closeSheet('notifSheet');openDetail('0041')">
+      <div class="notif-unread"></div>
+      <div><div class="notif-txt">DEL-2026-0041 is now in transit — left Accra Central 2 hours ago.</div><div class="notif-time">2h ago</div></div>
+    </div>
+    <div class="notif-row" onclick="closeSheet('notifSheet');openSheet('paySheet')">
+      <div class="notif-unread"></div>
+      <div><div class="notif-txt">Payment required for DEL-2026-0043 — confirm via MTN MoMo to proceed.</div><div class="notif-time">5 min ago</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Sheet -->
+<div class="sheet" id="receiptSheet">
+  <div class="s-handle"></div>
+  <div class="s-hdr">
+    <span class="s-ttl" id="rcptTitle">Receipt</span>
+    <button class="s-close" onclick="closeSheet('receiptSheet')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="s-body" id="rcptBody"></div>
+</div>
+
+<!-- Route From Sheet -->
+<div class="sheet" id="fromSheet">
+  <div class="s-handle"></div>
+  <div class="s-hdr">
+    <span class="s-ttl">Select Origin</span>
+    <button class="s-close" onclick="closeSheet('fromSheet')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div>
+    <div class="route-opt" onclick="closeSheet('fromSheet');showToast('Origin: Accra Central')">
+      <div><div class="route-opt-name">Accra Central</div><div class="route-opt-city">Greater Accra · ST-ACC-01</div></div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="route-opt" onclick="closeSheet('fromSheet');showToast('Origin: Kumasi Adum')">
+      <div><div class="route-opt-name">Kumasi Adum</div><div class="route-opt-city">Ashanti Region · ST-KMS-01</div></div>
+    </div>
+    <div class="route-opt" onclick="closeSheet('fromSheet');showToast('Origin: Tamale Central')">
+      <div><div class="route-opt-name">Tamale Central</div><div class="route-opt-city">Northern Region · ST-TML-01</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Route To Sheet -->
+<div class="sheet" id="toSheet">
+  <div class="s-handle"></div>
+  <div class="s-hdr">
+    <span class="s-ttl">Select Destination</span>
+    <button class="s-close" onclick="closeSheet('toSheet')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div>
+    <div class="route-opt" onclick="pickDest('Kumasi Adum','GHS 35.00')">
+      <div><div class="route-opt-name">Kumasi Adum</div><div class="route-opt-city">Ashanti Region · from GHS 35.00</div></div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="route-opt" onclick="pickDest('Tamale Central','GHS 65.00')">
+      <div><div class="route-opt-name">Tamale Central</div><div class="route-opt-city">Northern Region · from GHS 65.00</div></div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+  </div>
+</div>
+
+</div><!-- /phone-screen -->
+</div><!-- /phone-wrap -->
+
+<!-- DESIGN NOTES PANEL -->
+<div class="notes">
+  <h2>Design Handoff Notes — Kra Sender Dashboard</h2>
+  <div class="n-sec">
+    <h3>Colour Tokens</h3>
+    <div class="n-item">--blue: #2563EB — primary CTA, in-transit status, trusted state</div>
+    <div class="n-item">--green: #16A34A — delivered, success, wallet balance, paid status</div>
+    <div class="n-item">--amber: #D97706 — payment pending, attention, warning states</div>
+    <div class="n-item">--red: #DC2626 — error, issue, failure, report actions</div>
+    <div class="n-item">--t1/#111827 primary text · --t2/#374151 secondary · --t3/#6B7280 meta/labels · --t4/#9CA3AF placeholder</div>
+    <div class="n-item">--border: #E5E7EB card border · --surf2: #F3F4F6 chip/cell bg</div>
+  </div>
+  <div class="n-sec">
+    <h3>Typography (SF Pro / system-ui)</h3>
+    <div class="n-item">Greeting: 23px / 700 / tracking −0.3px</div>
+    <div class="n-item">Section title: 15px / 700</div>
+    <div class="n-item">Card reference: 13px / 700</div>
+    <div class="n-item">Card route / body: 12px / 400</div>
+    <div class="n-item">Card event/meta: 11px / 400, color t3</div>
+    <div class="n-item">Stat number large: 24px / 700 / tracking −0.4px</div>
+    <div class="n-item">Badge: 10px / 600 / tracking +0.1px — always pill (border-radius 100px)</div>
+    <div class="n-item">Tab label: 9px / 600</div>
+  </div>
+  <div class="n-sec">
+    <h3>Spacing &amp; Radius</h3>
+    <div class="n-item">Screen horizontal padding: 18px</div>
+    <div class="n-item">Card internal padding: 13px sides / 13px top-bottom</div>
+    <div class="n-item">Card border radius: 12px · Badge radius: 100px (pill) · Input: 8px</div>
+    <div class="n-item">Card gap (stack): 9px</div>
+    <div class="n-item">Section spacing (top): 18px</div>
+    <div class="n-item">Status stripe: 3px left border, same hue as badge</div>
+    <div class="n-item">Shadow: 0 1px 3px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.05)</div>
+  </div>
+  <div class="n-sec">
+    <h3>Motion</h3>
+    <div class="n-item">Sheet open/close: translateY, 320ms cubic-bezier(0.4,0,0.2,1)</div>
+    <div class="n-item">Card press: scale(0.97), 120ms ease</div>
+    <div class="n-item">Banner dismiss: translateX(110%) + opacity 0, 300ms ease</div>
+    <div class="n-item">Tab switch: instant content swap (no cross-fade in prototype, fade recommended in implementation)</div>
+    <div class="n-item">Toast: fade in/out 200ms, auto-dismiss 2.2s</div>
+    <div class="n-item">Payment flow: 1.6s spinner → green success → 2.5s auto-close</div>
+  </div>
+  <div class="n-sec">
+    <h3>Screens</h3>
+    <div class="n-item">Home: greeting, search, 3-stat strip, attention banner, 4 delivery cards, quick actions (2×2), wallet strip, recent shipments</div>
+    <div class="n-item">Create Delivery: step 1 of 5 — route selection with origin/destination pickers + price estimate</div>
+    <div class="n-item">Track: focused search + active delivery list with status dots</div>
+    <div class="n-item">History: filter chips (All/Active/Delivered/Issues) + full 7-delivery list with amounts and badges</div>
+    <div class="n-item">Wallet: hero balance card (GHS 340), pending bar, 5 transaction rows</div>
+    <div class="n-item">Support: 3 action cards (Track issue / Report problem / Call) + open issues status</div>
+  </div>
+  <div class="n-sec">
+    <h3>Bottom Sheets</h3>
+    <div class="n-item">Delivery Detail: ref, badge, route, 3-cell grid (service/price/payment), receiver row, timeline, share + report actions. DEL-0043 shows amber payment banner inside.</div>
+    <div class="n-item">Payment (MTN MoMo): yellow MTN circle, amount, breakdown, pre-filled phone, spinner → success → auto-close</div>
+    <div class="n-item">Top Up: amount chips (GHS 50/100/200/Custom), MoMo field, proceed CTA</div>
+    <div class="n-item">Notifications: 2 unread rows (blue dot), tapping payment notif opens payment sheet</div>
+    <div class="n-item">Receipt: paid confirmation, delivery details, Download Receipt + Repeat Booking CTAs</div>
+    <div class="n-item">Route pickers (From / To): station list with name, city, station ID</div>
+  </div>
+  <div class="n-sec">
+    <h3>Key Business Rules Surfaced in UI</h3>
+    <div class="n-item">DEL-2026-0043: payment_pending state blocks dispatch — amber banner + card CTA + payment sheet enforce this</div>
+    <div class="n-item">MTN MoMo is v1 primary payment path — Hubtel/Paystack deferred</div>
+    <div class="n-item">Attention banner persists until user pays or explicitly dismisses (✕)</div>
+    <div class="n-item">Receivers don't need accounts — sender shares tracking link</div>
+    <div class="n-item">Delivered status shows full doorstep proof timestamp (Apr 25, 3:14 PM)</div>
+    <div class="n-item">Launch corridors: Accra–Kumasi (GHS 35), Accra–Tamale (GHS 65), Kumasi–Tamale (GHS 50) base fees shown in route picker</div>
+  </div>
+</div>
+
+</div><!-- /page-wrap -->
+
+<script>
+// TAB SWITCHING
+function switchTab(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  const s = document.getElementById('sc-'+name);
+  const t = document.getElementById('tb-'+name);
+  if (s) s.classList.add('active');
+  if (t) t.classList.add('active');
+  document.getElementById('scrollArea').scrollTop = 0;
+}
+
+// SHEETS
+function openSheet(id) {
+  document.getElementById('overlay').classList.add('on');
+  document.getElementById(id).classList.add('open');
+}
+function closeSheet(id) {
+  document.getElementById(id).classList.remove('open');
+  if (!document.querySelector('.sheet.open')) {
+    document.getElementById('overlay').classList.remove('on');
+  }
+}
+function closeAll() {
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+  document.getElementById('overlay').classList.remove('on');
+}
+
+// BELL
+function clearBell() {
+  document.getElementById('notifDot').style.display = 'none';
+}
+
+// BANNER DISMISS
+function dismissBanner() {
+  const b = document.getElementById('attnBanner');
+  b.style.transform = 'translateX(110%)';
+  b.style.opacity = '0';
+  setTimeout(() => b.style.display = 'none', 310);
+}
+
+// TOAST
+let tTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(tTimer);
+  tTimer = setTimeout(() => t.classList.remove('on'), 2300);
+}
+
+// FILTER CHIPS
+function fChip(el) {
+  el.closest('.filter-row').querySelectorAll('.f-chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+// TOP UP CHIP
+function pickTopup(el) {
+  el.closest('.topup-grid').querySelectorAll('.tu-chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+// DESTINATION PICKER
+function pickDest(name, price) {
+  const t = document.getElementById('toTxt');
+  t.textContent = name;
+  t.style.color = 'var(--t1)';
+  t.style.fontWeight = '500';
+  closeSheet('toSheet');
+  showToast('Route: Accra Central → ' + name + ' · From ' + price);
+}
+
+// PAYMENT FLOW
+const defaultPayHTML = document.getElementById('payBody').innerHTML;
+function doPayment() {
+  const btn = document.getElementById('payCta');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+  setTimeout(() => {
+    document.getElementById('payBody').innerHTML = `
+      <div class="pay-ok">
+        <div class="pay-ok-ico"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="pay-ok-ttl">Payment prompt sent</div>
+        <div class="pay-ok-sub">Approve the MTN MoMo prompt on your phone to confirm GHS 80.00 for DEL-2026-0043.</div>
+      </div>`;
+    setTimeout(() => {
+      closeSheet('paySheet');
+      dismissBanner();
+      showToast('Awaiting MoMo approval on 055 123 4567');
+      setTimeout(() => {
+        document.getElementById('payBody').innerHTML = defaultPayHTML;
+        document.getElementById('payCta').disabled = false;
+        document.getElementById('payCta').innerHTML = 'Send Payment Prompt';
+      }, 600);
+    }, 2600);
+  }, 1700);
+}
+
+// DELIVERY DATA
+const DEL = {
+  '0041': {
+    ref:'DEL-2026-0041',badge:'b-bl',status:'In transit',
+    route:'Accra Central → Kumasi Adum',svc:'Standard',price:'GHS 35.00',pay:'Paid',payCol:'var(--green)',
+    rcv:'Kojo Asante',ph:'024 456 7890',
+    tl:[
+      {s:'In transit',d:'Left Accra Central station',t:'Today, 7:42 AM',ok:true},
+      {s:'Received at origin',d:'Package accepted at Accra Central',t:'Today, 7:10 AM',ok:true},
+      {s:'Booking created',d:'Delivery booked by Ama Mensah',t:'Today, 6:55 AM',ok:true},
+    ]
+  },
+  '0042': {
+    ref:'DEL-2026-0042',badge:'b-ne',status:'Awaiting dispatch',
+    route:'Kumasi Adum → Tamale Central',svc:'Express',price:'GHS 84.00',pay:'Paid',payCol:'var(--green)',
+    rcv:'Efua Darko',ph:'050 987 6543',
+    tl:[
+      {s:'Received at origin',d:'Package accepted at Kumasi Adum',t:'Today, 9:01 AM',ok:true},
+      {s:'Booking created',d:'Delivery booked by Ama Mensah',t:'Today, 8:55 AM',ok:true},
+      {s:'Awaiting dispatch',d:'Pending driver assignment',t:'Est. Today, 11:00 AM',ok:false},
+    ]
+  },
+  '0043': {
+    ref:'DEL-2026-0043',badge:'b-am',status:'Payment pending',
+    route:'Accra Central → Tamale Central',svc:'Standard + Doorstep',price:'GHS 80.00',pay:'Pending',payCol:'var(--amber-dark)',
+    rcv:'Yaw Boateng',ph:'027 333 2211',pendPay:true,
+    tl:[
+      {s:'Booking created',d:'Delivery booked by Ama Mensah',t:'Today, 9:39 AM',ok:true},
+      {s:'Awaiting payment confirmation',d:'MTN MoMo prompt not yet approved',t:'Pending',ok:false},
+    ]
+  },
+  '0039': {
+    ref:'DEL-2026-0039',badge:'b-gr',status:'Delivered',
+    route:'Accra Central → Kumasi Adum',svc:'Doorstep',price:'GHS 50.00',pay:'Paid',payCol:'var(--green)',
+    rcv:'Abena Owusu',ph:'020 112 2334',
+    tl:[
+      {s:'Delivered',d:'Received by Abena Owusu · doorstep confirmed',t:'Apr 25, 2026 · 3:14 PM',ok:true},
+      {s:'Out for delivery',d:'Doorstep courier en route from Kumasi Adum',t:'Apr 25, 2026 · 2:30 PM',ok:true},
+      {s:'Arrived at destination',d:'Package received at Kumasi Adum station',t:'Apr 25, 2026 · 1:55 PM',ok:true},
+      {s:'In transit',d:'Left Accra Central station',t:'Apr 25, 2026 · 8:00 AM',ok:true},
+      {s:'Received at origin',d:'Accepted at Accra Central',t:'Apr 25, 2026 · 7:30 AM',ok:true},
+    ]
+  }
+};
+
+function openDetail(id) {
+  const d = DEL[id];
+  if (!d) return;
+  let tl = '';
+  d.tl.forEach((item, i) => {
+    const last = i === d.tl.length - 1;
+    tl += `<div class="tl-item"><div class="tl-left"><div class="tl-dot ${item.ok?'filled':'empty'}"></div>${!last?'<div class="tl-line"></div>':''}</div><div class="tl-r"><div class="tl-stat">${item.s}</div><div class="tl-desc">${item.d}</div><div class="tl-time">${item.t}</div></div></div>`;
+  });
+  const payIcon = d.pay==='Paid'
+    ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Paid`
+    : '⏳ Pending';
+  let pendHTML = '';
+  if (d.pendPay) {
+    pendHTML = `<div class="pend-bar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div class="pend-bar-txt">Payment must be confirmed before this delivery can be dispatched.</div></div><button class="pend-cta" onclick="closeSheet('detailSheet');openSheet('paySheet')">Pay GHS 80.00 via MTN MoMo</button>`;
+  }
+  document.getElementById('detailContent').innerHTML = `
+    <div class="s-hdr"><div><div class="d-ref">${d.ref}</div><span class="badge ${d.badge}">${d.status}</span></div>
+    <button class="s-close" onclick="closeSheet('detailSheet')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="s-body">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:11px">${d.route}</div>
+      <div class="d-grid">
+        <div class="d-cell"><div class="d-c-lbl">Service</div><div class="d-c-val">${d.svc}</div></div>
+        <div class="d-cell"><div class="d-c-lbl">Price</div><div class="d-c-val">${d.price}</div></div>
+        <div class="d-cell"><div class="d-c-lbl">Payment</div><div class="d-c-val" style="color:${d.payCol};font-size:11px;display:flex;align-items:center;justify-content:center;gap:3px">${payIcon}</div></div>
+      </div>
+      <div class="rcvr-row" onclick="showToast('Phone copied: ${d.ph}')">
+        <div><div class="rcvr-name">${d.rcv}</div><div class="rcvr-ph">${d.ph}</div></div>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      </div>
+      ${pendHTML}
+      <div class="tl-lbl">Tracking timeline</div>
+      ${tl}
+      <div class="d-acts" style="margin-top:14px">
+        <button class="d-btn d-share" onclick="showToast('Tracking link copied to clipboard')">Share Tracking Link</button>
+        <button class="d-btn d-issue" onclick="showToast('Select issue type to file a report')">Report Issue</button>
+      </div>
+    </div>`;
+  openSheet('detailSheet');
+}
+
+// RECEIPTS
+const RCPT = {
+  '0038':{ref:'DEL-2026-0038',route:'Accra Central → Kumasi Adum',svc:'Standard',date:'Apr 23, 2026',amt:'GHS 35.00',rcv:'Kojo Tetteh',from:'Accra',to:'Kumasi'},
+  '0035':{ref:'DEL-2026-0035',route:'Kumasi Adum → Accra Central',svc:'Standard',date:'Apr 19, 2026',amt:'GHS 35.00',rcv:'Nana Ama Owusu',from:'Kumasi',to:'Accra'},
+  '0031':{ref:'DEL-2026-0031',route:'Accra Central → Tamale Central',svc:'Express',date:'Apr 14, 2026',amt:'GHS 78.00',rcv:'Kweku Asante',from:'Accra',to:'Tamale'},
+};
+function openReceipt(id) {
+  const r = RCPT[id];
+  if (!r) return;
+  document.getElementById('rcptTitle').textContent = 'Receipt · ' + r.ref;
+  document.getElementById('rcptBody').innerHTML = `
+    <div class="rcpt-paid"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span class="rcpt-paid-txt">Payment confirmed · MTN MoMo</span></div>
+    <div class="rcpt-row"><span class="rcpt-lbl">Delivery ID</span><span class="rcpt-val">${r.ref}</span></div>
+    <div class="rcpt-row"><span class="rcpt-lbl">Route</span><span class="rcpt-val">${r.route}</span></div>
+    <div class="rcpt-row"><span class="rcpt-lbl">Service type</span><span class="rcpt-val">${r.svc}</span></div>
+    <div class="rcpt-row"><span class="rcpt-lbl">Delivered</span><span class="rcpt-val">${r.date}</span></div>
+    <div class="rcpt-row"><span class="rcpt-lbl">Amount paid</span><span class="rcpt-val" style="color:var(--green);font-size:15px">${r.amt}</span></div>
+    <div class="rcpt-row"><span class="rcpt-lbl">Receiver</span><span class="rcpt-val">${r.rcv}</span></div>
+    <div style="display:flex;gap:9px;margin-top:18px">
+      <button class="d-btn d-share" style="flex:1" onclick="showToast('Receipt saved to device')">Download Receipt</button>
+      <button class="d-btn" style="flex:1;background:var(--blue-bg);color:var(--blue)" onclick="closeSheet('receiptSheet');switchTab('create');showToast('Route pre-filled: ${r.from} → ${r.to}')">Repeat Booking</button>
+    </div>`;
+  openSheet('receiptSheet');
+}
+</script>
+</body>
+</html>

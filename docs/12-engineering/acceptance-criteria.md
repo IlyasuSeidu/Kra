@@ -1,0 +1,43 @@
+# Acceptance Criteria
+
+## Core Delivery Acceptance
+- Sender can create a delivery with required details.
+- Origin station can intake and confirm a package.
+- Driver can be assigned and can complete inter-station handoff.
+- Destination station can confirm receipt.
+- Final-mile courier can complete delivery with proof.
+
+## Trust Acceptance
+- Sender can view a timeline.
+- Payment record is attached to the delivery.
+- Audit history exists for each major lifecycle event.
+
+## Admin Acceptance
+- Admin can search any delivery and view current state, payment state, and issue state.
+
+## Non-Functional Acceptance
+- Core workflows work on common mobile device sizes.
+- Critical actions are logged.
+- Permission boundaries are enforced for role-sensitive flows.
+
+## Feature Acceptance Owners
+- sender flows: `product owner`
+- station and driver flows: `ops_admin`
+- payments and refunds: `finance_admin`
+- admin and support tools: `support_admin`
+- technical quality and security: `technical owner`
+
+## Pilot Metrics
+- successful end-to-end dry run at all launch stations
+- payment confirmation before transport for `100%` of paid flows
+- proof capture on `>= 98%` of completed final-mile jobs
+
+## Explicit Launch Blockers
+- any unresolved `P1`
+- payment state can bypass dispatch gate
+- station cannot intake or dispatch reliably
+- missing audit history on core transitions
+- broken sender tracking timeline
+
+## Baseline Status
+This file is now concrete enough to support sign-off and launch gating.

@@ -1,0 +1,2 @@
+#!/bin/sh
+pnpm test:coverage && pnpm check:critical-coverage

@@ -1,0 +1,11 @@
+{
+  "name": "@kra/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node -e \"const fs=require('node:fs');fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/build.txt','config package baseline\\n');console.log('config package baseline emitted')\"",
+    "lint": "node -e \"console.log('config package has no lint target')\"",
+    "typecheck": "node -e \"console.log('config package has no typecheck target')\""
+  }
+}

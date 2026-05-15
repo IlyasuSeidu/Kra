@@ -1,0 +1,10 @@
+# Replace single-owner coverage with real teams before the first multi-contributor production phase.
+* @IlyasuSeidu
+
+/apps/web/ @IlyasuSeidu
+/apps/mobile/ @IlyasuSeidu
+/apps/admin/ @IlyasuSeidu
+/services/api/ @IlyasuSeidu
+/services/ai/ @IlyasuSeidu
+/packages/shared/ @IlyasuSeidu
+/docs/ @IlyasuSeidu
