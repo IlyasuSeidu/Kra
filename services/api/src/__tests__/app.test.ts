@@ -145,6 +145,9 @@ function makeAppDeps(): ApiAppDeps {
       markRefundPending() {
         return resolveVoid();
       },
+      markRefundSettled() {
+        return resolveVoid();
+      },
       countByStatus() {
         return resolve([]);
       },
@@ -175,6 +178,9 @@ function makeAppDeps(): ApiAppDeps {
       },
       getLatestChallenge() {
         return resolve(undefined);
+      },
+      createChallenge() {
+        return resolveVoid();
       },
       listFailedAttemptsSince() {
         return resolve([]);
@@ -224,8 +230,10 @@ function makeAppDeps(): ApiAppDeps {
       nextPaymentId: () => "PAY-9401",
       nextWebhookEventId: () => "EVT-WEB-9401",
       nextIssueId: () => "ISS-9401",
+      nextChallengeId: () => "CHL-9401",
       nextDeliveryEventId: () => "EVT-DEL-9401",
       nextHandoffEventId: () => "EVT-HOF-9401",
+      nextOtpCode: () => "123456",
       nextAttemptId: () => "ATT-9401",
       nextVerificationId: () => "VRF-9401",
       nextVerificationToken: () => "verification-token-9401"

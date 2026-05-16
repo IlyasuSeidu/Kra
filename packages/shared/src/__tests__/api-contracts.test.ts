@@ -6,6 +6,8 @@ import {
   assignDriverRequestSchema,
   assignFinalMileRequestSchema,
   buildApiErrorResponse,
+  cancelDeliveryRequestSchema,
+  cancelDeliveryResponseSchema,
   completeDeliveryRequestSchema,
   confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
@@ -16,9 +18,13 @@ import {
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
   publicTrackingResponseSchema,
+  requestPhoneVerificationChallengeRequestSchema,
+  requestPhoneVerificationChallengeResponseSchema,
   receiveDestinationRequestSchema,
   refundPaymentRequestSchema,
   refundPaymentResponseSchema,
+  settleRefundRequestSchema,
+  settleRefundResponseSchema,
   verifyPhoneResponseSchema
 } from "../contracts/api";
 
@@ -184,6 +190,30 @@ describe("api contracts", () => {
 
   it("accepts a public phone-verification response contract", () => {
     expect(
+      requestPhoneVerificationChallengeRequestSchema.parse({
+        phone: "+233240000000"
+      })
+    ).toEqual({
+      phone: "+233240000000"
+    });
+
+    expect(
+      requestPhoneVerificationChallengeResponseSchema.parse({
+        deliveryId: "DEL-0001",
+        trackingCode: "KRA-0001",
+        challengeStatus: "sent",
+        challengeId: "CHL-0001",
+        channel: "sms",
+        maskedPhone: "+233*****0000",
+        expiresAt: "2026-05-16T10:10:00.000Z",
+        resendAvailableAt: "2026-05-16T10:01:00.000Z"
+      })
+    ).toMatchObject({
+      challengeStatus: "sent",
+      channel: "sms"
+    });
+
+    expect(
       verifyPhoneResponseSchema.parse({
         deliveryId: "DEL-0001",
         trackingCode: "KRA-0001",
@@ -254,6 +284,15 @@ describe("api contracts", () => {
     });
 
     expect(
+      cancelDeliveryRequestSchema.parse({
+        reasonCode: "sender_changed_mind",
+        note: "Customer booked twice"
+      })
+    ).toMatchObject({
+      reasonCode: "sender_changed_mind"
+    });
+
+    expect(
       deliveryLifecycleResponseSchema.parse({
         eventId: "EVT-DEL-0001",
         deliveryId: "DEL-0001",
@@ -264,6 +303,22 @@ describe("api contracts", () => {
     ).toMatchObject({
       eventId: "EVT-DEL-0001",
       status: "delivered"
+    });
+
+    expect(
+      cancelDeliveryResponseSchema.parse({
+        eventId: "EVT-DEL-0002",
+        deliveryId: "DEL-0001",
+        status: "cancelled",
+        paymentStatus: "refund_pending",
+        occurredAt: "2026-05-16T10:35:00.000Z",
+        refundStatus: "refund_pending",
+        refundAmountGhs: 35,
+        refundReason: "full_refund_pre_intake"
+      })
+    ).toMatchObject({
+      status: "cancelled",
+      refundStatus: "refund_pending"
     });
   });
 
@@ -291,6 +346,31 @@ describe("api contracts", () => {
     ).toMatchObject({
       paymentId: "PAY-0001",
       refundAmountGhs: 35
+    });
+
+    expect(
+      settleRefundRequestSchema.parse({
+        paymentId: "PAY-0001",
+        refundReference: "RFD-MTN-0001"
+      })
+    ).toEqual({
+      paymentId: "PAY-0001",
+      refundReference: "RFD-MTN-0001"
+    });
+
+    expect(
+      settleRefundResponseSchema.parse({
+        paymentId: "PAY-0001",
+        deliveryId: "DEL-0001",
+        refundStatus: "refunded",
+        refundAmountGhs: 35,
+        refundReason: "never_received_at_origin",
+        refundReference: "RFD-MTN-0001",
+        settledAt: "2026-05-16T11:30:00.000Z"
+      })
+    ).toMatchObject({
+      refundStatus: "refunded",
+      refundReference: "RFD-MTN-0001"
     });
   });
 

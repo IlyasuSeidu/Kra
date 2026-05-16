@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type DeliveryRecord } from "../deliveries";
 import { type PaymentRecord } from "../payments";
-import { requestPaymentRefund } from "../refunds";
+import { requestPaymentRefund, settlePaymentRefund } from "../refunds";
 import { ApiServiceError } from "../service-errors";
 
 function resolve<T>(value: T): Promise<T> {
@@ -111,6 +111,9 @@ describe("refund execution", () => {
           markRefundPending(input) {
             updatedPayments.push(`${input.paymentId}:${input.refundAmountGhs}:${input.refundReason}`);
             return resolveVoid();
+          },
+          markRefundSettled() {
+            return resolveVoid();
           }
         },
         now: () => "2026-05-16T11:00:00.000Z"
@@ -175,6 +178,9 @@ describe("refund execution", () => {
           markRefundPending(input) {
             updatedPayments.push(`${input.paymentId}:${input.refundAmountGhs}:${input.refundReason}`);
             return resolveVoid();
+          },
+          markRefundSettled() {
+            return resolveVoid();
           }
         },
         now: () => "2026-05-16T11:05:00.000Z"
@@ -215,6 +221,9 @@ describe("refund execution", () => {
             },
             markRefundPending() {
               return resolveVoid();
+            },
+            markRefundSettled() {
+              return resolveVoid();
             }
           },
           now: () => "2026-05-16T11:10:00.000Z"
@@ -250,6 +259,9 @@ describe("refund execution", () => {
               }));
             },
             markRefundPending() {
+              return resolveVoid();
+            },
+            markRefundSettled() {
               return resolveVoid();
             }
           },
@@ -292,11 +304,84 @@ describe("refund execution", () => {
             },
             markRefundPending() {
               throw new Error("manual-review refunds should not auto-execute");
+            },
+            markRefundSettled() {
+              return resolveVoid();
             }
           },
           now: () => "2026-05-16T11:10:00.000Z"
         }
       )
     ).rejects.toBeInstanceOf(ApiServiceError);
+  });
+
+  it("settles a refund-pending payment and closes the delivery payment state", async () => {
+    const settledPayments: string[] = [];
+    const updatedDeliveries: string[] = [];
+
+    const result = await settlePaymentRefund(
+      {
+        paymentId: "PAY-7006",
+        refundReference: "RFD-MTN-7006"
+      },
+      {
+        deliveries: {
+          create() {
+            return resolveVoid();
+          },
+          getById() {
+            return resolve(
+              makeDelivery({
+                deliveryId: "DEL-7006",
+                trackingCode: "KRA-7006",
+                currentStatus: "cancelled",
+                paymentStatus: "refund_pending"
+              })
+            );
+          },
+          getByTrackingCode() {
+            return resolve(undefined);
+          },
+          updatePaymentStatus(deliveryId, paymentStatus) {
+            updatedDeliveries.push(`${deliveryId}:${paymentStatus}`);
+            return resolveVoid();
+          }
+        },
+        payments: {
+          getById() {
+            return resolve(
+              makePayment({
+                paymentId: "PAY-7006",
+                deliveryId: "DEL-7006",
+                status: "refund_pending",
+                refundAmountGhs: 35,
+                refundReason: "full_refund_pre_intake",
+                refundRequestedAt: "2026-05-16T11:00:00.000Z"
+              })
+            );
+          },
+          markRefundPending() {
+            return resolveVoid();
+          },
+          markRefundSettled(input) {
+            settledPayments.push(`${input.paymentId}:${input.refundReference}:${input.settledAt}`);
+            return resolveVoid();
+          }
+        },
+        now: () => "2026-05-16T11:20:00.000Z"
+      }
+    );
+
+    expect(settledPayments).toEqual(["PAY-7006:RFD-MTN-7006:2026-05-16T11:20:00.000Z"]);
+    expect(updatedDeliveries).toEqual(["DEL-7006:refunded"]);
+    expect(result.response).toEqual({
+      paymentId: "PAY-7006",
+      deliveryId: "DEL-7006",
+      refundStatus: "refunded",
+      refundAmountGhs: 35,
+      refundReason: "full_refund_pre_intake",
+      refundReference: "RFD-MTN-7006",
+      settledAt: "2026-05-16T11:20:00.000Z"
+    });
   });
 });

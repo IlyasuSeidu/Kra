@@ -46,4 +46,32 @@ describe("api runtime config", () => {
       })
     ).toThrow("All MTN MoMo runtime variables must be set together when MoMo payments are enabled.");
   });
+
+  it("loads and validates Hubtel SMS runtime configuration", () => {
+    expect(
+      loadApiRuntimeConfig({
+        FIREBASE_PROJECT_ID: "kra-prod",
+        HUBTEL_SMS_BASE_URL: "https://smsc.hubtel.com",
+        HUBTEL_SMS_CLIENT_ID: "hubtel-client-001",
+        HUBTEL_SMS_CLIENT_SECRET: "hubtel-secret-001",
+        HUBTEL_SMS_FROM: "Kra"
+      })
+    ).toEqual({
+      firebaseProjectId: "kra-prod",
+      apiPort: 8080,
+      hubtelSms: {
+        baseUrl: "https://smsc.hubtel.com",
+        clientId: "hubtel-client-001",
+        clientSecret: "hubtel-secret-001",
+        from: "Kra"
+      }
+    });
+
+    expect(() =>
+      loadApiRuntimeConfig({
+        FIREBASE_PROJECT_ID: "kra-prod",
+        HUBTEL_SMS_BASE_URL: "https://smsc.hubtel.com"
+      })
+    ).toThrow("All Hubtel SMS runtime variables must be set together when receiver SMS is enabled.");
+  });
 });

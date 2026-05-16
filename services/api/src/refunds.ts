@@ -2,6 +2,7 @@ import {
   calculateDeliveryQuoteBreakdown,
   getRefundDecision,
   refundPaymentResponseSchema,
+  settleRefundResponseSchema,
   type RefundDecision
 } from "@kra/shared";
 import type { z } from "zod";
@@ -18,6 +19,11 @@ export interface RefundPaymentRepository {
     refundReason: RefundDecision["reason"];
     requestedAt: string;
   }): Promise<void>;
+  markRefundSettled(input: {
+    paymentId: string;
+    refundReference: string;
+    settledAt: string;
+  }): Promise<void>;
 }
 
 export interface RequestPaymentRefundDeps {
@@ -27,6 +33,7 @@ export interface RequestPaymentRefundDeps {
 }
 
 export type RequestPaymentRefundResponse = z.infer<typeof refundPaymentResponseSchema>;
+export type SettlePaymentRefundResponse = z.infer<typeof settleRefundResponseSchema>;
 
 function getRefundStage(delivery: DeliveryRecord): "before_origin_intake" | "after_origin_intake_before_dispatch" | "after_dispatch" {
   if (delivery.currentStatus === "created" || delivery.currentStatus === "cancelled") {
@@ -153,6 +160,77 @@ export async function requestPaymentRefund(
       refundReason: decision.reason,
       requiresManualReview: false,
       requestedAt
+    })
+  };
+}
+
+export async function settlePaymentRefund(
+  input: {
+    paymentId: string;
+    refundReference: string;
+    settledAt?: string;
+  },
+  deps: RequestPaymentRefundDeps
+): Promise<{
+  payment: PaymentRecord;
+  response: SettlePaymentRefundResponse;
+}> {
+  const payment = await deps.payments.getById(input.paymentId);
+
+  if (!payment) {
+    throw new ApiServiceError("NOT_FOUND", "Payment was not found.", {
+      paymentId: input.paymentId
+    });
+  }
+
+  if (payment.status !== "refund_pending") {
+    throw new ApiServiceError("VALIDATION_ERROR", "Only refund-pending payments can be settled.", {
+      paymentId: payment.paymentId,
+      paymentStatus: payment.status
+    });
+  }
+
+  if (payment.refundAmountGhs === undefined || !payment.refundReason || !payment.refundRequestedAt) {
+    throw new ApiServiceError("INTERNAL_ERROR", "Refund settlement is missing refund request metadata.", {
+      paymentId: payment.paymentId
+    });
+  }
+
+  const delivery = await deps.deliveries.getById(payment.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery linked to this refund was not found.", {
+      paymentId: payment.paymentId,
+      deliveryId: payment.deliveryId
+    });
+  }
+
+  const settledAt = input.settledAt ?? deps.now();
+
+  await deps.payments.markRefundSettled({
+    paymentId: payment.paymentId,
+    refundReference: input.refundReference,
+    settledAt
+  });
+  await deps.deliveries.updatePaymentStatus(payment.deliveryId, "refunded");
+
+  const settledPayment: PaymentRecord = {
+    ...payment,
+    status: "refunded",
+    refundReference: input.refundReference,
+    refundSettledAt: settledAt
+  };
+
+  return {
+    payment: settledPayment,
+    response: settleRefundResponseSchema.parse({
+      paymentId: settledPayment.paymentId,
+      deliveryId: settledPayment.deliveryId,
+      refundStatus: "refunded",
+      refundAmountGhs: payment.refundAmountGhs,
+      refundReason: payment.refundReason,
+      refundReference: input.refundReference,
+      settledAt
     })
   };
 }

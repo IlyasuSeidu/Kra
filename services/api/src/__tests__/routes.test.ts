@@ -10,6 +10,12 @@ describe("api routes", () => {
   });
 
   it("exposes public tracking routes without authenticated scope", () => {
+    expect(getApiRoute("cancel_delivery")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries/:id/cancel",
+      capability: "cancel_eligible_delivery"
+    });
+
     expect(getApiRoute("get_delivery")).toMatchObject({
       authScope: "authenticated",
       path: "/v1/deliveries/:id"
@@ -24,6 +30,12 @@ describe("api routes", () => {
       authScope: "public",
       path: "/v1/public/track/:trackingCode",
       idempotent: true
+    });
+
+    expect(getApiRoute("request_public_tracking_phone_challenge")).toMatchObject({
+      authScope: "public",
+      path: "/v1/public/track/:trackingCode/request-verification",
+      idempotent: false
     });
 
     expect(getApiRoute("verify_public_tracking_phone")).toMatchObject({
@@ -60,6 +72,12 @@ describe("api routes", () => {
 
     expect(getApiRoute("refund_payment")?.requestSchema).toBeDefined();
     expect(getApiRoute("refund_payment")?.responseSchema).toBeDefined();
+
+    expect(getApiRoute("settle_refund_payment")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/payments/refund/settle",
+      capability: "execute_refund"
+    });
 
     expect(getApiRoute("admin_overview")).toMatchObject({
       authScope: "admin"

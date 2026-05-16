@@ -6,6 +6,8 @@ import {
   apiErrorResponseSchema,
   assignDriverRequestSchema,
   assignFinalMileRequestSchema,
+  cancelDeliveryRequestSchema,
+  cancelDeliveryResponseSchema,
   completeDeliveryRequestSchema,
   confirmIntakeRequestSchema,
   createIssueRequestSchema,
@@ -23,9 +25,13 @@ import {
   paymentInitializeResponseSchema,
   refundPaymentRequestSchema,
   refundPaymentResponseSchema,
+  settleRefundRequestSchema,
+  settleRefundResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
   publicTrackingResponseSchema,
+  requestPhoneVerificationChallengeRequestSchema,
+  requestPhoneVerificationChallengeResponseSchema,
   receiveDestinationRequestSchema,
   verifyPhoneResponseSchema,
   verifyPhoneRequestSchema,
@@ -71,6 +77,18 @@ export const apiRoutes = [
     errorSchema: apiErrorResponseSchema
   },
   {
+    operationId: "cancel_delivery",
+    method: "POST",
+    path: "/v1/deliveries/:id/cancel",
+    module: "deliveries",
+    authScope: "authenticated",
+    capability: "cancel_eligible_delivery",
+    idempotent: false,
+    requestSchema: cancelDeliveryRequestSchema,
+    responseSchema: cancelDeliveryResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
     operationId: "get_delivery",
     method: "GET",
     path: "/v1/deliveries/:id",
@@ -100,6 +118,17 @@ export const apiRoutes = [
     authScope: "public",
     idempotent: true,
     responseSchema: publicTrackingResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "request_public_tracking_phone_challenge",
+    method: "POST",
+    path: "/v1/public/track/:trackingCode/request-verification",
+    module: "deliveries",
+    authScope: "public",
+    idempotent: false,
+    requestSchema: requestPhoneVerificationChallengeRequestSchema,
+    responseSchema: requestPhoneVerificationChallengeResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -158,6 +187,18 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: refundPaymentRequestSchema,
     responseSchema: refundPaymentResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "settle_refund_payment",
+    method: "POST",
+    path: "/v1/payments/refund/settle",
+    module: "payments",
+    authScope: "admin",
+    capability: "execute_refund",
+    idempotent: false,
+    requestSchema: settleRefundRequestSchema,
+    responseSchema: settleRefundResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

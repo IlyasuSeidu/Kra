@@ -35,6 +35,7 @@ export const deliveryIdSchema = z.string().regex(/^DEL-[A-Z0-9-]+$/);
 export const paymentIdSchema = z.string().regex(/^PAY-[A-Z0-9-]+$/);
 export const issueIdSchema = z.string().regex(/^ISS-[A-Z0-9-]+$/);
 export const trackingCodeSchema = z.string().regex(/^KRA-[A-Z0-9-]+$/);
+export const challengeIdSchema = z.string().regex(/^CHL-[A-Z0-9-]+$/);
 export const userIdSchema = z.string().regex(/^USR-[A-Z0-9-]+$/);
 export const publicTouchpointRoleSchema = z.enum([
   "system",
@@ -251,6 +252,23 @@ export const verifyPhoneRequestSchema = z.object({
   otp: z.string().trim().min(4).max(8)
 });
 
+export const requestPhoneVerificationChallengeRequestSchema = z.object({
+  phone: phoneSchema
+});
+
+export const requestPhoneVerificationChallengeResponseSchema = z.object({
+  deliveryId: deliveryIdSchema,
+  trackingCode: trackingCodeSchema,
+  challengeStatus: z.enum(["sent", "recently_sent", "already_verified"]),
+  maskedPhone: z.string().trim().min(4).max(32),
+  challengeId: challengeIdSchema.optional(),
+  channel: z.literal("sms").optional(),
+  resendAvailableAt: z.string().datetime().optional(),
+  verificationToken: z.string().trim().min(24).max(512).optional(),
+  verifiedAt: z.string().datetime().optional(),
+  expiresAt: z.string().datetime()
+});
+
 export const verifyPhoneResponseSchema = z.object({
   deliveryId: deliveryIdSchema,
   trackingCode: trackingCodeSchema,
@@ -296,6 +314,18 @@ export const completeDeliveryRequestSchema = z.object({
   receivedByName: z.string().trim().min(2).max(120)
 });
 
+export const cancelDeliveryRequestSchema = z.object({
+  reasonCode: z.enum([
+    "sender_changed_mind",
+    "duplicate_booking",
+    "pricing_dispute",
+    "receiver_unavailable",
+    "support_advised",
+    "other"
+  ]),
+  note: z.string().trim().min(5).max(400).optional()
+});
+
 export const refundPaymentRequestSchema = z.object({
   paymentId: paymentIdSchema,
   duplicateCharge: z.boolean().optional(),
@@ -305,22 +335,51 @@ export const refundPaymentRequestSchema = z.object({
   expressHandlingPerformed: z.boolean().optional()
 });
 
+const refundReasonSchema = z.enum([
+  "full_refund_pre_intake",
+  "duplicate_charge",
+  "platform_payment_error",
+  "never_received_at_origin",
+  "post_intake_handling_fee",
+  "doorstep_surcharge_refund",
+  "express_surcharge_refund"
+]);
+
 export const refundPaymentResponseSchema = z.object({
   paymentId: paymentIdSchema,
   deliveryId: deliveryIdSchema,
   refundStatus: z.literal("refund_pending"),
   refundAmountGhs: z.number().int().nonnegative(),
-  refundReason: z.enum([
-    "full_refund_pre_intake",
-    "duplicate_charge",
-    "platform_payment_error",
-    "never_received_at_origin",
-    "post_intake_handling_fee",
-    "doorstep_surcharge_refund",
-    "express_surcharge_refund"
-  ]),
+  refundReason: refundReasonSchema,
   requiresManualReview: z.literal(false),
   requestedAt: z.string().datetime()
+});
+
+export const settleRefundRequestSchema = z.object({
+  paymentId: paymentIdSchema,
+  refundReference: z.string().trim().min(3).max(120),
+  settledAt: z.string().datetime().optional()
+});
+
+export const settleRefundResponseSchema = z.object({
+  paymentId: paymentIdSchema,
+  deliveryId: deliveryIdSchema,
+  refundStatus: z.literal("refunded"),
+  refundAmountGhs: z.number().int().positive(),
+  refundReason: refundReasonSchema,
+  refundReference: z.string().trim().min(3).max(120),
+  settledAt: z.string().datetime()
+});
+
+export const cancelDeliveryResponseSchema = z.object({
+  eventId: z.string().regex(/^EVT-DEL-[A-Z0-9-]+$/),
+  deliveryId: deliveryIdSchema,
+  status: z.literal("cancelled"),
+  paymentStatus: paymentStatusSchema,
+  occurredAt: z.string().datetime(),
+  refundStatus: z.enum(["not_applicable", "refund_pending"]),
+  refundAmountGhs: z.number().int().positive().optional(),
+  refundReason: refundReasonSchema.optional()
 });
 
 export const deliveryLifecycleResponseSchema = z.object({

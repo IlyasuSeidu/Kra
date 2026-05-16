@@ -6,6 +6,7 @@ import {
   assignDriverRequestSchema,
   assignFinalMileRequestSchema,
   buildApiErrorResponse,
+  cancelDeliveryRequestSchema,
   completeDeliveryRequestSchema,
   confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
@@ -17,6 +18,8 @@ import {
   paymentVerifyRequestSchema,
   receiveDestinationRequestSchema,
   refundPaymentRequestSchema,
+  requestPhoneVerificationChallengeRequestSchema,
+  settleRefundRequestSchema,
   verifyPhoneRequestSchema
 } from "@kra/shared";
 import { ZodError } from "zod";
@@ -39,6 +42,7 @@ import {
   type AdminPaymentMetricsRepository,
   type AdminWebhookMetricsRepository
 } from "./admin";
+import { cancelDelivery } from "./cancellations";
 import { loadApiRuntimeConfig, type ApiRuntimeConfig } from "./config";
 import { createDeliveryBooking, type DeliveryRepository } from "./deliveries";
 import {
@@ -76,6 +80,10 @@ import {
 } from "./issues";
 import { createMtnMomoGateway } from "./mtn-momo";
 import {
+  createHubtelSmsGateway,
+  type PublicTrackingOtpNotificationGateway
+} from "./notifications";
+import {
   processMtnMomoWebhook,
   type PaymentLookupRepository,
   type PaymentWebhookIdentityFactory,
@@ -90,11 +98,16 @@ import {
 } from "./payments";
 import { getPublicTracking } from "./public-tracking";
 import {
+  requestPublicTrackingPhoneChallenge,
   verifyPublicTrackingPhone,
   type PublicTrackingVerificationIdentityFactory,
   type PublicTrackingVerificationRepository
 } from "./public-tracking-verification";
-import { requestPaymentRefund, type RefundPaymentRepository } from "./refunds";
+import {
+  requestPaymentRefund,
+  settlePaymentRefund,
+  type RefundPaymentRepository
+} from "./refunds";
 import { ApiServiceError } from "./service-errors";
 
 declare module "fastify" {
@@ -129,6 +142,7 @@ export interface ApiAppDeps {
   verification: PublicTrackingVerificationRepository;
   webhookEvents: WebhookEventRepository & AdminWebhookMetricsRepository;
   gateway: MtnMomoGateway;
+  notifications?: PublicTrackingOtpNotificationGateway;
   identityFactory: SharedIdentityFactory;
   now: () => string;
   readinessCheck?: () => Promise<void>;
@@ -251,27 +265,6 @@ function withOptionalValue<K extends string, V>(key: K, value: V | undefined): P
   } as Partial<Record<K, V>>;
 }
 
-function routeRateLimit(max: number, timeWindow = "1 minute") {
-  return {
-    config: {
-      rateLimit: {
-        max,
-        timeWindow,
-        skipOnError: false
-      }
-    }
-  };
-}
-
-const publicReadRoute = routeRateLimit(120);
-const publicMutationRoute = routeRateLimit(20);
-const authenticatedReadRoute = routeRateLimit(120);
-const authenticatedMutationRoute = routeRateLimit(60);
-const createDeliveryRoute = routeRateLimit(20);
-const paymentInitializeRoute = routeRateLimit(10);
-const adminMutationRoute = routeRateLimit(5);
-const webhookRoute = routeRateLimit(300);
-
 function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
   const firestore = getKraFirestore(config);
   const repositories = createFirestoreApiRepositories(firestore, () => new Date().toISOString());
@@ -288,6 +281,9 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
     verification: repositories.verification,
     webhookEvents: repositories.webhookEvents,
     gateway: createMtnMomoGateway(config),
+    ...(config.hubtelSms === undefined
+      ? {}
+      : { notifications: createHubtelSmsGateway(config) }),
     identityFactory,
     now: () => new Date().toISOString(),
     readinessCheck: async () => {
@@ -303,7 +299,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
   });
 
   void app.register(rateLimit, {
-    global: true,
+    global: false,
     max: 120,
     timeWindow: "1 minute",
     skipOnError: false
@@ -373,412 +369,522 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     };
   });
 
-  app.post("/v1/deliveries", createDeliveryRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertCapabilityForPrincipal(principal, "create_delivery");
-    const input = createDeliveryRequestSchema.parse(request.body);
-    const result = await createDeliveryBooking(
-      principal.userId,
-      {
-        senderId: principal.userId,
-        originStationId: input.originStationId,
-        destinationStationId: input.destinationStationId,
-        receiver: {
-          name: input.receiver.name,
-          phone: input.receiver.phone,
-          ...withOptionalValue("addressText", input.receiver.addressText)
-        },
-        package: input.package,
-        serviceType: input.serviceType,
-        doorstepRequested: input.doorstepRequested,
-        ...withOptionalValue("doorstepDistanceKm", input.doorstepDistanceKm)
-      },
-      {
-        deliveries: deps.deliveries,
-        identityFactory: deps.identityFactory,
-        now: deps.now
-      }
-    );
-
-    reply.status(201);
-    return result.response;
-  });
-
-  app.get("/v1/deliveries/:id", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAuthenticatedPrincipal(principal);
-    setNoStore(reply);
-    return getDeliveryDetail(principal, (request.params as { id: string }).id, {
-      deliveries: deps.deliveries
+  app.register(function registerRateLimitedRoutes(rateLimitedApp) {
+    const publicReadPreHandler = rateLimitedApp.rateLimit({
+      max: 120,
+      timeWindow: "1 minute",
+      skipOnError: false
     });
-  });
-
-  app.get("/v1/deliveries/:id/timeline", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAuthenticatedPrincipal(principal);
-    setNoStore(reply);
-    return getDeliveryTimeline(principal, (request.params as { id: string }).id, {
-      deliveries: deps.deliveries,
-      deliveryEvents: deps.deliveryEvents,
-      handoffEvents: deps.handoffEvents,
-      issues: deps.issues
+    const publicMutationPreHandler = rateLimitedApp.rateLimit({
+      max: 20,
+      timeWindow: "1 minute",
+      skipOnError: false
     });
-  });
-
-  app.get("/v1/public/track/:trackingCode", publicReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    setNoStore(reply);
-    return getPublicTracking((request.params as { trackingCode: string }).trackingCode, {
-      deliveries: deps.deliveries
+    const authenticatedReadPreHandler = rateLimitedApp.rateLimit({
+      max: 120,
+      timeWindow: "1 minute",
+      skipOnError: false
     });
-  });
+    const authenticatedMutationPreHandler = rateLimitedApp.rateLimit({
+      max: 60,
+      timeWindow: "1 minute",
+      skipOnError: false
+    });
+    const createDeliveryPreHandler = rateLimitedApp.rateLimit({
+      max: 20,
+      timeWindow: "1 minute",
+      skipOnError: false
+    });
+    const paymentInitializePreHandler = rateLimitedApp.rateLimit({
+      max: 10,
+      timeWindow: "1 minute",
+      skipOnError: false
+    });
+    const adminMutationPreHandler = rateLimitedApp.rateLimit({
+      max: 5,
+      timeWindow: "1 minute",
+      skipOnError: false
+    });
+    const webhookPreHandler = rateLimitedApp.rateLimit({
+      max: 300,
+      timeWindow: "1 minute",
+      skipOnError: false
+    });
 
-  app.post("/v1/public/track/:trackingCode/verify-phone", publicMutationRoute, async (request: FastifyRequest) => {
-    const input = verifyPhoneRequestSchema.parse(request.body);
-
-    return (
-      await verifyPublicTrackingPhone(
+    rateLimitedApp.post("/v1/deliveries", { preHandler: createDeliveryPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertCapabilityForPrincipal(principal, "create_delivery");
+      const input = createDeliveryRequestSchema.parse(request.body);
+      const result = await createDeliveryBooking(
+        principal.userId,
         {
-          trackingCode: (request.params as { trackingCode: string }).trackingCode,
-          phone: input.phone,
-          otp: input.otp
+          senderId: principal.userId,
+          originStationId: input.originStationId,
+          destinationStationId: input.destinationStationId,
+          receiver: {
+            name: input.receiver.name,
+            phone: input.receiver.phone,
+            ...withOptionalValue("addressText", input.receiver.addressText)
+          },
+          package: input.package,
+          serviceType: input.serviceType,
+          doorstepRequested: input.doorstepRequested,
+          ...withOptionalValue("doorstepDistanceKm", input.doorstepDistanceKm)
         },
         {
           deliveries: deps.deliveries,
-          verification: deps.verification,
           identityFactory: deps.identityFactory,
           now: deps.now
         }
-      )
-    ).response;
-  });
+      );
 
-  app.post("/v1/payments/initialize", paymentInitializeRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertCapabilityForPrincipal(principal, "create_delivery");
-    const input = paymentInitializeRequestSchema.parse(request.body);
+      reply.status(201);
+      return result.response;
+    });
 
-    return (
-      await initializeMtnMomoPayment(input, {
+    rateLimitedApp.post("/v1/deliveries/:id/cancel", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = cancelDeliveryRequestSchema.parse(request.body);
+
+      return (
+        await cancelDelivery(
+          principal,
+          {
+            deliveryId: (request.params as { id: string }).id,
+            reasonCode: input.reasonCode,
+            ...(input.note === undefined ? {} : { note: input.note })
+          },
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            payments: deps.payments,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.get("/v1/deliveries/:id", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAuthenticatedPrincipal(principal);
+      setNoStore(reply);
+      return getDeliveryDetail(principal, (request.params as { id: string }).id, {
+        deliveries: deps.deliveries
+      });
+    });
+
+    rateLimitedApp.get("/v1/deliveries/:id/timeline", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAuthenticatedPrincipal(principal);
+      setNoStore(reply);
+      return getDeliveryTimeline(principal, (request.params as { id: string }).id, {
         deliveries: deps.deliveries,
-        payments: deps.payments,
-        gateway: deps.gateway,
-        identityFactory: deps.identityFactory,
-        now: deps.now
-      })
-    ).response;
-  });
+        deliveryEvents: deps.deliveryEvents,
+        handoffEvents: deps.handoffEvents,
+        issues: deps.issues
+      });
+    });
 
-  app.post("/v1/payments/verify", authenticatedMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAuthenticatedPrincipal(principal);
-    const input = paymentVerifyRequestSchema.parse(request.body);
+    rateLimitedApp.get("/v1/public/track/:trackingCode", { preHandler: publicReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      setNoStore(reply);
+      return getPublicTracking((request.params as { trackingCode: string }).trackingCode, {
+        deliveries: deps.deliveries
+      });
+    });
 
-    return (
-      await verifyMtnMomoPayment(
-        {
-          deliveryId: input.deliveryId
-        },
-        {
+    rateLimitedApp.post("/v1/public/track/:trackingCode/request-verification", { preHandler: publicMutationPreHandler }, async (request: FastifyRequest) => {
+      const input = requestPhoneVerificationChallengeRequestSchema.parse(request.body);
+
+      return (
+        await requestPublicTrackingPhoneChallenge(
+          {
+            trackingCode: (request.params as { trackingCode: string }).trackingCode,
+            phone: input.phone
+          },
+          {
+            deliveries: deps.deliveries,
+            verification: deps.verification,
+            identityFactory: deps.identityFactory,
+            now: deps.now,
+            ...(deps.notifications === undefined
+              ? {}
+              : { notifications: deps.notifications })
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/public/track/:trackingCode/verify-phone", { preHandler: publicMutationPreHandler }, async (request: FastifyRequest) => {
+      const input = verifyPhoneRequestSchema.parse(request.body);
+
+      return (
+        await verifyPublicTrackingPhone(
+          {
+            trackingCode: (request.params as { trackingCode: string }).trackingCode,
+            phone: input.phone,
+            otp: input.otp
+          },
+          {
+            deliveries: deps.deliveries,
+            verification: deps.verification,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/payments/initialize", { preHandler: paymentInitializePreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertCapabilityForPrincipal(principal, "create_delivery");
+      const input = paymentInitializeRequestSchema.parse(request.body);
+
+      return (
+        await initializeMtnMomoPayment(input, {
           deliveries: deps.deliveries,
           payments: deps.payments,
           gateway: deps.gateway,
           identityFactory: deps.identityFactory,
           now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/payments/refund", adminMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAdminPrincipal(principal);
-    assertCapabilityForPrincipal(principal, "execute_refund");
-    const input = refundPaymentRequestSchema.parse(request.body);
-
-    return (
-      await requestPaymentRefund(
-        {
-          paymentId: input.paymentId,
-          ...withOptionalValue("duplicateCharge", input.duplicateCharge),
-          ...withOptionalValue("platformPaymentError", input.platformPaymentError),
-          ...withOptionalValue(
-            "packageNeverReceivedAtOrigin",
-            input.packageNeverReceivedAtOrigin
-          ),
-          ...withOptionalValue("doorstepAttemptOccurred", input.doorstepAttemptOccurred),
-          ...withOptionalValue("expressHandlingPerformed", input.expressHandlingPerformed)
-        },
-        {
-          deliveries: deps.deliveries,
-          payments: deps.payments,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/webhooks/payments/mtn-momo", webhookRoute, async (request: FastifyRequest) => {
-    const payload = mtnMomoWebhookRequestSchema.parse(request.body);
-
-    verifyWebhookSignature(
-      payload,
-      typeof request.headers["x-kra-webhook-signature"] === "string"
-        ? request.headers["x-kra-webhook-signature"]
-        : undefined,
-      deps.config.mtnMomo?.webhookSharedSecret
-    );
-
-    return (
-      await processMtnMomoWebhook(
-        {
-          providerReference: payload.providerReference,
-          eventType: payload.eventType,
-          amountGhs: payload.amountGhs,
-          currency: payload.currency,
-          occurredAt: payload.occurredAt,
-          rawPayload: payload.rawPayload ?? {},
-          ...withOptionalValue("providerEventId", payload.providerEventId)
-        },
-        {
-          deliveries: deps.deliveries,
-          payments: deps.payments,
-          webhookEvents: deps.webhookEvents,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/deliveries/:id/intake", authenticatedMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = confirmIntakeRequestSchema.parse(request.body);
-
-    return (
-      await confirmOriginIntake(
-        {
-          deliveryId: (request.params as { id: string }).id,
-          measuredWeightKg: input.measuredWeightKg,
-          sizeTier: input.sizeTier,
-          condition: input.condition,
-          labelScanCode: input.labelScanCode,
-          ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-          ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-        },
-        mapPrincipalToOperationalActor(principal),
-        {
-          deliveries: deps.deliveries,
-          deliveryEvents: deps.deliveryEvents,
-          handoffEvents: deps.handoffEvents,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/deliveries/:id/assign-driver", authenticatedMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = assignDriverRequestSchema.parse(request.body);
-
-    return (
-      await assignDriver(
-        {
-          deliveryId: (request.params as { id: string }).id,
-          driverUserId: input.driverUserId
-        },
-        mapPrincipalToOperationalActor(principal),
-        {
-          deliveries: deps.deliveries,
-          deliveryEvents: deps.deliveryEvents,
-          handoffEvents: deps.handoffEvents,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/deliveries/:id/dispatch", authenticatedMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = dispatchDeliveryRequestSchema.parse(request.body);
-
-    return (
-      await dispatchDelivery(
-        {
-          deliveryId: (request.params as { id: string }).id,
-          packageScanCode: input.packageScanCode,
-          ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-          ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-        },
-        mapPrincipalToOperationalActor(principal),
-        {
-          deliveries: deps.deliveries,
-          deliveryEvents: deps.deliveryEvents,
-          handoffEvents: deps.handoffEvents,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/deliveries/:id/receive-destination", authenticatedMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = receiveDestinationRequestSchema.parse(request.body);
-
-    return (
-      await receiveDestination(
-        {
-          deliveryId: (request.params as { id: string }).id,
-          packageScanCode: input.packageScanCode,
-          condition: input.condition,
-          nextStep: input.nextStep,
-          ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-          ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-        },
-        mapPrincipalToOperationalActor(principal),
-        {
-          deliveries: deps.deliveries,
-          deliveryEvents: deps.deliveryEvents,
-          handoffEvents: deps.handoffEvents,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/deliveries/:id/assign-final-mile", authenticatedMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = assignFinalMileRequestSchema.parse(request.body);
-
-    return (
-      await assignFinalMileCourier(
-        {
-          deliveryId: (request.params as { id: string }).id,
-          courierUserId: input.courierUserId
-        },
-        mapPrincipalToOperationalActor(principal),
-        {
-          deliveries: deps.deliveries,
-          deliveryEvents: deps.deliveryEvents,
-          handoffEvents: deps.handoffEvents,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/deliveries/:id/complete", authenticatedMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = completeDeliveryRequestSchema.parse(request.body);
-
-    return (
-      await completeDelivery(
-        {
-          deliveryId: (request.params as { id: string }).id,
-          proofType: input.proofType,
-          proofReference: input.proofReference,
-          receivedByName: input.receivedByName
-        },
-        mapPrincipalToOperationalActor(principal),
-        {
-          deliveries: deps.deliveries,
-          deliveryEvents: deps.deliveryEvents,
-          handoffEvents: deps.handoffEvents,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        }
-      )
-    ).response;
-  });
-
-  app.post("/v1/issues", authenticatedMutationRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = createIssueRequestSchema.parse(request.body);
-    const result = await createSupportIssue(principal, input, {
-      deliveries: deps.deliveries,
-      issues: deps.issues,
-      identityFactory: deps.identityFactory,
-      now: deps.now
+        })
+      ).response;
     });
 
-    reply.status(201);
-    return result.response;
-  });
+    rateLimitedApp.post("/v1/payments/verify", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAuthenticatedPrincipal(principal);
+      const input = paymentVerifyRequestSchema.parse(request.body);
 
-  app.get("/v1/issues/:id", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    setNoStore(reply);
-    return getSupportIssue(principal, (request.params as { id: string }).id, {
-      deliveries: deps.deliveries,
-      issues: deps.issues
+      return (
+        await verifyMtnMomoPayment(
+          {
+            deliveryId: input.deliveryId
+          },
+          {
+            deliveries: deps.deliveries,
+            payments: deps.payments,
+            gateway: deps.gateway,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
     });
-  });
 
-  app.post("/v1/issues/:id/escalate", adminMutationRoute, async (request: FastifyRequest) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    const input = escalateIssueRequestSchema.parse(request.body);
+    rateLimitedApp.post("/v1/payments/refund", { preHandler: adminMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+      assertCapabilityForPrincipal(principal, "execute_refund");
+      const input = refundPaymentRequestSchema.parse(request.body);
 
-    return (
-      await escalateSupportIssue(principal, (request.params as { id: string }).id, input, {
+      return (
+        await requestPaymentRefund(
+          {
+            paymentId: input.paymentId,
+            ...withOptionalValue("duplicateCharge", input.duplicateCharge),
+            ...withOptionalValue("platformPaymentError", input.platformPaymentError),
+            ...withOptionalValue(
+              "packageNeverReceivedAtOrigin",
+              input.packageNeverReceivedAtOrigin
+            ),
+            ...withOptionalValue("doorstepAttemptOccurred", input.doorstepAttemptOccurred),
+            ...withOptionalValue("expressHandlingPerformed", input.expressHandlingPerformed)
+          },
+          {
+            deliveries: deps.deliveries,
+            payments: deps.payments,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/payments/refund/settle", { preHandler: adminMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+      assertCapabilityForPrincipal(principal, "execute_refund");
+      const input = settleRefundRequestSchema.parse(request.body);
+
+      return (
+        await settlePaymentRefund(
+          {
+            paymentId: input.paymentId,
+            refundReference: input.refundReference,
+            ...(input.settledAt === undefined ? {} : { settledAt: input.settledAt })
+          },
+          {
+            deliveries: deps.deliveries,
+            payments: deps.payments,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/webhooks/payments/mtn-momo", { preHandler: webhookPreHandler }, async (request: FastifyRequest) => {
+      const payload = mtnMomoWebhookRequestSchema.parse(request.body);
+
+      verifyWebhookSignature(
+        payload,
+        typeof request.headers["x-kra-webhook-signature"] === "string"
+          ? request.headers["x-kra-webhook-signature"]
+          : undefined,
+        deps.config.mtnMomo?.webhookSharedSecret
+      );
+
+      return (
+        await processMtnMomoWebhook(
+          {
+            providerReference: payload.providerReference,
+            eventType: payload.eventType,
+            amountGhs: payload.amountGhs,
+            currency: payload.currency,
+            occurredAt: payload.occurredAt,
+            rawPayload: payload.rawPayload ?? {},
+            ...withOptionalValue("providerEventId", payload.providerEventId)
+          },
+          {
+            deliveries: deps.deliveries,
+            payments: deps.payments,
+            webhookEvents: deps.webhookEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/intake", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = confirmIntakeRequestSchema.parse(request.body);
+
+      return (
+        await confirmOriginIntake(
+          {
+            deliveryId: (request.params as { id: string }).id,
+            measuredWeightKg: input.measuredWeightKg,
+            sizeTier: input.sizeTier,
+            condition: input.condition,
+            labelScanCode: input.labelScanCode,
+            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/assign-driver", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = assignDriverRequestSchema.parse(request.body);
+
+      return (
+        await assignDriver(
+          {
+            deliveryId: (request.params as { id: string }).id,
+            driverUserId: input.driverUserId
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/dispatch", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = dispatchDeliveryRequestSchema.parse(request.body);
+
+      return (
+        await dispatchDelivery(
+          {
+            deliveryId: (request.params as { id: string }).id,
+            packageScanCode: input.packageScanCode,
+            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/receive-destination", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = receiveDestinationRequestSchema.parse(request.body);
+
+      return (
+        await receiveDestination(
+          {
+            deliveryId: (request.params as { id: string }).id,
+            packageScanCode: input.packageScanCode,
+            condition: input.condition,
+            nextStep: input.nextStep,
+            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/assign-final-mile", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = assignFinalMileRequestSchema.parse(request.body);
+
+      return (
+        await assignFinalMileCourier(
+          {
+            deliveryId: (request.params as { id: string }).id,
+            courierUserId: input.courierUserId
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = completeDeliveryRequestSchema.parse(request.body);
+
+      return (
+        await completeDelivery(
+          {
+            deliveryId: (request.params as { id: string }).id,
+            proofType: input.proofType,
+            proofReference: input.proofReference,
+            receivedByName: input.receivedByName
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        )
+      ).response;
+    });
+
+    rateLimitedApp.post("/v1/issues", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = createIssueRequestSchema.parse(request.body);
+      const result = await createSupportIssue(principal, input, {
+        deliveries: deps.deliveries,
+        issues: deps.issues,
+        identityFactory: deps.identityFactory,
+        now: deps.now
+      });
+
+      reply.status(201);
+      return result.response;
+    });
+
+    rateLimitedApp.get("/v1/issues/:id", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      setNoStore(reply);
+      return getSupportIssue(principal, (request.params as { id: string }).id, {
+        deliveries: deps.deliveries,
+        issues: deps.issues
+      });
+    });
+
+    rateLimitedApp.post("/v1/issues/:id/escalate", { preHandler: adminMutationPreHandler }, async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = escalateIssueRequestSchema.parse(request.body);
+
+      return (
+        await escalateSupportIssue(principal, (request.params as { id: string }).id, input, {
+          deliveries: deps.deliveries,
+          issues: deps.issues,
+          now: deps.now
+        })
+      ).response;
+    });
+
+    rateLimitedApp.get("/v1/admin/overview", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+      setNoStore(reply);
+      return getAdminOverview({
+        deliveries: deps.deliveries,
+        payments: deps.payments,
+        webhookEvents: deps.webhookEvents,
+        now: deps.now
+      });
+    });
+
+    rateLimitedApp.get("/v1/admin/deliveries", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+      setNoStore(reply);
+      return listAdminDeliveries({
+        deliveries: deps.deliveries,
+        now: deps.now
+      });
+    });
+
+    rateLimitedApp.get("/v1/admin/stations", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+      setNoStore(reply);
+      return listAdminStations({
         deliveries: deps.deliveries,
         issues: deps.issues,
         now: deps.now
-      })
-    ).response;
-  });
-
-  app.get("/v1/admin/overview", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAdminPrincipal(principal);
-    setNoStore(reply);
-    return getAdminOverview({
-      deliveries: deps.deliveries,
-      payments: deps.payments,
-      webhookEvents: deps.webhookEvents,
-      now: deps.now
-    });
-  });
-
-  app.get("/v1/admin/deliveries", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAdminPrincipal(principal);
-    setNoStore(reply);
-    return listAdminDeliveries({
-      deliveries: deps.deliveries,
-      now: deps.now
-    });
-  });
-
-  app.get("/v1/admin/stations", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAdminPrincipal(principal);
-    setNoStore(reply);
-    return listAdminStations({
-      deliveries: deps.deliveries,
-      issues: deps.issues,
-      now: deps.now
-    });
-  });
-
-  app.get("/v1/admin/finance", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
-    const principal = await authenticateRequest(request, deps.authVerifier);
-    assertAdminPrincipal(principal);
-
-    if (principal.role !== "finance_admin" && principal.role !== "super_admin") {
-      throw new ApiServiceError("FORBIDDEN", "Finance admin scope is required.", {
-        userId: principal.userId,
-        role: principal.role
       });
-    }
+    });
 
-    setNoStore(reply);
-    return listAdminFinance({
-      payments: deps.payments,
-      now: deps.now
+    rateLimitedApp.get("/v1/admin/finance", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+
+      if (principal.role !== "finance_admin" && principal.role !== "super_admin") {
+        throw new ApiServiceError("FORBIDDEN", "Finance admin scope is required.", {
+          userId: principal.userId,
+          role: principal.role
+        });
+      }
+
+      setNoStore(reply);
+      return listAdminFinance({
+        payments: deps.payments,
+        now: deps.now
+      });
     });
   });
 

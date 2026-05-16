@@ -32,7 +32,8 @@ type LifecycleEventType =
   | "delivery_routed_to_issue_queue"
   | "final_mile_courier_assigned"
   | "delivery_marked_out_for_delivery"
-  | "delivery_completed";
+  | "delivery_completed"
+  | "delivery_cancelled";
 
 export interface OperationalActor {
   actorId: string;
@@ -53,7 +54,7 @@ export interface DeliveryEventRecord {
   nextStatus: DeliveryStatus;
   occurredAt: string;
   actorId: string;
-  actorRole: StaffDeliveryRole;
+  actorRole: Role;
   stationId?: StationId;
   metadata?: Record<string, unknown>;
 }

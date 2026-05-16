@@ -287,6 +287,21 @@ export function createFirestorePaymentRepository(
         { merge: true }
       );
     },
+    async markRefundSettled(input: {
+      paymentId: string;
+      refundReference: string;
+      settledAt: string;
+    }) {
+      await paymentsCollection.doc(input.paymentId).set(
+        {
+          status: "refunded",
+          refundReference: input.refundReference,
+          refundSettledAt: input.settledAt,
+          updatedAt: now()
+        },
+        { merge: true }
+      );
+    },
     async countByStatus() {
       const counts = await Promise.all(
         paymentStatuses.map(async (status) => {
@@ -338,6 +353,9 @@ export function createFirestorePublicTrackingVerificationRepository(
         .get();
 
       return snapshot.docs[0]?.data();
+    },
+    async createChallenge(challenge) {
+      await challengesCollection.doc(challenge.challengeId).set(challenge);
     },
     async listFailedAttemptsSince(trackingCode, since) {
       const snapshot = await attemptsCollection

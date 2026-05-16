@@ -28,6 +28,9 @@ export function createApiIdentityFactory() {
     nextIssueId() {
       return buildPrefixedId("ISS");
     },
+    nextChallengeId() {
+      return buildPrefixedId("CHL");
+    },
     nextDeliveryEventId() {
       return buildPrefixedId("EVT-DEL");
     },
@@ -39,6 +42,9 @@ export function createApiIdentityFactory() {
     },
     nextVerificationId() {
       return buildPrefixedId("VRF");
+    },
+    nextOtpCode() {
+      return `${Math.floor(Math.random() * 900_000) + 100_000}`;
     },
     nextVerificationToken() {
       return randomBytes(24).toString("base64url");

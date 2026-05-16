@@ -12,7 +12,11 @@ const apiRuntimeEnvSchema = z
     MTN_MOMO_API_USER: z.string().trim().min(8).optional(),
     MTN_MOMO_API_KEY: z.string().trim().min(8).optional(),
     MTN_MOMO_TARGET_ENV: z.enum(["sandbox", "mtnghana", "production"]).optional(),
-    MTN_MOMO_WEBHOOK_SHARED_SECRET: z.string().trim().min(12).optional()
+    MTN_MOMO_WEBHOOK_SHARED_SECRET: z.string().trim().min(12).optional(),
+    HUBTEL_SMS_BASE_URL: z.string().trim().url().optional(),
+    HUBTEL_SMS_CLIENT_ID: z.string().trim().min(8).optional(),
+    HUBTEL_SMS_CLIENT_SECRET: z.string().trim().min(8).optional(),
+    HUBTEL_SMS_FROM: z.string().trim().min(3).max(16).optional()
   })
   .superRefine((value, ctx) => {
     const hasClientEmail = value.FIREBASE_CLIENT_EMAIL !== undefined;
@@ -46,6 +50,24 @@ const apiRuntimeEnvSchema = z
         path: ["MTN_MOMO_BASE_URL"]
       });
     }
+
+    const hubtelSmsFields = [
+      value.HUBTEL_SMS_BASE_URL,
+      value.HUBTEL_SMS_CLIENT_ID,
+      value.HUBTEL_SMS_CLIENT_SECRET,
+      value.HUBTEL_SMS_FROM
+    ];
+    const hasAnyHubtelSmsField = hubtelSmsFields.some((field) => field !== undefined);
+    const hasAllHubtelSmsFields = hubtelSmsFields.every((field) => field !== undefined);
+
+    if (hasAnyHubtelSmsField && !hasAllHubtelSmsFields) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "All Hubtel SMS runtime variables must be set together when receiver SMS is enabled.",
+        path: ["HUBTEL_SMS_BASE_URL"]
+      });
+    }
   });
 
 export interface ApiRuntimeConfig {
@@ -61,6 +83,12 @@ export interface ApiRuntimeConfig {
     apiKey: string;
     targetEnvironment: "sandbox" | "mtnghana" | "production";
     webhookSharedSecret: string;
+  };
+  hubtelSms?: {
+    baseUrl: string;
+    clientId: string;
+    clientSecret: string;
+    from: string;
   };
 }
 
@@ -78,7 +106,11 @@ export function loadApiRuntimeConfig(
     MTN_MOMO_API_USER: env.MTN_MOMO_API_USER,
     MTN_MOMO_API_KEY: env.MTN_MOMO_API_KEY,
     MTN_MOMO_TARGET_ENV: env.MTN_MOMO_TARGET_ENV,
-    MTN_MOMO_WEBHOOK_SHARED_SECRET: env.MTN_MOMO_WEBHOOK_SHARED_SECRET
+    MTN_MOMO_WEBHOOK_SHARED_SECRET: env.MTN_MOMO_WEBHOOK_SHARED_SECRET,
+    HUBTEL_SMS_BASE_URL: env.HUBTEL_SMS_BASE_URL,
+    HUBTEL_SMS_CLIENT_ID: env.HUBTEL_SMS_CLIENT_ID,
+    HUBTEL_SMS_CLIENT_SECRET: env.HUBTEL_SMS_CLIENT_SECRET,
+    HUBTEL_SMS_FROM: env.HUBTEL_SMS_FROM
   });
 
   return {
@@ -103,6 +135,16 @@ export function loadApiRuntimeConfig(
             apiKey: parsed.MTN_MOMO_API_KEY as string,
             targetEnvironment: parsed.MTN_MOMO_TARGET_ENV as "sandbox" | "mtnghana" | "production",
             webhookSharedSecret: parsed.MTN_MOMO_WEBHOOK_SHARED_SECRET as string
+          }
+        }),
+    ...(parsed.HUBTEL_SMS_BASE_URL === undefined
+      ? {}
+      : {
+          hubtelSms: {
+            baseUrl: parsed.HUBTEL_SMS_BASE_URL,
+            clientId: parsed.HUBTEL_SMS_CLIENT_ID as string,
+            clientSecret: parsed.HUBTEL_SMS_CLIENT_SECRET as string,
+            from: parsed.HUBTEL_SMS_FROM as string
           }
         })
   };

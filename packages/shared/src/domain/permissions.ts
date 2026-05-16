@@ -52,7 +52,8 @@ const capabilityMatrix: Record<Role, Capability[]> = {
     "confirm_dispatch",
     "confirm_destination_receipt",
     "assign_final_mile",
-    "open_issue"
+    "open_issue",
+    "cancel_eligible_delivery"
   ],
   final_mile_courier: [
     "accept_final_mile_assignment",
@@ -62,6 +63,7 @@ const capabilityMatrix: Record<Role, Capability[]> = {
     "open_issue"
   ],
   ops_admin: [
+    "cancel_eligible_delivery",
     "reassign_delivery",
     "override_queue_state",
     "resolve_operational_issue",
@@ -70,6 +72,7 @@ const capabilityMatrix: Record<Role, Capability[]> = {
   finance_admin: ["approve_refund", "execute_refund", "review_reconciliation"],
   support_admin: ["manage_issue_thread", "escalate_case"],
   super_admin: [
+    "cancel_eligible_delivery",
     "reassign_delivery",
     "override_queue_state",
     "resolve_operational_issue",
@@ -89,4 +92,3 @@ export function canPerform(role: Role, capability: Capability): boolean {
 export function getCapabilities(role: Role): readonly Capability[] {
   return capabilityMatrix[role];
 }
-

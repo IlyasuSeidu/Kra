@@ -104,6 +104,25 @@ function makeFailedAttempt(
   };
 }
 
+function makeIdentityFactory(
+  overrides: Partial<{
+    nextChallengeId: () => string;
+    nextOtpCode: () => string;
+    nextAttemptId: () => string;
+    nextVerificationId: () => string;
+    nextVerificationToken: () => string;
+  }> = {}
+) {
+  return {
+    nextChallengeId: () => "CHL-DEFAULT",
+    nextOtpCode: () => "654321",
+    nextAttemptId: () => "ATT-DEFAULT",
+    nextVerificationId: () => "PVT-DEFAULT",
+    nextVerificationToken: () => "pvt_live_delivery_scope_token_default",
+    ...overrides
+  };
+}
+
 describe("public tracking phone verification", () => {
   it("creates a delivery-scoped verification grant for a valid receiver OTP", async () => {
     const consumedChallenges: string[] = [];
@@ -137,6 +156,9 @@ describe("public tracking phone verification", () => {
           getLatestChallenge() {
             return resolve(makeChallenge());
           },
+          createChallenge() {
+            return resolveVoid();
+          },
           listFailedAttemptsSince() {
             return resolve([]);
           },
@@ -152,11 +174,10 @@ describe("public tracking phone verification", () => {
             return resolveVoid();
           }
         },
-        identityFactory: {
-          nextAttemptId: () => "ATT-IGNORED",
+        identityFactory: makeIdentityFactory({
           nextVerificationId: () => "PVT-5001",
           nextVerificationToken: () => "pvt_live_delivery_scope_token_5001"
-        },
+        }),
         now: () => "2026-05-16T10:00:00.000Z"
       }
     );
@@ -201,6 +222,9 @@ describe("public tracking phone verification", () => {
           getLatestChallenge() {
             throw new Error("should not fetch challenge when an active grant exists");
           },
+          createChallenge() {
+            throw new Error("should not create a challenge when an active grant exists");
+          },
           listFailedAttemptsSince() {
             throw new Error("should not read failed attempts when an active grant exists");
           },
@@ -214,11 +238,10 @@ describe("public tracking phone verification", () => {
             throw new Error("should not create a second grant");
           }
         },
-        identityFactory: {
-          nextAttemptId: () => "ATT-IGNORED",
+        identityFactory: makeIdentityFactory({
           nextVerificationId: () => "PVT-IGNORED",
           nextVerificationToken: () => "pvt_live_delivery_scope_token_ignored"
-        },
+        }),
         now: () => "2026-05-16T10:05:00.000Z"
       }
     );
@@ -262,6 +285,9 @@ describe("public tracking phone verification", () => {
             getLatestChallenge() {
               return resolve(undefined);
             },
+            createChallenge() {
+              return resolveVoid();
+            },
             listFailedAttemptsSince() {
               return resolve([]);
             },
@@ -275,11 +301,11 @@ describe("public tracking phone verification", () => {
               return resolveVoid();
             }
           },
-          identityFactory: {
+          identityFactory: makeIdentityFactory({
             nextAttemptId: () => "ATT-5001",
             nextVerificationId: () => "PVT-5001",
             nextVerificationToken: () => "pvt_live_delivery_scope_token_5001"
-          },
+          }),
           now: () => "2026-05-16T10:00:00.000Z"
         }
       )
@@ -316,6 +342,9 @@ describe("public tracking phone verification", () => {
             getLatestChallenge() {
               return resolve(undefined);
             },
+            createChallenge() {
+              return resolveVoid();
+            },
             listFailedAttemptsSince() {
               return resolve([]);
             },
@@ -329,11 +358,11 @@ describe("public tracking phone verification", () => {
               return resolveVoid();
             }
           },
-          identityFactory: {
+          identityFactory: makeIdentityFactory({
             nextAttemptId: () => "ATT-5002",
             nextVerificationId: () => "PVT-5002",
             nextVerificationToken: () => "pvt_live_delivery_scope_token_5002"
-          },
+          }),
           now: () => "2026-05-16T10:00:00.000Z"
         }
       )
@@ -372,6 +401,9 @@ describe("public tracking phone verification", () => {
             getLatestChallenge() {
               return resolve(undefined);
             },
+            createChallenge() {
+              return resolveVoid();
+            },
             listFailedAttemptsSince() {
               return resolve([]);
             },
@@ -386,11 +418,11 @@ describe("public tracking phone verification", () => {
               return resolveVoid();
             }
           },
-          identityFactory: {
+          identityFactory: makeIdentityFactory({
             nextAttemptId: () => "ATT-5003",
             nextVerificationId: () => "PVT-5003",
             nextVerificationToken: () => "pvt_live_delivery_scope_token_5003"
-          },
+          }),
           now: () => "2026-05-16T10:00:00.000Z"
         }
       )
@@ -430,6 +462,9 @@ describe("public tracking phone verification", () => {
             getLatestChallenge() {
               return resolve(makeChallenge());
             },
+            createChallenge() {
+              return resolveVoid();
+            },
             listFailedAttemptsSince() {
               return resolve([]);
             },
@@ -444,11 +479,11 @@ describe("public tracking phone verification", () => {
               return resolveVoid();
             }
           },
-          identityFactory: {
+          identityFactory: makeIdentityFactory({
             nextAttemptId: () => "ATT-5004",
             nextVerificationId: () => "PVT-5004",
             nextVerificationToken: () => "pvt_live_delivery_scope_token_5004"
-          },
+          }),
           now: () => "2026-05-16T10:00:00.000Z"
         }
       )
@@ -515,6 +550,9 @@ describe("public tracking phone verification", () => {
             getLatestChallenge() {
               return resolve(makeChallenge());
             },
+            createChallenge() {
+              return resolveVoid();
+            },
             listFailedAttemptsSince() {
               return resolve(recentAttempts);
             },
@@ -529,11 +567,11 @@ describe("public tracking phone verification", () => {
               return resolveVoid();
             }
           },
-          identityFactory: {
+          identityFactory: makeIdentityFactory({
             nextAttemptId: () => "ATT-5",
             nextVerificationId: () => "PVT-5005",
             nextVerificationToken: () => "pvt_live_delivery_scope_token_5005"
-          },
+          }),
           now: () => "2026-05-16T10:00:00.000Z"
         }
       )
@@ -575,6 +613,9 @@ describe("public tracking phone verification", () => {
             getLatestChallenge() {
               throw new Error("should not read challenges while the delivery is locked");
             },
+            createChallenge() {
+              throw new Error("should not create challenges while the delivery is locked");
+            },
             listFailedAttemptsSince() {
               return resolve([
                 ...recentAttempts,
@@ -594,11 +635,11 @@ describe("public tracking phone verification", () => {
               return resolveVoid();
             }
           },
-          identityFactory: {
+          identityFactory: makeIdentityFactory({
             nextAttemptId: () => "ATT-IGNORED",
             nextVerificationId: () => "PVT-IGNORED",
             nextVerificationToken: () => "pvt_live_delivery_scope_token_ignored"
-          },
+          }),
           now: () => "2026-05-16T10:00:30.000Z"
         }
       )
