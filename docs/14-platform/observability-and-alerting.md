@@ -42,6 +42,8 @@ This document defines the monitoring, logging, tracing, and alerting standards r
 - retry queue depth
 - dead-letter depth
 - notification backlog
+- outbound notification pending age
+- receiver SMS dead-letter count
 
 ### Client Quality
 - crash-free sessions
@@ -80,6 +82,7 @@ Every structured log entry on critical services must include:
 ### Urgent But Not Paging
 - station queue lag threshold exceeded
 - notification delay threshold exceeded
+- receiver SMS outbox record remains `failed` or `pending` past `30 minutes`
 - elevated crash rate on latest mobile version
 - reconciliation mismatches above threshold
 

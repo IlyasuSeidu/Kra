@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createApiApp, type ApiAppDeps } from "../app";
 import type { DeliveryRecord } from "../deliveries";
+import type { OutboundNotificationRecord } from "../outbound-notifications";
 
 const appsToClose: Array<ReturnType<typeof createApiApp>> = [];
 
@@ -114,6 +115,23 @@ function makeAppDeps(): ApiAppDeps {
         return resolveVoid();
       },
       listByRecipientUserId() {
+        return resolve([]);
+      }
+    },
+    outboundNotifications: {
+      getByDedupeKey() {
+        return resolve(undefined);
+      },
+      create() {
+        return resolveVoid();
+      },
+      markSent() {
+        return resolveVoid();
+      },
+      markFailed() {
+        return resolveVoid();
+      },
+      listDue() {
         return resolve([]);
       }
     },
@@ -300,6 +318,7 @@ function makeAppDeps(): ApiAppDeps {
       nextWebhookEventId: () => "EVT-WEB-9401",
       nextIssueId: () => "ISS-9401",
       nextNotificationId: () => "NTF-9401",
+      nextOutboundNotificationId: () => "ONF-9401",
       nextChallengeId: () => "CHL-9401",
       nextDeliveryEventId: () => "EVT-DEL-9401",
       nextHandoffEventId: () => "EVT-HOF-9401",
@@ -481,6 +500,107 @@ describe("api app", () => {
         eventType: "out_for_delivery",
         stationName: "Kumasi Adum"
       }
+    ]);
+  });
+
+  it("records receiver SMS delivery failure without failing the lifecycle mutation", async () => {
+    const deps = makeAppDeps();
+    const outboxRecords: OutboundNotificationRecord[] = [];
+
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-COR-001",
+          role: "final_mile_courier",
+          capabilities: ["mark_out_for_delivery"],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.notifications = {
+      sendPublicTrackingOtp() {
+        return resolveVoid();
+      },
+      sendReceiverDeliverySms() {
+        return Promise.reject(new Error("Hubtel unavailable"));
+      }
+    };
+    deps.outboundNotifications = {
+      getByDedupeKey(dedupeKey) {
+        return resolve(outboxRecords.find((record) => record.dedupeKey === dedupeKey));
+      },
+      create(record) {
+        outboxRecords.push(record);
+        return resolveVoid();
+      },
+      markSent() {
+        return resolveVoid();
+      },
+      markFailed(input) {
+        const record = outboxRecords.find(
+          (item) => item.outboundNotificationId === input.outboundNotificationId
+        );
+
+        if (record) {
+          Object.assign(record, {
+            status: input.status,
+            attemptCount: input.attemptCount,
+            lastAttemptAt: input.attemptedAt,
+            nextAttemptAt: input.nextAttemptAt,
+            lastError: input.lastError,
+            updatedAt: input.attemptedAt
+          });
+        }
+
+        return resolveVoid();
+      },
+      listDue() {
+        return resolve([]);
+      }
+    };
+    deps.deliveries.getById = () =>
+      resolve(
+        makeDelivery({
+          currentStatus: "assigned_for_final_mile",
+          doorstepRequested: true,
+          receiver: {
+            name: "Kojo Asante",
+            phone: "+233240000000",
+            addressText: "15 Ringway Road, Accra"
+          },
+          currentCustodyRole: "final_mile_courier",
+          currentCustodyActorId: "USR-COR-001",
+          assignedFinalMileCourierId: "USR-COR-001"
+        })
+      );
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries/DEL-9401/out-for-delivery",
+      headers: {
+        authorization: "Bearer token-courier"
+      },
+      payload: {
+        note: "Courier is en route to receiver"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(outboxRecords).toEqual([
+      expect.objectContaining({
+        outboundNotificationId: "ONF-9401",
+        status: "failed",
+        dedupeKey: "receiver-sms:DEL-9401:out_for_delivery",
+        attemptCount: 1,
+        nextAttemptAt: "2026-05-16T15:30:00.000Z",
+        lastError: {
+          name: "Error",
+          message: "Hubtel unavailable"
+        }
+      })
     ]);
   });
 

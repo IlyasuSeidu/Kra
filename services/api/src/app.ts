@@ -127,6 +127,11 @@ import {
   type QueueNotificationInput
 } from "./notification-feed";
 import {
+  queueAndDispatchReceiverDeliverySms,
+  type OutboundNotificationIdentityFactory,
+  type OutboundNotificationRepository
+} from "./outbound-notifications";
+import {
   listAdminWebhookEvents,
   processMtnMomoWebhook,
   type PaymentLookupRepository,
@@ -171,6 +176,7 @@ type SharedIdentityFactory = PaymentIdentityFactory &
   PaymentWebhookIdentityFactory &
   DeliveryLifecycleIdentityFactory &
   NotificationIdentityFactory &
+  OutboundNotificationIdentityFactory &
   PublicTrackingVerificationIdentityFactory &
   AuditIdentityFactory &
   SupportIssueIdentityFactory & {
@@ -186,6 +192,7 @@ export interface ApiAppDeps {
   users: UserRepository;
   stations: StationRepository;
   notificationFeed: NotificationRepository;
+  outboundNotifications: OutboundNotificationRepository;
   deliveries: DeliveryRepository &
     DeliveryLifecycleRepository &
     DeliveryListRepository &
@@ -533,12 +540,21 @@ async function sendReceiverDeliverySms(
     return;
   }
 
-  await deps.notifications.sendReceiverDeliverySms({
-    phone: delivery.receiver.phone,
-    trackingCode: delivery.trackingCode,
-    eventType,
-    stationName: stationCatalog[delivery.destinationStationId].name
-  });
+  await queueAndDispatchReceiverDeliverySms(
+    {
+      deliveryId: delivery.deliveryId,
+      phone: delivery.receiver.phone,
+      trackingCode: delivery.trackingCode,
+      eventType,
+      stationName: stationCatalog[delivery.destinationStationId].name
+    },
+    {
+      outboundNotifications: deps.outboundNotifications,
+      notifications: deps.notifications,
+      identityFactory: deps.identityFactory,
+      now: deps.now
+    }
+  );
 }
 
 async function notifyDeliveryStatusChange(
@@ -683,6 +699,7 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
     users: repositories.users,
     stations: repositories.stations,
     notificationFeed: repositories.notificationFeed,
+    outboundNotifications: repositories.outboundNotifications,
     deliveries: repositories.deliveries,
     deliveryEvents: repositories.deliveryEvents,
     handoffEvents: repositories.handoffEvents,

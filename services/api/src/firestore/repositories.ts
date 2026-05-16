@@ -1,4 +1,4 @@
-import type { Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { deliveryStatuses } from "@kra/shared";
 
 import type {
@@ -22,6 +22,10 @@ import type {
 } from "../handoffs";
 import type { SupportIssueRecord, SupportIssueRepository } from "../issues";
 import type { NotificationRepository } from "../notification-feed";
+import type {
+  OutboundNotificationRecord,
+  OutboundNotificationRepository
+} from "../outbound-notifications";
 import type {
   PaymentRecord,
   PaymentRepository
@@ -47,6 +51,7 @@ import {
   handoffEventConverter,
   idempotencyRecordConverter,
   notificationConverter,
+  outboundNotificationConverter,
   paymentConverter,
   publicTrackingPhoneChallengeConverter,
   publicTrackingVerificationAttemptConverter,
@@ -271,6 +276,86 @@ export function createFirestoreNotificationRepository(
         .get();
 
       return snapshot.docs.map((document) => document.data());
+    }
+  };
+}
+
+function sortOutboundNotificationsByNextAttemptAt(
+  records: OutboundNotificationRecord[]
+): OutboundNotificationRecord[] {
+  return [...records].sort((left, right) =>
+    left.nextAttemptAt.localeCompare(right.nextAttemptAt)
+  );
+}
+
+export function createFirestoreOutboundNotificationRepository(
+  firestore: Firestore
+): OutboundNotificationRepository {
+  const outboundNotificationsCollection = firestore
+    .collection(firestoreCollections.outboundNotifications)
+    .withConverter(outboundNotificationConverter);
+
+  async function listDueByStatus(input: {
+    status: Extract<OutboundNotificationRecord["status"], "pending" | "failed">;
+    now: string;
+    limit: number;
+  }): Promise<OutboundNotificationRecord[]> {
+    const snapshot = await outboundNotificationsCollection
+      .where("status", "==", input.status)
+      .where("nextAttemptAt", "<=", input.now)
+      .orderBy("nextAttemptAt", "asc")
+      .limit(input.limit)
+      .get();
+
+    return snapshot.docs.map((document) => document.data());
+  }
+
+  return {
+    async getByDedupeKey(dedupeKey) {
+      const snapshot = await outboundNotificationsCollection
+        .where("dedupeKey", "==", dedupeKey)
+        .limit(1)
+        .get();
+      const match = snapshot.docs[0];
+
+      return match?.data();
+    },
+    async create(record) {
+      await outboundNotificationsCollection.doc(record.outboundNotificationId).create(record);
+    },
+    async markSent(input) {
+      await outboundNotificationsCollection.doc(input.outboundNotificationId).set(
+        {
+          status: "sent",
+          attemptCount: input.attemptCount,
+          lastAttemptAt: input.attemptedAt,
+          sentAt: input.attemptedAt,
+          lastError: FieldValue.delete(),
+          updatedAt: input.attemptedAt
+        },
+        { merge: true }
+      );
+    },
+    async markFailed(input) {
+      await outboundNotificationsCollection.doc(input.outboundNotificationId).set(
+        {
+          status: input.status,
+          attemptCount: input.attemptCount,
+          lastAttemptAt: input.attemptedAt,
+          nextAttemptAt: input.nextAttemptAt,
+          lastError: input.lastError,
+          updatedAt: input.attemptedAt
+        },
+        { merge: true }
+      );
+    },
+    async listDue(input) {
+      const [pending, failed] = await Promise.all([
+        listDueByStatus({ status: "pending", now: input.now, limit: input.limit }),
+        listDueByStatus({ status: "failed", now: input.now, limit: input.limit })
+      ]);
+
+      return sortOutboundNotificationsByNextAttemptAt([...pending, ...failed]).slice(0, input.limit);
     }
   };
 }
@@ -1007,6 +1092,7 @@ export function createFirestoreApiRepositories(
     users: createFirestoreUserRepository(firestore),
     stations: createFirestoreStationRepository(firestore),
     notificationFeed: createFirestoreNotificationRepository(firestore),
+    outboundNotifications: createFirestoreOutboundNotificationRepository(firestore),
     deliveries: createFirestoreDeliveryRepository(firestore, now),
     payments: createFirestorePaymentRepository(firestore, now),
     issues: createFirestoreSupportIssueRepository(firestore, now),

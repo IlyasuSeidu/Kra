@@ -78,6 +78,14 @@ Deliver only meaningful updates to the right user at the right time.
 - SMS does not automatically retry more than once for the same event inside `30 minutes`.
 - Low-priority operational reminders may be suppressed between `22:00` and `06:00` local time.
 
+## Delivery Enforcement
+- Receiver SMS must be written to the durable `outbound_notifications` outbox before provider dispatch.
+- Receiver SMS uses `receiver-sms:{deliveryId}:{eventType}` as the dedupe key so repeated lifecycle commands do not create duplicate channel noise.
+- Provider success updates the outbox record to `sent` with `sentAt`, `lastAttemptAt`, and `attemptCount`.
+- Provider failure updates the outbox record to `failed`, schedules one retry at `30 minutes`, and preserves `lastError` for operations review.
+- A second failed SMS attempt moves the record to `dead_letter`; customer support must review the affected delivery before suppressing or manually re-sending.
+- Lifecycle state mutation must not roll back only because an SMS provider is temporarily unavailable; the outbox is the recovery mechanism.
+
 ## Copy Baseline
 - Payment confirmed: `Payment confirmed. Kra has started processing your delivery.`
 - Ready for pickup: `Your package is ready for pickup at {stationName}.`
