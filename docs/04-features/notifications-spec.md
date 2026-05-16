@@ -86,6 +86,7 @@ Deliver only meaningful updates to the right user at the right time.
 - A second failed SMS attempt moves the record to `dead_letter`; customer support must review the affected delivery before suppressing or manually re-sending.
 - Lifecycle state mutation must not roll back only because an SMS provider is temporarily unavailable; the outbox is the recovery mechanism.
 - Cloud Tasks or a scheduler must call the internal dispatch endpoint with `X-Kra-Internal-Task-Secret` to process due outbox records.
+- Ops and support admins review failed or dead-lettered records through `GET /v1/admin/outbound-notifications`.
 
 ## Copy Baseline
 - Payment confirmed: `Payment confirmed. Kra has started processing your delivery.`

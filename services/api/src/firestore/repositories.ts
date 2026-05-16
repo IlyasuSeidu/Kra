@@ -288,6 +288,12 @@ function sortOutboundNotificationsByNextAttemptAt(
   );
 }
 
+function sortOutboundNotificationsByUpdatedAt(
+  records: OutboundNotificationRecord[]
+): OutboundNotificationRecord[] {
+  return [...records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
 export function createFirestoreOutboundNotificationRepository(
   firestore: Firestore
 ): OutboundNotificationRepository {
@@ -356,6 +362,24 @@ export function createFirestoreOutboundNotificationRepository(
       ]);
 
       return sortOutboundNotificationsByNextAttemptAt([...pending, ...failed]).slice(0, input.limit);
+    },
+    async listRecent(input) {
+      if (input.status) {
+        const snapshot = await outboundNotificationsCollection
+          .where("status", "==", input.status)
+          .orderBy("updatedAt", "desc")
+          .limit(input.limit)
+          .get();
+
+        return snapshot.docs.map((document) => document.data());
+      }
+
+      const snapshot = await outboundNotificationsCollection
+        .orderBy("updatedAt", "desc")
+        .limit(input.limit)
+        .get();
+
+      return sortOutboundNotificationsByUpdatedAt(snapshot.docs.map((document) => document.data()));
     }
   };
 }

@@ -1,6 +1,8 @@
 import {
   adminDeliveryListResponseSchema,
   adminFinanceResponseSchema,
+  adminOutboundNotificationListQuerySchema,
+  adminOutboundNotificationListResponseSchema,
   adminOverviewResponseSchema,
   adminStationListResponseSchema
 } from "@kra/shared";
@@ -8,6 +10,7 @@ import type { z } from "zod";
 
 import type { DeliveryRecord } from "./deliveries";
 import type { WebhookEventRecord } from "./payment-webhooks";
+import type { OutboundNotificationRecord } from "./outbound-notifications";
 import type { PaymentRecord } from "./payments";
 import { listConfiguredStations, type StationRepository } from "./stations";
 
@@ -38,6 +41,13 @@ export interface AdminWebhookMetricsRepository {
   }>>;
 }
 
+export interface AdminOutboundNotificationRepository {
+  listRecent(input: {
+    status?: OutboundNotificationRecord["status"];
+    limit: number;
+  }): Promise<OutboundNotificationRecord[]>;
+}
+
 export interface AdminIssueMetricsRepository {
   countOpenByStation(stationId: DeliveryRecord["originStationId"]): Promise<number>;
 }
@@ -53,6 +63,9 @@ export type AdminOverviewResponse = z.infer<typeof adminOverviewResponseSchema>;
 export type AdminDeliveryListResponse = z.infer<typeof adminDeliveryListResponseSchema>;
 export type AdminStationListResponse = z.infer<typeof adminStationListResponseSchema>;
 export type AdminFinanceResponse = z.infer<typeof adminFinanceResponseSchema>;
+export type AdminOutboundNotificationListResponse = z.infer<
+  typeof adminOutboundNotificationListResponseSchema
+>;
 
 export async function getAdminOverview(
   deps: GetAdminOverviewDeps
@@ -195,5 +208,24 @@ export async function listAdminFinance(
         ? { refundAmountGhs: payment.refundAmountGhs }
         : {})
     }))
+  });
+}
+
+export async function listAdminOutboundNotifications(
+  input: z.input<typeof adminOutboundNotificationListQuerySchema>,
+  deps: {
+    outboundNotifications: AdminOutboundNotificationRepository;
+    now: () => string;
+  }
+): Promise<AdminOutboundNotificationListResponse> {
+  const parsedInput = adminOutboundNotificationListQuerySchema.parse(input);
+  const notifications = await deps.outboundNotifications.listRecent({
+    ...(parsedInput.status === undefined ? {} : { status: parsedInput.status }),
+    limit: parsedInput.limit ?? 100
+  });
+
+  return adminOutboundNotificationListResponseSchema.parse({
+    generatedAt: deps.now(),
+    notifications
   });
 }

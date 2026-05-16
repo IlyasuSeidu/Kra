@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getAdminOverview, listAdminStations } from "../admin";
+import { getAdminOverview, listAdminOutboundNotifications, listAdminStations } from "../admin";
 
 describe("admin overview", () => {
   it("returns network-wide delivery, payment, and webhook alert counts", async () => {
@@ -108,6 +108,65 @@ describe("admin station list", () => {
         status: "not_started",
         goLiveEligible: false
       }
+    });
+  });
+});
+
+describe("admin outbound notification list", () => {
+  it("returns filtered outbox records for operations review", async () => {
+    const result = await listAdminOutboundNotifications(
+      {
+        status: "failed",
+        limit: 10
+      },
+      {
+        outboundNotifications: {
+          listRecent(input) {
+            expect(input).toEqual({
+              status: "failed",
+              limit: 10
+            });
+
+            return Promise.resolve([
+              {
+                outboundNotificationId: "ONF-9401",
+                channel: "sms",
+                provider: "hubtel",
+                kind: "receiver_delivery_sms",
+                status: "failed",
+                dedupeKey: "receiver-sms:DEL-9401:out_for_delivery",
+                deliveryId: "DEL-9401",
+                recipientPhone: "+233240000000",
+                trackingCode: "KRA-9401",
+                eventType: "out_for_delivery",
+                stationName: "Kumasi Adum",
+                attemptCount: 1,
+                maxAttempts: 2,
+                nextAttemptAt: "2026-05-16T15:30:00.000Z",
+                createdAt: "2026-05-16T15:00:00.000Z",
+                updatedAt: "2026-05-16T15:00:00.000Z",
+                lastAttemptAt: "2026-05-16T15:00:00.000Z",
+                lastError: {
+                  name: "Error",
+                  message: "Hubtel timeout"
+                }
+              }
+            ]);
+          }
+        },
+        now: () => "2026-05-16T15:00:00.000Z"
+      }
+    );
+
+    expect(result).toMatchObject({
+      generatedAt: "2026-05-16T15:00:00.000Z",
+      notifications: [
+        {
+          outboundNotificationId: "ONF-9401",
+          status: "failed",
+          attemptCount: 1
+        }
+      ]
     });
   });
 });

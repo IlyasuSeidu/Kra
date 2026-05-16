@@ -592,6 +592,55 @@ export const outboundNotificationDispatchResponseSchema = z.object({
   )
 });
 
+export const outboundNotificationStatusSchema = z.enum([
+  "pending",
+  "sent",
+  "failed",
+  "dead_letter"
+]);
+
+export const adminOutboundNotificationListQuerySchema = z.object({
+  status: outboundNotificationStatusSchema.optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const adminOutboundNotificationListResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  notifications: z.array(
+    z.object({
+      outboundNotificationId: z.string().regex(/^ONF-[A-Z0-9-]+$/),
+      channel: z.literal("sms"),
+      provider: z.literal("hubtel"),
+      kind: z.literal("receiver_delivery_sms"),
+      status: outboundNotificationStatusSchema,
+      dedupeKey: z.string().trim().min(3).max(180),
+      deliveryId: deliveryIdSchema,
+      recipientPhone: phoneSchema,
+      trackingCode: trackingCodeSchema,
+      eventType: z.enum([
+        "ready_for_pickup",
+        "final_mile_assigned",
+        "out_for_delivery",
+        "failed_attempt",
+        "delivered"
+      ]),
+      stationName: z.string().trim().min(2).max(120).optional(),
+      attemptCount: z.number().int().nonnegative(),
+      maxAttempts: z.number().int().positive(),
+      nextAttemptAt: z.string().datetime(),
+      createdAt: z.string().datetime(),
+      updatedAt: z.string().datetime(),
+      lastAttemptAt: z.string().datetime().optional(),
+      sentAt: z.string().datetime().optional(),
+      lastError: z.object({
+        name: z.string().trim().min(2).max(120),
+        message: z.string().trim().min(3).max(500),
+        code: z.string().trim().min(2).max(120).optional()
+      }).optional()
+    })
+  )
+});
+
 export const auditTargetTypeSchema = z.enum(["delivery", "payment", "issue", "tracking"]);
 
 export const auditEventListQuerySchema = z.object({

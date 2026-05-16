@@ -134,6 +134,9 @@ function makeAppDeps(): ApiAppDeps {
       },
       listDue() {
         return resolve([]);
+      },
+      listRecent() {
+        return resolve([]);
       }
     },
     deliveries: {
@@ -557,6 +560,9 @@ describe("api app", () => {
       },
       listDue() {
         return resolve([]);
+      },
+      listRecent() {
+        return resolve([]);
       }
     };
     deps.deliveries.getById = () =>
@@ -672,6 +678,9 @@ describe("api app", () => {
           limit: 10
         });
         return resolve(outboxRecords);
+      },
+      listRecent() {
+        return resolve([]);
       }
     };
 
@@ -898,6 +907,80 @@ describe("api app", () => {
           body: "Your package is ready for receiver pickup at the destination station.",
           deliveryId: "DEL-9401",
           createdAt: "2026-05-16T15:00:00.000Z"
+        }
+      ]
+    });
+  });
+
+  it("lists outbound notification recovery records for operational admins", async () => {
+    const deps = makeAppDeps();
+
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-OPS-001",
+          role: "ops_admin",
+          capabilities: [],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.outboundNotifications.listRecent = (input) => {
+      expect(input).toEqual({
+        status: "dead_letter",
+        limit: 20
+      });
+
+      return resolve([
+        {
+          outboundNotificationId: "ONF-9401",
+          channel: "sms",
+          provider: "hubtel",
+          kind: "receiver_delivery_sms",
+          status: "dead_letter",
+          dedupeKey: "receiver-sms:DEL-9401:out_for_delivery",
+          deliveryId: "DEL-9401",
+          recipientPhone: "+233240000000",
+          trackingCode: "KRA-9401",
+          eventType: "out_for_delivery",
+          stationName: "Kumasi Adum",
+          attemptCount: 2,
+          maxAttempts: 2,
+          nextAttemptAt: "2026-05-16T15:00:00.000Z",
+          createdAt: "2026-05-16T14:00:00.000Z",
+          updatedAt: "2026-05-16T15:00:00.000Z",
+          lastAttemptAt: "2026-05-16T15:00:00.000Z",
+          lastError: {
+            name: "Error",
+            message: "Hubtel rejected message"
+          }
+        }
+      ]);
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/outbound-notifications?status=dead_letter&limit=20",
+      headers: {
+        authorization: "Bearer token-ops-admin"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      generatedAt: "2026-05-16T15:00:00.000Z",
+      notifications: [
+        {
+          outboundNotificationId: "ONF-9401",
+          status: "dead_letter",
+          deliveryId: "DEL-9401",
+          trackingCode: "KRA-9401",
+          lastError: {
+            message: "Hubtel rejected message"
+          }
         }
       ]
     });

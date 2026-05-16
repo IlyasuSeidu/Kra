@@ -6,6 +6,8 @@ import {
   adminUpdateStationStatusRequestSchema,
   adminUpdateStationStatusResponseSchema,
   adminUpdateUserAccessRequestSchema,
+  adminOutboundNotificationListQuerySchema,
+  adminOutboundNotificationListResponseSchema,
   adminUserListQuerySchema,
   adminUserListResponseSchema,
   adminUserResponseSchema,
@@ -569,6 +571,17 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: auditEventListQuerySchema,
     responseSchema: auditEventListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_outbound_notifications",
+    method: "GET",
+    path: "/v1/admin/outbound-notifications",
+    module: "admin",
+    authScope: "admin",
+    idempotent: true,
+    requestSchema: adminOutboundNotificationListQuerySchema,
+    responseSchema: adminOutboundNotificationListResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
