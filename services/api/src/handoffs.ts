@@ -506,6 +506,66 @@ export async function dispatchDelivery(
   };
 }
 
+export async function markDeliveryInTransit(
+  input: {
+    deliveryId: string;
+    note?: string;
+  },
+  actor: OperationalActor,
+  deps: DeliveryLifecycleDeps
+): Promise<{
+  delivery: DeliveryRecord;
+  response: DeliveryLifecycleResponse;
+}> {
+  assertCapability(actor, "update_transit_status");
+
+  const delivery = await deps.deliveries.getById(input.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  if (actor.role !== "driver") {
+    throw new ApiServiceError("FORBIDDEN", "Only assigned drivers can mark deliveries in transit.", {
+      deliveryId: input.deliveryId,
+      actorId: actor.actorId,
+      actorRole: actor.role
+    });
+  }
+
+  if (delivery.assignedDriverId !== actor.actorId) {
+    throw new ApiServiceError("FORBIDDEN", "This delivery is assigned to a different driver.", {
+      deliveryId: input.deliveryId,
+      assignedDriverId: delivery.assignedDriverId,
+      actorId: actor.actorId
+    });
+  }
+
+  const occurredAt = deps.now();
+  const { delivery: updatedDelivery, event } = await applyTransition(
+    {
+      delivery,
+      nextStatus: "in_transit",
+      eventType: "delivery_marked_in_transit",
+      actor,
+      occurredAt,
+      currentCustodyRole: "driver",
+      currentCustodyActorId: actor.actorId,
+      metadata: {
+        ...(input.note === undefined ? {} : { note: input.note })
+      }
+    },
+    deps
+  );
+
+  return {
+    delivery: updatedDelivery,
+    response: buildLifecycleResponse(event.eventId, updatedDelivery, occurredAt)
+  };
+}
+
 export async function receiveDestination(
   input: {
     deliveryId: string;
@@ -696,6 +756,70 @@ export async function assignFinalMileCourier(
       proof: {
         reference: `${delivery.deliveryId}:${input.courierUserId}`,
         type: "package_scan"
+      }
+    },
+    deps
+  );
+
+  return {
+    delivery: updatedDelivery,
+    response: buildLifecycleResponse(event.eventId, updatedDelivery, occurredAt)
+  };
+}
+
+export async function markDeliveryOutForDelivery(
+  input: {
+    deliveryId: string;
+    note?: string;
+  },
+  actor: OperationalActor,
+  deps: DeliveryLifecycleDeps
+): Promise<{
+  delivery: DeliveryRecord;
+  response: DeliveryLifecycleResponse;
+}> {
+  assertCapability(actor, "mark_out_for_delivery");
+
+  const delivery = await deps.deliveries.getById(input.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  if (actor.role !== "final_mile_courier") {
+    throw new ApiServiceError(
+      "FORBIDDEN",
+      "Only assigned final-mile couriers can mark deliveries out for delivery.",
+      {
+        deliveryId: input.deliveryId,
+        actorId: actor.actorId,
+        actorRole: actor.role
+      }
+    );
+  }
+
+  if (delivery.assignedFinalMileCourierId !== actor.actorId) {
+    throw new ApiServiceError("FORBIDDEN", "This delivery is assigned to a different courier.", {
+      deliveryId: input.deliveryId,
+      assignedFinalMileCourierId: delivery.assignedFinalMileCourierId,
+      actorId: actor.actorId
+    });
+  }
+
+  const occurredAt = deps.now();
+  const { delivery: updatedDelivery, event } = await applyTransition(
+    {
+      delivery,
+      nextStatus: "out_for_delivery",
+      eventType: "delivery_marked_out_for_delivery",
+      actor,
+      occurredAt,
+      currentCustodyRole: "final_mile_courier",
+      currentCustodyActorId: actor.actorId,
+      metadata: {
+        ...(input.note === undefined ? {} : { note: input.note })
       }
     },
     deps

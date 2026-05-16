@@ -13,6 +13,8 @@ import {
   createIssueRequestSchema,
   dispatchDeliveryRequestSchema,
   escalateIssueRequestSchema,
+  markInTransitRequestSchema,
+  markOutForDeliveryRequestSchema,
   mtnMomoWebhookRequestSchema,
   paymentInitializeRequestSchema,
   paymentVerifyRequestSchema,
@@ -75,6 +77,8 @@ import {
   completeDelivery,
   confirmOriginIntake,
   dispatchDelivery,
+  markDeliveryInTransit,
+  markDeliveryOutForDelivery,
   recordFinalMileFailedAttempt,
   receiveDestination,
   type DeliveryEventRepository,
@@ -1086,6 +1090,38 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       }));
     });
 
+    rateLimitedApp.post("/v1/deliveries/:id/mark-in-transit", { preHandler: [authenticatedMutationPreHandler, requireCapability("update_transit_status")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = markInTransitRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "mark_in_transit",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await markDeliveryInTransit(
+            {
+              deliveryId,
+              ...withOptionalValue("note", input.note)
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
+    });
+
     rateLimitedApp.post("/v1/deliveries/:id/receive-destination", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_destination_receipt")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = receiveDestinationRequestSchema.parse(request.body);
@@ -1140,6 +1176,38 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             {
               deliveryId,
               courierUserId: input.courierUserId
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/out-for-delivery", { preHandler: [authenticatedMutationPreHandler, requireCapability("mark_out_for_delivery")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = markOutForDeliveryRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "mark_out_for_delivery",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await markDeliveryOutForDelivery(
+            {
+              deliveryId,
+              ...withOptionalValue("note", input.note)
             },
             mapPrincipalToOperationalActor(principal),
             {
