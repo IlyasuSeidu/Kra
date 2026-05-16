@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@tootallnate/once': ^3.0.1
+
 importers:
 
   .:
@@ -552,8 +555,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@tootallnate/once@2.0.1':
-    resolution: {integrity: sha512-HqmEUIGRJ5fSXchkVgR5F7qn48bDBzv0kWj/Kfu5e6uci4UlEeng4331LnBkWffb++Ei3FOVLxo8JJWMFBDMeQ==}
+  '@tootallnate/once@3.0.1':
+    resolution: {integrity: sha512-VyMVKRrpHTT8PnotUeV8L/mDaMwD5DaAKCFLP73zAqAtvF0FCqky+Ki7BYbFCYQmqFyTe9316Ed5zS70QUR9eg==}
     engines: {node: '>= 10'}
 
   '@turbo/darwin-64@2.9.14':
@@ -2278,7 +2281,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.4':
     optional: true
 
-  '@tootallnate/once@2.0.1':
+  '@tootallnate/once@3.0.1':
     optional: true
 
   '@turbo/darwin-64@2.9.14':
@@ -3048,7 +3051,7 @@ snapshots:
 
   http-proxy-agent@5.0.0:
     dependencies:
-      '@tootallnate/once': 2.0.1
+      '@tootallnate/once': 3.0.1
       agent-base: 6.0.2
       debug: 4.4.3
     transitivePeerDependencies:

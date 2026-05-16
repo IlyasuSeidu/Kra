@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@9.15.4",
+  "pnpm": {
+    "overrides": {
+      "@tootallnate/once": "^3.0.1"
+    }
+  },
   "engines": {
     "node": ">=22.0.0",
     "pnpm": ">=9.15.4"
