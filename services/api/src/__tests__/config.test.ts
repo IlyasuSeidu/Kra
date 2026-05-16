@@ -54,7 +54,8 @@ describe("api runtime config", () => {
         HUBTEL_SMS_BASE_URL: "https://smsc.hubtel.com",
         HUBTEL_SMS_CLIENT_ID: "hubtel-client-001",
         HUBTEL_SMS_CLIENT_SECRET: "hubtel-secret-001",
-        HUBTEL_SMS_FROM: "Kra"
+        HUBTEL_SMS_FROM: "Kra",
+        PUBLIC_TRACKING_BASE_URL: "https://kra.example.com/track"
       })
     ).toEqual({
       firebaseProjectId: "kra-prod",
@@ -63,7 +64,8 @@ describe("api runtime config", () => {
         baseUrl: "https://smsc.hubtel.com",
         clientId: "hubtel-client-001",
         clientSecret: "hubtel-secret-001",
-        from: "Kra"
+        from: "Kra",
+        publicTrackingBaseUrl: "https://kra.example.com/track"
       }
     });
 
