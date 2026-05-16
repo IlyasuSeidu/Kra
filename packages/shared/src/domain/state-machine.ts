@@ -34,7 +34,7 @@ const transitions: Record<DeliveryStatus, DeliveryStatus[]> = {
     "awaiting_final_mile_assignment",
     "issue_reported"
   ],
-  awaiting_receiver_pickup: ["on_hold", "closed", "issue_reported"],
+  awaiting_receiver_pickup: ["delivered", "on_hold", "closed", "issue_reported"],
   awaiting_final_mile_assignment: ["assigned_for_final_mile", "issue_reported"],
   assigned_for_final_mile: ["out_for_delivery", "issue_reported"],
   out_for_delivery: ["delivered", "awaiting_receiver_pickup", "issue_reported"],

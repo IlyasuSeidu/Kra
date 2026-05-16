@@ -59,7 +59,18 @@ export function getBaseRouteFee(
   return fee;
 }
 
-export function calculateDeliveryQuote(input: QuoteInput): number {
+export interface QuoteBreakdown {
+  baseFee: number;
+  weightSurcharge: number;
+  sizeSurcharge: number;
+  fragileSurcharge: number;
+  declaredValueSurcharge: number;
+  expressSurcharge: number;
+  doorstepSurcharge: number;
+  totalAmount: number;
+}
+
+export function calculateDeliveryQuoteBreakdown(input: QuoteInput): QuoteBreakdown {
   if (input.declaredValueGhs > 5000) {
     throw new Error("Declared value above GHS 5,000 is not self-serve in v1.");
   }
@@ -74,13 +85,25 @@ export function calculateDeliveryQuote(input: QuoteInput): number {
   const doorstepSurcharge =
     input.doorstepRequested ? getDoorstepSurcharge(input.doorstepDistanceKm) : 0;
 
-  return (
-    baseFee +
-    weightSurcharge +
-    sizeSurcharge +
-    fragileSurcharge +
-    declaredValueSurcharge +
-    expressSurcharge +
-    doorstepSurcharge
-  );
+  return {
+    baseFee,
+    weightSurcharge,
+    sizeSurcharge,
+    fragileSurcharge,
+    declaredValueSurcharge,
+    expressSurcharge,
+    doorstepSurcharge,
+    totalAmount:
+      baseFee +
+      weightSurcharge +
+      sizeSurcharge +
+      fragileSurcharge +
+      declaredValueSurcharge +
+      expressSurcharge +
+      doorstepSurcharge
+  };
+}
+
+export function calculateDeliveryQuote(input: QuoteInput): number {
+  return calculateDeliveryQuoteBreakdown(input).totalAmount;
 }

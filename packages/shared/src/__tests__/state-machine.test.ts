@@ -11,6 +11,7 @@ describe("state-machine", () => {
   it("allows core happy-path transitions", () => {
     expect(canTransition("draft", "created")).toBe(true);
     expect(canTransition("created", "received_at_origin")).toBe(true);
+    expect(canTransition("awaiting_receiver_pickup", "delivered")).toBe(true);
     expect(canTransition("out_for_delivery", "delivered")).toBe(true);
   });
 
@@ -41,4 +42,3 @@ describe("state-machine", () => {
     ]);
   });
 });
-

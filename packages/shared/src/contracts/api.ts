@@ -16,13 +16,17 @@ export const paymentStatusSchema = z.enum([
 ]);
 export const requestIdSchema = z.string().regex(/^REQ-[A-Z0-9-]+$/);
 export const deliveryIdSchema = z.string().regex(/^DEL-[A-Z0-9-]+$/);
+export const paymentIdSchema = z.string().regex(/^PAY-[A-Z0-9-]+$/);
 export const trackingCodeSchema = z.string().regex(/^KRA-[A-Z0-9-]+$/);
+export const userIdSchema = z.string().regex(/^USR-[A-Z0-9-]+$/);
 export const publicTouchpointRoleSchema = z.enum([
   "system",
   "station_operator",
   "driver",
   "final_mile_courier"
 ]);
+export const packageConditionSchema = z.enum(["ok", "damaged"]);
+export const deliveryProofTypeSchema = z.enum(["otp", "signature", "delivery_photo"]);
 
 const moneySchema = z.object({
   currency: z.literal("GHS"),
@@ -107,7 +111,7 @@ export const paymentInitializeRequestSchema = z.object({
 });
 
 export const paymentInitializeResponseSchema = z.object({
-  paymentId: z.string().regex(/^PAY-[A-Z0-9-]+$/),
+  paymentId: paymentIdSchema,
   deliveryId: deliveryIdSchema,
   provider: z.literal("mtn_momo"),
   paymentStatus: z.literal("pending"),
@@ -120,7 +124,7 @@ export const paymentVerifyRequestSchema = z.object({
 });
 
 export const paymentVerifyResponseSchema = z.object({
-  paymentId: z.string().regex(/^PAY-[A-Z0-9-]+$/),
+  paymentId: paymentIdSchema,
   deliveryId: deliveryIdSchema,
   provider: z.literal("mtn_momo"),
   paymentStatus: z.enum(["pending", "confirmed", "failed"]),
@@ -147,7 +151,7 @@ export const mtnMomoWebhookResponseSchema = z.object({
     "accepted_pending",
     "manual_review"
   ]),
-  matchedPaymentId: z.string().regex(/^PAY-[A-Z0-9-]+$/).optional(),
+  matchedPaymentId: paymentIdSchema.optional(),
   matchedDeliveryId: deliveryIdSchema.optional()
 });
 
@@ -168,6 +172,107 @@ export const publicTrackingResponseSchema = z.object({
 export const verifyPhoneRequestSchema = z.object({
   phone: phoneSchema,
   otp: z.string().trim().min(4).max(8)
+});
+
+export const verifyPhoneResponseSchema = z.object({
+  deliveryId: deliveryIdSchema,
+  trackingCode: trackingCodeSchema,
+  verificationToken: z.string().trim().min(24).max(512),
+  verifiedAt: z.string().datetime(),
+  expiresAt: z.string().datetime()
+});
+
+export const confirmIntakeRequestSchema = z.object({
+  measuredWeightKg: z.number().positive(),
+  sizeTier: sizeTierSchema,
+  condition: packageConditionSchema,
+  labelScanCode: z.string().trim().min(4).max(80),
+  fallbackUsed: z.boolean().optional(),
+  supervisorOverrideActorId: userIdSchema.optional()
+});
+
+export const assignDriverRequestSchema = z.object({
+  driverUserId: userIdSchema
+});
+
+export const dispatchDeliveryRequestSchema = z.object({
+  packageScanCode: z.string().trim().min(4).max(80),
+  fallbackUsed: z.boolean().optional(),
+  supervisorOverrideActorId: userIdSchema.optional()
+});
+
+export const receiveDestinationRequestSchema = z.object({
+  packageScanCode: z.string().trim().min(4).max(80),
+  condition: packageConditionSchema,
+  nextStep: z.enum(["pickup", "doorstep", "issue"]),
+  fallbackUsed: z.boolean().optional(),
+  supervisorOverrideActorId: userIdSchema.optional()
+});
+
+export const assignFinalMileRequestSchema = z.object({
+  courierUserId: userIdSchema
+});
+
+export const completeDeliveryRequestSchema = z.object({
+  proofType: deliveryProofTypeSchema,
+  proofReference: z.string().trim().min(3).max(120),
+  receivedByName: z.string().trim().min(2).max(120)
+});
+
+export const refundPaymentRequestSchema = z.object({
+  paymentId: paymentIdSchema,
+  duplicateCharge: z.boolean().optional(),
+  platformPaymentError: z.boolean().optional(),
+  packageNeverReceivedAtOrigin: z.boolean().optional(),
+  doorstepAttemptOccurred: z.boolean().optional(),
+  expressHandlingPerformed: z.boolean().optional()
+});
+
+export const refundPaymentResponseSchema = z.object({
+  paymentId: paymentIdSchema,
+  deliveryId: deliveryIdSchema,
+  refundStatus: z.literal("refund_pending"),
+  refundAmountGhs: z.number().int().nonnegative(),
+  refundReason: z.enum([
+    "full_refund_pre_intake",
+    "duplicate_charge",
+    "platform_payment_error",
+    "never_received_at_origin",
+    "post_intake_handling_fee",
+    "doorstep_surcharge_refund",
+    "express_surcharge_refund"
+  ]),
+  requiresManualReview: z.literal(false),
+  requestedAt: z.string().datetime()
+});
+
+export const deliveryLifecycleResponseSchema = z.object({
+  eventId: z.string().regex(/^EVT-DEL-[A-Z0-9-]+$/),
+  deliveryId: deliveryIdSchema,
+  status: deliveryStatusSchema,
+  paymentStatus: paymentStatusSchema,
+  occurredAt: z.string().datetime()
+});
+
+export const adminOverviewResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  deliveryStatusCounts: z.array(
+    z.object({
+      status: deliveryStatusSchema,
+      count: z.number().int().nonnegative()
+    })
+  ),
+  paymentStatusCounts: z.array(
+    z.object({
+      status: paymentStatusSchema,
+      count: z.number().int().nonnegative()
+    })
+  ),
+  operationalAlerts: z.object({
+    openIssueLikeDeliveries: z.number().int().nonnegative(),
+    unmatchedWebhookEvents: z.number().int().nonnegative(),
+    manualReviewWebhookEvents: z.number().int().nonnegative()
+  })
 });
 
 export const apiErrorCodeSchema = z.enum([

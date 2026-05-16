@@ -18,8 +18,12 @@ describe("api routes", () => {
 
     expect(getApiRoute("verify_public_tracking_phone")).toMatchObject({
       authScope: "public",
-      path: "/v1/public/track/:trackingCode/verify-phone"
+      path: "/v1/public/track/:trackingCode/verify-phone",
+      idempotent: true
     });
+
+    expect(getApiRoute("verify_public_tracking_phone")?.requestSchema).toBeDefined();
+    expect(getApiRoute("verify_public_tracking_phone")?.responseSchema).toBeDefined();
   });
 
   it("registers the MTN MoMo webhook under webhook auth scope", () => {
@@ -44,9 +48,14 @@ describe("api routes", () => {
       capability: "execute_refund"
     });
 
+    expect(getApiRoute("refund_payment")?.requestSchema).toBeDefined();
+    expect(getApiRoute("refund_payment")?.responseSchema).toBeDefined();
+
     expect(getApiRoute("admin_overview")).toMatchObject({
       authScope: "admin"
     });
+
+    expect(getApiRoute("admin_overview")?.responseSchema).toBeDefined();
   });
 
   it("groups handoff operations under the handoffs module", () => {

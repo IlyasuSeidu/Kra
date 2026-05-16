@@ -6,11 +6,12 @@
   "scripts": {
     "build": "pnpm --filter @kra/shared build && tsc -p tsconfig.build.json",
     "lint": "pnpm --filter @kra/shared build && eslint src",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "pnpm --filter @kra/shared build && vitest run",
+    "test:coverage": "pnpm --filter @kra/shared build && vitest run --coverage",
     "typecheck": "pnpm --filter @kra/shared build && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@kra/shared": "workspace:*"
+    "@kra/shared": "workspace:*",
+    "firebase-admin": "^13.10.0"
   }
 }

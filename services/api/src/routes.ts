@@ -1,14 +1,25 @@
 import {
+  adminOverviewResponseSchema,
   apiErrorResponseSchema,
+  assignDriverRequestSchema,
+  assignFinalMileRequestSchema,
+  completeDeliveryRequestSchema,
+  confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
   createDeliveryResponseSchema,
+  deliveryLifecycleResponseSchema,
+  dispatchDeliveryRequestSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
   paymentInitializeRequestSchema,
   paymentInitializeResponseSchema,
+  refundPaymentRequestSchema,
+  refundPaymentResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
   publicTrackingResponseSchema,
+  receiveDestinationRequestSchema,
+  verifyPhoneResponseSchema,
   verifyPhoneRequestSchema,
   type Capability
 } from "@kra/shared";
@@ -37,10 +48,6 @@ export interface ApiRouteDefinition {
   responseSchema?: unknown;
   errorSchema: typeof apiErrorResponseSchema;
 }
-
-const emptySuccessSchema = {
-  type: "empty_success"
-} as const;
 
 export const apiRoutes = [
   {
@@ -73,7 +80,7 @@ export const apiRoutes = [
     authScope: "public",
     idempotent: true,
     requestSchema: verifyPhoneRequestSchema,
-    responseSchema: emptySuccessSchema,
+    responseSchema: verifyPhoneResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -119,7 +126,8 @@ export const apiRoutes = [
     authScope: "admin",
     capability: "execute_refund",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: refundPaymentRequestSchema,
+    responseSchema: refundPaymentResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -130,7 +138,8 @@ export const apiRoutes = [
     authScope: "staff",
     capability: "confirm_intake",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: confirmIntakeRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -141,7 +150,8 @@ export const apiRoutes = [
     authScope: "staff",
     capability: "assign_driver",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: assignDriverRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -152,7 +162,8 @@ export const apiRoutes = [
     authScope: "staff",
     capability: "confirm_dispatch",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: dispatchDeliveryRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -163,7 +174,8 @@ export const apiRoutes = [
     authScope: "staff",
     capability: "confirm_destination_receipt",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: receiveDestinationRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -174,7 +186,8 @@ export const apiRoutes = [
     authScope: "staff",
     capability: "assign_final_mile",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: assignFinalMileRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -185,7 +198,8 @@ export const apiRoutes = [
     authScope: "staff",
     capability: "complete_delivery_with_proof",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: completeDeliveryRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -195,7 +209,7 @@ export const apiRoutes = [
     module: "admin",
     authScope: "admin",
     idempotent: false,
-    responseSchema: emptySuccessSchema,
+    responseSchema: adminOverviewResponseSchema,
     errorSchema: apiErrorResponseSchema
   }
 ] as const satisfies readonly ApiRouteDefinition[];

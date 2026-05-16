@@ -1,0 +1,96 @@
+import type { DocumentData, FirestoreDataConverter, QueryDocumentSnapshot } from "firebase-admin/firestore";
+
+import type { DeliveryRecord } from "../deliveries";
+import type { DeliveryEventRecord, HandoffEventRecord } from "../handoffs";
+import type { WebhookEventRecord } from "../payment-webhooks";
+import type { PaymentRecord } from "../payments";
+import type {
+  PublicTrackingPhoneChallengeRecord,
+  PublicTrackingVerificationFailedAttemptRecord,
+  PublicTrackingVerificationGrantRecord
+} from "../public-tracking-verification";
+
+export const firestoreCollections = {
+  deliveries: "deliveries",
+  deliveryEvents: "events",
+  payments: "payments",
+  handoffEvents: "handoff_events",
+  webhookEvents: "provider_webhook_events",
+  publicTrackingPhoneChallenges: "public_tracking_phone_challenges",
+  publicTrackingVerificationAttempts: "public_tracking_verification_failed_attempts",
+  publicTrackingVerificationGrants: "public_tracking_verification_grants"
+} as const;
+
+export interface DeliveryDocument extends DeliveryRecord {
+  updatedAt: string;
+}
+
+export interface PaymentDocument extends PaymentRecord {
+  updatedAt: string;
+  refundAmountGhs?: number;
+  refundReason?: string;
+  refundRequestedAt?: string;
+}
+
+export type DeliveryEventDocument = DeliveryEventRecord;
+export type HandoffEventDocument = HandoffEventRecord;
+export type WebhookEventDocument = WebhookEventRecord;
+export type PublicTrackingPhoneChallengeDocument = PublicTrackingPhoneChallengeRecord;
+export type PublicTrackingVerificationAttemptDocument =
+  PublicTrackingVerificationFailedAttemptRecord;
+export type PublicTrackingVerificationGrantDocument = PublicTrackingVerificationGrantRecord;
+
+function createPassThroughConverter<T extends DocumentData>(): FirestoreDataConverter<T> {
+  return {
+    toFirestore(value: T): DocumentData {
+      return value;
+    },
+    fromFirestore(snapshot: QueryDocumentSnapshot): T {
+      return snapshot.data() as T;
+    }
+  };
+}
+
+export const deliveryConverter = createPassThroughConverter<DeliveryDocument>();
+export const paymentConverter = createPassThroughConverter<PaymentDocument>();
+export const deliveryEventConverter = createPassThroughConverter<DeliveryEventDocument>();
+export const handoffEventConverter = createPassThroughConverter<HandoffEventDocument>();
+export const webhookEventConverter = createPassThroughConverter<WebhookEventDocument>();
+export const publicTrackingPhoneChallengeConverter =
+  createPassThroughConverter<PublicTrackingPhoneChallengeDocument>();
+export const publicTrackingVerificationAttemptConverter =
+  createPassThroughConverter<PublicTrackingVerificationAttemptDocument>();
+export const publicTrackingVerificationGrantConverter =
+  createPassThroughConverter<PublicTrackingVerificationGrantDocument>();
+
+export function deliveryDocumentPath(deliveryId: string): string {
+  return `${firestoreCollections.deliveries}/${deliveryId}`;
+}
+
+export function deliveryEventDocumentPath(deliveryId: string, eventId: string): string {
+  return `${deliveryDocumentPath(deliveryId)}/${firestoreCollections.deliveryEvents}/${eventId}`;
+}
+
+export function paymentDocumentPath(paymentId: string): string {
+  return `${firestoreCollections.payments}/${paymentId}`;
+}
+
+export function handoffEventDocumentPath(handoffEventId: string): string {
+  return `${firestoreCollections.handoffEvents}/${handoffEventId}`;
+}
+
+export function webhookEventDocumentPath(eventId: string): string {
+  return `${firestoreCollections.webhookEvents}/${eventId}`;
+}
+
+export function publicTrackingPhoneChallengeDocumentPath(challengeId: string): string {
+  return `${firestoreCollections.publicTrackingPhoneChallenges}/${challengeId}`;
+}
+
+export function publicTrackingVerificationAttemptDocumentPath(attemptId: string): string {
+  return `${firestoreCollections.publicTrackingVerificationAttempts}/${attemptId}`;
+}
+
+export function publicTrackingVerificationGrantDocumentPath(verificationId: string): string {
+  return `${firestoreCollections.publicTrackingVerificationGrants}/${verificationId}`;
+}

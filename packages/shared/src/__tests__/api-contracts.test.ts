@@ -1,14 +1,25 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adminOverviewResponseSchema,
   apiErrorResponseSchema,
+  assignDriverRequestSchema,
+  assignFinalMileRequestSchema,
   buildApiErrorResponse,
+  completeDeliveryRequestSchema,
+  confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
+  deliveryLifecycleResponseSchema,
+  dispatchDeliveryRequestSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
-  publicTrackingResponseSchema
+  publicTrackingResponseSchema,
+  receiveDestinationRequestSchema,
+  refundPaymentRequestSchema,
+  refundPaymentResponseSchema,
+  verifyPhoneResponseSchema
 } from "../contracts/api";
 
 describe("api contracts", () => {
@@ -168,6 +179,147 @@ describe("api contracts", () => {
     ).toMatchObject({
       acknowledgement: "processed",
       matchedPaymentId: "PAY-0001"
+    });
+  });
+
+  it("accepts a public phone-verification response contract", () => {
+    expect(
+      verifyPhoneResponseSchema.parse({
+        deliveryId: "DEL-0001",
+        trackingCode: "KRA-0001",
+        verificationToken: "pvt_live_delivery_scope_token_0001",
+        verifiedAt: "2026-05-16T10:00:00.000Z",
+        expiresAt: "2026-05-16T10:30:00.000Z"
+      })
+    ).toMatchObject({
+      deliveryId: "DEL-0001",
+      trackingCode: "KRA-0001"
+    });
+  });
+
+  it("accepts lifecycle mutation request and response contracts", () => {
+    expect(
+      confirmIntakeRequestSchema.parse({
+        measuredWeightKg: 1.9,
+        sizeTier: "standard",
+        condition: "ok",
+        labelScanCode: "PKG-0001"
+      })
+    ).toMatchObject({
+      condition: "ok"
+    });
+
+    expect(
+      assignDriverRequestSchema.parse({
+        driverUserId: "USR-DRV-001"
+      })
+    ).toEqual({
+      driverUserId: "USR-DRV-001"
+    });
+
+    expect(
+      dispatchDeliveryRequestSchema.parse({
+        packageScanCode: "PKG-0001"
+      })
+    ).toEqual({
+      packageScanCode: "PKG-0001"
+    });
+
+    expect(
+      receiveDestinationRequestSchema.parse({
+        packageScanCode: "PKG-0001",
+        condition: "ok",
+        nextStep: "doorstep"
+      })
+    ).toMatchObject({
+      nextStep: "doorstep"
+    });
+
+    expect(
+      assignFinalMileRequestSchema.parse({
+        courierUserId: "USR-COR-001"
+      })
+    ).toEqual({
+      courierUserId: "USR-COR-001"
+    });
+
+    expect(
+      completeDeliveryRequestSchema.parse({
+        proofType: "otp",
+        proofReference: "OTP-VERIFIED",
+        receivedByName: "Kojo Asante"
+      })
+    ).toMatchObject({
+      proofType: "otp"
+    });
+
+    expect(
+      deliveryLifecycleResponseSchema.parse({
+        eventId: "EVT-DEL-0001",
+        deliveryId: "DEL-0001",
+        status: "delivered",
+        paymentStatus: "confirmed",
+        occurredAt: "2026-05-16T10:30:00.000Z"
+      })
+    ).toMatchObject({
+      eventId: "EVT-DEL-0001",
+      status: "delivered"
+    });
+  });
+
+  it("accepts refund execution request and response contracts", () => {
+    expect(
+      refundPaymentRequestSchema.parse({
+        paymentId: "PAY-0001",
+        packageNeverReceivedAtOrigin: true
+      })
+    ).toEqual({
+      paymentId: "PAY-0001",
+      packageNeverReceivedAtOrigin: true
+    });
+
+    expect(
+      refundPaymentResponseSchema.parse({
+        paymentId: "PAY-0001",
+        deliveryId: "DEL-0001",
+        refundStatus: "refund_pending",
+        refundAmountGhs: 35,
+        refundReason: "never_received_at_origin",
+        requiresManualReview: false,
+        requestedAt: "2026-05-16T11:00:00.000Z"
+      })
+    ).toMatchObject({
+      paymentId: "PAY-0001",
+      refundAmountGhs: 35
+    });
+  });
+
+  it("accepts an admin overview response contract", () => {
+    expect(
+      adminOverviewResponseSchema.parse({
+        generatedAt: "2026-05-16T12:00:00.000Z",
+        deliveryStatusCounts: [
+          {
+            status: "awaiting_driver_assignment",
+            count: 4
+          }
+        ],
+        paymentStatusCounts: [
+          {
+            status: "confirmed",
+            count: 11
+          }
+        ],
+        operationalAlerts: {
+          openIssueLikeDeliveries: 3,
+          unmatchedWebhookEvents: 2,
+          manualReviewWebhookEvents: 1
+        }
+      })
+    ).toMatchObject({
+      operationalAlerts: {
+        openIssueLikeDeliveries: 3
+      }
     });
   });
 });
