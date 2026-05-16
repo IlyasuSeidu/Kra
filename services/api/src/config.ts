@@ -16,7 +16,8 @@ const apiRuntimeEnvSchema = z
     HUBTEL_SMS_BASE_URL: z.string().trim().url().optional(),
     HUBTEL_SMS_CLIENT_ID: z.string().trim().min(8).optional(),
     HUBTEL_SMS_CLIENT_SECRET: z.string().trim().min(8).optional(),
-    HUBTEL_SMS_FROM: z.string().trim().min(3).max(16).optional()
+    HUBTEL_SMS_FROM: z.string().trim().min(3).max(16).optional(),
+    PUBLIC_TRACKING_BASE_URL: z.string().trim().url().optional()
   })
   .superRefine((value, ctx) => {
     const hasClientEmail = value.FIREBASE_CLIENT_EMAIL !== undefined;
@@ -55,7 +56,8 @@ const apiRuntimeEnvSchema = z
       value.HUBTEL_SMS_BASE_URL,
       value.HUBTEL_SMS_CLIENT_ID,
       value.HUBTEL_SMS_CLIENT_SECRET,
-      value.HUBTEL_SMS_FROM
+      value.HUBTEL_SMS_FROM,
+      value.PUBLIC_TRACKING_BASE_URL
     ];
     const hasAnyHubtelSmsField = hubtelSmsFields.some((field) => field !== undefined);
     const hasAllHubtelSmsFields = hubtelSmsFields.every((field) => field !== undefined);
@@ -89,6 +91,7 @@ export interface ApiRuntimeConfig {
     clientId: string;
     clientSecret: string;
     from: string;
+    publicTrackingBaseUrl: string;
   };
 }
 
@@ -110,7 +113,8 @@ export function loadApiRuntimeConfig(
     HUBTEL_SMS_BASE_URL: env.HUBTEL_SMS_BASE_URL,
     HUBTEL_SMS_CLIENT_ID: env.HUBTEL_SMS_CLIENT_ID,
     HUBTEL_SMS_CLIENT_SECRET: env.HUBTEL_SMS_CLIENT_SECRET,
-    HUBTEL_SMS_FROM: env.HUBTEL_SMS_FROM
+    HUBTEL_SMS_FROM: env.HUBTEL_SMS_FROM,
+    PUBLIC_TRACKING_BASE_URL: env.PUBLIC_TRACKING_BASE_URL
   });
 
   return {
@@ -144,7 +148,8 @@ export function loadApiRuntimeConfig(
             baseUrl: parsed.HUBTEL_SMS_BASE_URL,
             clientId: parsed.HUBTEL_SMS_CLIENT_ID as string,
             clientSecret: parsed.HUBTEL_SMS_CLIENT_SECRET as string,
-            from: parsed.HUBTEL_SMS_FROM as string
+            from: parsed.HUBTEL_SMS_FROM as string,
+            publicTrackingBaseUrl: parsed.PUBLIC_TRACKING_BASE_URL as string
           }
         })
   };

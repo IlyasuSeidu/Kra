@@ -31,6 +31,7 @@ import {
   requestPhoneVerificationChallengeRequestSchema,
   resolveIssueRequestSchema,
   settleRefundRequestSchema,
+  stationCatalog,
   type Capability,
   verifyPhoneRequestSchema
 } from "@kra/shared";
@@ -114,7 +115,9 @@ import {
 import { createMtnMomoGateway } from "./mtn-momo";
 import {
   createHubtelSmsGateway,
-  type PublicTrackingOtpNotificationGateway
+  type PublicTrackingOtpNotificationGateway,
+  type ReceiverDeliveryNotificationGateway,
+  type ReceiverDeliverySmsEvent
 } from "./notifications";
 import {
   listNotifications,
@@ -199,7 +202,7 @@ export interface ApiAppDeps {
   idempotency: IdempotencyRepository;
   auditEvents: AuditEventRepository;
   gateway: MtnMomoGateway;
-  notifications?: PublicTrackingOtpNotificationGateway;
+  notifications?: PublicTrackingOtpNotificationGateway & ReceiverDeliveryNotificationGateway;
   identityFactory: SharedIdentityFactory;
   now: () => string;
   readinessCheck?: () => Promise<void>;
@@ -504,6 +507,51 @@ async function queueIssueNotification(
     getIssueNotificationCopy(status),
     `issue:${issueId}:${status}`
   );
+}
+
+function getReceiverSmsEventForStatus(
+  status: DeliveryRecord["currentStatus"]
+): ReceiverDeliverySmsEvent | undefined {
+  switch (status) {
+    case "awaiting_receiver_pickup":
+      return "ready_for_pickup";
+    case "out_for_delivery":
+      return "out_for_delivery";
+    case "delivered":
+      return "delivered";
+    default:
+      return undefined;
+  }
+}
+
+async function sendReceiverDeliverySms(
+  deps: ApiAppDeps,
+  delivery: DeliveryRecord,
+  eventType: ReceiverDeliverySmsEvent
+): Promise<void> {
+  if (!deps.notifications) {
+    return;
+  }
+
+  await deps.notifications.sendReceiverDeliverySms({
+    phone: delivery.receiver.phone,
+    trackingCode: delivery.trackingCode,
+    eventType,
+    stationName: stationCatalog[delivery.destinationStationId].name
+  });
+}
+
+async function notifyDeliveryStatusChange(
+  deps: ApiAppDeps,
+  delivery: DeliveryRecord
+): Promise<void> {
+  await queueDeliveryStatusNotification(deps, delivery);
+
+  const receiverSmsEvent = getReceiverSmsEventForStatus(delivery.currentStatus);
+
+  if (receiverSmsEvent) {
+    await sendReceiverDeliverySms(deps, delivery, receiverSmsEvent);
+  }
 }
 
 function getIdempotencyKey(request: FastifyRequest): string | undefined {
@@ -1293,7 +1341,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             now: deps.now
           }
         );
-        await queueDeliveryStatusNotification(deps, result.delivery);
+        await notifyDeliveryStatusChange(deps, result.delivery);
 
         return {
           statusCode: 200,
@@ -1394,7 +1442,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             now: deps.now
           }
         );
-        await queueDeliveryStatusNotification(deps, result.delivery);
+        await notifyDeliveryStatusChange(deps, result.delivery);
 
         return {
           statusCode: 200,
@@ -1499,7 +1547,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             now: deps.now
           }
         );
-        await queueDeliveryStatusNotification(deps, result.delivery);
+        await notifyDeliveryStatusChange(deps, result.delivery);
 
         return {
           statusCode: 200,
@@ -1519,25 +1567,28 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           deliveryId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await assignFinalMileCourier(
-            {
-              deliveryId,
-              courierUserId: input.courierUserId
-            },
-            mapPrincipalToOperationalActor(principal),
-            {
-              deliveries: deps.deliveries,
-              deliveryEvents: deps.deliveryEvents,
-              handoffEvents: deps.handoffEvents,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await assignFinalMileCourier(
+          {
+            deliveryId,
+            courierUserId: input.courierUserId
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await sendReceiverDeliverySms(deps, result.delivery, "final_mile_assigned");
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/deliveries/:id/accept-final-mile-assignment", { preHandler: [authenticatedMutationPreHandler, requireCapability("accept_final_mile_assignment")] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1598,7 +1649,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             now: deps.now
           }
         );
-        await queueDeliveryStatusNotification(deps, result.delivery);
+        await notifyDeliveryStatusChange(deps, result.delivery);
 
         return {
           statusCode: 200,
@@ -1634,7 +1685,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             now: deps.now
           }
         );
-        await queueDeliveryStatusNotification(deps, result.delivery);
+        await sendReceiverDeliverySms(deps, result.delivery, "failed_attempt");
+        await notifyDeliveryStatusChange(deps, result.delivery);
 
         return {
           statusCode: 200,
@@ -1671,7 +1723,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             now: deps.now
           }
         );
-        await queueDeliveryStatusNotification(deps, result.delivery);
+        await notifyDeliveryStatusChange(deps, result.delivery);
 
         return {
           statusCode: 200,

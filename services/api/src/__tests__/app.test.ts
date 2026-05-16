@@ -415,6 +415,75 @@ describe("api app", () => {
     });
   });
 
+  it("sends receiver SMS for final-mile delivery milestones when configured", async () => {
+    const deps = makeAppDeps();
+    const receiverMessages: Array<{
+      phone: string;
+      trackingCode: string;
+      eventType: string;
+      stationName?: string;
+    }> = [];
+
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-COR-001",
+          role: "final_mile_courier",
+          capabilities: ["mark_out_for_delivery"],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.notifications = {
+      sendPublicTrackingOtp() {
+        return resolveVoid();
+      },
+      sendReceiverDeliverySms(input) {
+        receiverMessages.push(input);
+        return resolveVoid();
+      }
+    };
+    deps.deliveries.getById = () =>
+      resolve(
+        makeDelivery({
+          currentStatus: "assigned_for_final_mile",
+          doorstepRequested: true,
+          receiver: {
+            name: "Kojo Asante",
+            phone: "+233240000000",
+            addressText: "15 Ringway Road, Accra"
+          },
+          currentCustodyRole: "final_mile_courier",
+          currentCustodyActorId: "USR-COR-001",
+          assignedFinalMileCourierId: "USR-COR-001"
+        })
+      );
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries/DEL-9401/out-for-delivery",
+      headers: {
+        authorization: "Bearer token-courier"
+      },
+      payload: {
+        note: "Courier is en route to receiver"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(receiverMessages).toEqual([
+      {
+        phone: "+233240000000",
+        trackingCode: "KRA-9401",
+        eventType: "out_for_delivery",
+        stationName: "Kumasi Adum"
+      }
+    ]);
+  });
+
   it("lets a super admin create a managed user record", async () => {
     const deps = makeAppDeps();
     let savedUserId: string | undefined;
