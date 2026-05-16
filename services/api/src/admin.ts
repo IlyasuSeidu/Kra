@@ -2,14 +2,14 @@ import {
   adminDeliveryListResponseSchema,
   adminFinanceResponseSchema,
   adminOverviewResponseSchema,
-  adminStationListResponseSchema,
-  stationCatalog
+  adminStationListResponseSchema
 } from "@kra/shared";
 import type { z } from "zod";
 
 import type { DeliveryRecord } from "./deliveries";
 import type { WebhookEventRecord } from "./payment-webhooks";
 import type { PaymentRecord } from "./payments";
+import { listConfiguredStations, type StationRepository } from "./stations";
 
 export interface AdminDeliveryMetricsRepository {
   countByStatus(): Promise<Array<{
@@ -115,19 +115,29 @@ export async function listAdminStations(
   deps: {
     deliveries: AdminDeliveryMetricsRepository;
     issues: AdminIssueMetricsRepository;
+    stations: StationRepository;
     now: () => string;
   }
 ): Promise<AdminStationListResponse> {
   const activeQueueCounts = await deps.deliveries.countActiveQueuesByStation();
   const activeQueueMap = new Map(activeQueueCounts.map((entry) => [entry.stationId, entry.count] as const));
+  const configuredStations = await listConfiguredStations({
+    stations: deps.stations,
+    now: deps.now
+  });
 
   const stations = await Promise.all(
-    Object.entries(stationCatalog).map(async ([stationId, metadata]) => ({
-      stationId,
-      name: metadata.name,
-      city: metadata.city,
-      activeQueueCount: activeQueueMap.get(stationId as DeliveryRecord["originStationId"]) ?? 0,
-      issueCount: await deps.issues.countOpenByStation(stationId as DeliveryRecord["originStationId"])
+    configuredStations.map(async (station) => ({
+      stationId: station.stationId,
+      name: station.name,
+      city: station.city,
+      operatingStatus: station.operatingStatus,
+      intakeStatus: station.intakeStatus,
+      serviceAvailability: station.serviceAvailability,
+      activeQueueCount: activeQueueMap.get(station.stationId) ?? 0,
+      issueCount: await deps.issues.countOpenByStation(station.stationId),
+      ...(station.note === undefined ? {} : { note: station.note }),
+      updatedAt: station.updatedAt
     }))
   );
 

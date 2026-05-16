@@ -7,13 +7,17 @@ import type { SupportIssueRecord } from "../issues";
 import type { WebhookEventRecord } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
 import type { AuditEventRecord } from "../audit";
+import type { StationRecord } from "../stations";
 import type {
   PublicTrackingPhoneChallengeRecord,
   PublicTrackingVerificationFailedAttemptRecord,
   PublicTrackingVerificationGrantRecord
 } from "../public-tracking-verification";
+import type { UserRecord } from "../users";
 
 export const firestoreCollections = {
+  users: "users",
+  stations: "stations",
   deliveries: "deliveries",
   deliveryEvents: "events",
   payments: "payments",
@@ -27,6 +31,8 @@ export const firestoreCollections = {
   auditEvents: "audit_events"
 } as const;
 
+export type UserDocument = UserRecord;
+export type StationDocument = StationRecord;
 export interface DeliveryDocument extends DeliveryRecord {
   updatedAt: string;
 }
@@ -60,6 +66,8 @@ function createPassThroughConverter<T extends DocumentData>(): FirestoreDataConv
   };
 }
 
+export const userConverter = createPassThroughConverter<UserDocument>();
+export const stationConverter = createPassThroughConverter<StationDocument>();
 export const deliveryConverter = createPassThroughConverter<DeliveryDocument>();
 export const paymentConverter = createPassThroughConverter<PaymentDocument>();
 export const deliveryEventConverter = createPassThroughConverter<DeliveryEventDocument>();
@@ -74,6 +82,14 @@ export const publicTrackingVerificationGrantConverter =
   createPassThroughConverter<PublicTrackingVerificationGrantDocument>();
 export const idempotencyRecordConverter = createPassThroughConverter<IdempotencyRecordDocument>();
 export const auditEventConverter = createPassThroughConverter<AuditEventDocument>();
+
+export function userDocumentPath(userId: string): string {
+  return `${firestoreCollections.users}/${userId}`;
+}
+
+export function stationDocumentPath(stationId: string): string {
+  return `${firestoreCollections.stations}/${stationId}`;
+}
 
 export function deliveryDocumentPath(deliveryId: string): string {
   return `${firestoreCollections.deliveries}/${deliveryId}`;

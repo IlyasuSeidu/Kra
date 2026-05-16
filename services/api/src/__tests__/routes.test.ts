@@ -72,7 +72,7 @@ describe("api routes", () => {
 
     expect(getApiRoute("refund_payment")).toMatchObject({
       authScope: "admin",
-      capability: "execute_refund"
+      capability: "approve_refund"
     });
 
     expect(getApiRoute("refund_payment")?.requestSchema).toBeDefined();
@@ -97,6 +97,26 @@ describe("api routes", () => {
       authScope: "admin",
       path: "/v1/admin/finance"
     });
+    expect(getApiRoute("admin_users")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/users",
+      capability: "manage_users_and_roles"
+    });
+    expect(getApiRoute("admin_upsert_user")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/users",
+      capability: "manage_users_and_roles"
+    });
+    expect(getApiRoute("admin_update_user_access")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/users/:id/access",
+      capability: "manage_users_and_roles"
+    });
+    expect(getApiRoute("admin_update_station_status")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/stations/:id/status",
+      capability: "override_queue_state"
+    });
     expect(getApiRoute("admin_audit_events")).toMatchObject({
       authScope: "admin",
       path: "/v1/admin/audit-events"
@@ -111,10 +131,13 @@ describe("api routes", () => {
     expect(listApiRoutesByModule("handoffs").map((route) => route.operationId)).toEqual([
       "confirm_intake",
       "assign_driver",
+      "accept_run",
       "dispatch_delivery",
+      "confirm_pickup",
       "mark_in_transit",
       "receive_destination",
       "assign_final_mile",
+      "accept_final_mile_assignment",
       "mark_out_for_delivery",
       "record_failed_attempt",
       "complete_delivery"

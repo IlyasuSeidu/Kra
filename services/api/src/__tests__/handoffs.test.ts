@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { type DeliveryRecord } from "../deliveries";
 import {
+  acceptDriverRun,
+  acceptFinalMileAssignment,
   assignDriver,
   assignFinalMileCourier,
   completeDelivery,
+  confirmDriverPickup,
   confirmOriginIntake,
   dispatchDelivery,
   markDeliveryInTransit,
@@ -688,5 +691,131 @@ describe("delivery lifecycle services", () => {
       "final_mile_courier_to_destination_station",
       "final_mile_courier_to_destination_station"
     ]);
+  });
+
+  it("records driver acceptance and pickup confirmation without moving status", async () => {
+    const savedDeliveries: DeliveryRecord[] = [];
+    const deliveryEvents: DeliveryEventRecord[] = [];
+
+    const deps = {
+      deliveries: {
+        getById() {
+          return resolve(
+            makeDelivery({
+              currentStatus: "assigned_to_driver",
+              assignedDriverId: "USR-DRV-001",
+              currentCustodyRole: "station_operator",
+              currentCustodyActorId: "USR-OP-001"
+            })
+          );
+        },
+        save(delivery: DeliveryRecord) {
+          savedDeliveries.push(delivery);
+          return resolveVoid();
+        }
+      },
+      deliveryEvents: {
+        create(event: DeliveryEventRecord) {
+          deliveryEvents.push(event);
+          return resolveVoid();
+        }
+      },
+      handoffEvents: {
+        create() {
+          return resolveVoid();
+        }
+      },
+      identityFactory: {
+        nextDeliveryEventId: (() => {
+          const ids = ["EVT-DEL-ACCEPT", "EVT-DEL-PICKUP"];
+          return () => ids.shift() ?? "EVT-DEL-EXTRA";
+        })(),
+        nextHandoffEventId: () => "EVT-HO-UNUSED"
+      },
+      now: () => "2026-05-16T18:00:00.000Z"
+    };
+
+    const accepted = await acceptDriverRun(
+      {
+        deliveryId: "DEL-6001",
+        note: "Accepted within SLA"
+      },
+      {
+        actorId: "USR-DRV-001",
+        role: "driver"
+      },
+      deps
+    );
+
+    const pickedUp = await confirmDriverPickup(
+      {
+        deliveryId: "DEL-6001",
+        packageScanCode: "PKG-6001"
+      },
+      {
+        actorId: "USR-DRV-001",
+        role: "driver"
+      },
+      deps
+    );
+
+    expect(accepted.response.status).toBe("assigned_to_driver");
+    expect(pickedUp.response.status).toBe("assigned_to_driver");
+    expect(savedDeliveries).toHaveLength(2);
+    expect(deliveryEvents.map((event) => event.type)).toEqual([
+      "driver_assignment_accepted",
+      "driver_pickup_confirmed"
+    ]);
+  });
+
+  it("records final-mile assignment acceptance without moving status", async () => {
+    const deliveryEvents: DeliveryEventRecord[] = [];
+
+    const result = await acceptFinalMileAssignment(
+      {
+        deliveryId: "DEL-6001",
+        note: "Courier ready"
+      },
+      {
+        actorId: "USR-COR-001",
+        role: "final_mile_courier"
+      },
+      {
+        deliveries: {
+          getById() {
+            return resolve(
+              makeDelivery({
+                currentStatus: "assigned_for_final_mile",
+                assignedFinalMileCourierId: "USR-COR-001",
+                currentCustodyRole: "final_mile_courier",
+                currentCustodyActorId: "USR-COR-001"
+              })
+            );
+          },
+          save() {
+            return resolveVoid();
+          }
+        },
+        deliveryEvents: {
+          create(event: DeliveryEventRecord) {
+            deliveryEvents.push(event);
+            return resolveVoid();
+          }
+        },
+        handoffEvents: {
+          create() {
+            return resolveVoid();
+          }
+        },
+        identityFactory: {
+          nextDeliveryEventId: () => "EVT-DEL-COR-ACCEPT",
+          nextHandoffEventId: () => "EVT-HO-UNUSED"
+        },
+        now: () => "2026-05-16T18:05:00.000Z"
+      }
+    );
+
+    expect(result.response.status).toBe("assigned_for_final_mile");
+    expect(deliveryEvents[0]?.type).toBe("final_mile_assignment_accepted");
   });
 });

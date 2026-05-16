@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  acceptFinalMileAssignmentRequestSchema,
+  acceptRunRequestSchema,
+  adminUpdateStationStatusRequestSchema,
+  adminUpdateStationStatusResponseSchema,
+  adminUpdateUserAccessRequestSchema,
+  adminUserListResponseSchema,
+  adminUserResponseSchema,
+  adminUpsertUserRequestSchema,
   adminWebhookEventListResponseSchema,
   adminOverviewResponseSchema,
   auditEventListResponseSchema,
@@ -11,6 +19,7 @@ import {
   cancelDeliveryRequestSchema,
   cancelDeliveryResponseSchema,
   completeDeliveryRequestSchema,
+  confirmDriverPickupRequestSchema,
   confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
   deliveryListResponseSchema,
@@ -297,6 +306,14 @@ describe("api contracts", () => {
 
   it("accepts explicit driver and final-mile progress request contracts", () => {
     expect(
+      acceptRunRequestSchema.parse({
+        note: "Run acknowledged by driver"
+      })
+    ).toEqual({
+      note: "Run acknowledged by driver"
+    });
+
+    expect(
       markInTransitRequestSchema.parse({
         note: "Departed Accra station"
       })
@@ -310,6 +327,14 @@ describe("api contracts", () => {
       })
     ).toEqual({
       note: "Courier en route to receiver"
+    });
+
+    expect(
+      acceptFinalMileAssignmentRequestSchema.parse({
+        note: "Courier accepted assignment"
+      })
+    ).toEqual({
+      note: "Courier accepted assignment"
     });
   });
 
@@ -405,6 +430,14 @@ describe("api contracts", () => {
 
     expect(
       dispatchDeliveryRequestSchema.parse({
+        packageScanCode: "PKG-0001"
+      })
+    ).toEqual({
+      packageScanCode: "PKG-0001"
+    });
+
+    expect(
+      confirmDriverPickupRequestSchema.parse({
         packageScanCode: "PKG-0001"
       })
     ).toEqual({
@@ -536,6 +569,105 @@ describe("api contracts", () => {
     ).toMatchObject({
       refundStatus: "refunded",
       refundReference: "RFD-MTN-0001"
+    });
+  });
+
+  it("accepts admin user and station-management contracts", () => {
+    expect(
+      adminUpsertUserRequestSchema.parse({
+        userId: "USR-OPS-001",
+        fullName: "Ama Owusu",
+        role: "station_operator",
+        stationId: "ST-ACC-01",
+        status: "active",
+        phone: "+233240000001"
+      })
+    ).toMatchObject({
+      role: "station_operator",
+      stationId: "ST-ACC-01"
+    });
+
+    expect(
+      adminUpdateUserAccessRequestSchema.parse({
+        role: "driver",
+        status: "active"
+      })
+    ).toMatchObject({
+      role: "driver",
+      status: "active"
+    });
+
+    expect(
+      adminUserResponseSchema.parse({
+        userId: "USR-OPS-001",
+        fullName: "Ama Owusu",
+        role: "station_operator",
+        status: "active",
+        stationId: "ST-ACC-01",
+        createdAt: "2026-05-16T12:00:00.000Z",
+        updatedAt: "2026-05-16T12:05:00.000Z",
+        activatedAt: "2026-05-16T12:00:00.000Z"
+      })
+    ).toMatchObject({
+      userId: "USR-OPS-001",
+      status: "active"
+    });
+
+    expect(
+      adminUserListResponseSchema.parse({
+        generatedAt: "2026-05-16T12:05:00.000Z",
+        users: [
+          {
+            userId: "USR-OPS-001",
+            fullName: "Ama Owusu",
+            role: "station_operator",
+            status: "active",
+            stationId: "ST-ACC-01",
+            createdAt: "2026-05-16T12:00:00.000Z",
+            updatedAt: "2026-05-16T12:05:00.000Z",
+            activatedAt: "2026-05-16T12:00:00.000Z"
+          }
+        ]
+      })
+    ).toMatchObject({
+      users: [
+        {
+          userId: "USR-OPS-001"
+        }
+      ]
+    });
+
+    expect(
+      adminUpdateStationStatusRequestSchema.parse({
+        operatingStatus: "active",
+        intakeStatus: "open",
+        serviceAvailability: {
+          standard: true,
+          express: true,
+          doorstep: true
+        }
+      })
+    ).toMatchObject({
+      operatingStatus: "active"
+    });
+
+    expect(
+      adminUpdateStationStatusResponseSchema.parse({
+        stationId: "ST-ACC-01",
+        name: "Accra Central",
+        city: "Accra",
+        operatingStatus: "active",
+        intakeStatus: "restricted",
+        serviceAvailability: {
+          standard: true,
+          express: false,
+          doorstep: true
+        },
+        updatedAt: "2026-05-16T12:10:00.000Z"
+      })
+    ).toMatchObject({
+      stationId: "ST-ACC-01",
+      intakeStatus: "restricted"
     });
   });
 
