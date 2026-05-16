@@ -61,7 +61,9 @@ function getEtaLabel(status: DeliveryRecord["currentStatus"]): string | undefine
   return undefined;
 }
 
-function requiresReceiverVerification(status: DeliveryRecord["currentStatus"]): boolean {
+export function isReceiverVerificationRequiredStatus(
+  status: DeliveryRecord["currentStatus"]
+): boolean {
   return (
     status === "awaiting_receiver_pickup" ||
     status === "awaiting_final_mile_assignment" ||
@@ -94,7 +96,7 @@ export async function getPublicTracking(
         : { stationId: delivery.latestTouchpoint.stationId }),
       occurredAt: delivery.latestTouchpoint.occurredAt
     },
-    receiverVerificationRequired: requiresReceiverVerification(delivery.currentStatus),
+    receiverVerificationRequired: isReceiverVerificationRequiredStatus(delivery.currentStatus),
     ...(getEtaLabel(delivery.currentStatus) === undefined
       ? {}
       : { etaLabel: getEtaLabel(delivery.currentStatus) })

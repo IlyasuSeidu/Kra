@@ -11,6 +11,15 @@ import { ApiServiceError } from "./service-errors";
 
 export interface DeliveryRecord extends DeliveryDraft {
   paymentStatus: PaymentStatus;
+  assignedDriverId?: string;
+  assignedFinalMileCourierId?: string;
+  finalMileAttemptCount?: number;
+  finalProof?: {
+    type: "otp" | "signature" | "delivery_photo";
+    reference: string;
+    receivedByName: string;
+    capturedAt: string;
+  };
   latestTouchpoint: {
     role: "system" | "station_operator" | "driver" | "final_mile_courier";
     occurredAt: string;

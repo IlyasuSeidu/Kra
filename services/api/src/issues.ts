@@ -1,0 +1,475 @@
+import {
+  canPerform,
+  createIssueRequestSchema,
+  escalateIssueRequestSchema,
+  issueListQuerySchema,
+  issueListResponseSchema,
+  issueResponseSchema,
+  resolveIssueRequestSchema,
+  type Capability,
+  type Role
+} from "@kra/shared";
+import type { z } from "zod";
+
+import type { AuthPrincipal } from "./auth";
+import { assertAdminPrincipal, assertCanAccessDelivery } from "./auth";
+import type { DeliveryRecord, DeliveryRepository } from "./deliveries";
+import { ApiServiceError } from "./service-errors";
+
+export interface SupportIssueRecord {
+  issueId: string;
+  deliveryId: string;
+  status: "open" | "in_review" | "escalated" | "resolved" | "closed";
+  severity: "p1" | "p2" | "p3";
+  category: "delay" | "damage" | "loss" | "payment" | "handoff" | "other";
+  summary: string;
+  description?: string;
+  reporter: {
+    actorId: string;
+    actorRole: Role;
+  };
+  escalatedAt?: string;
+  escalatedByActorId?: string;
+  escalationReasonCode?: string;
+  resolvedAt?: string;
+  resolvedByActorId?: string;
+  closedAt?: string;
+  closedByActorId?: string;
+  resolutionCode?: string;
+  resolutionNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportIssueRepository {
+  create(issue: SupportIssueRecord): Promise<void>;
+  getById(issueId: string): Promise<SupportIssueRecord | undefined>;
+  save(issue: SupportIssueRecord): Promise<void>;
+  listByDeliveryId(deliveryId: string): Promise<SupportIssueRecord[]>;
+  listRecent(input: {
+    status?: SupportIssueRecord["status"];
+    severity?: SupportIssueRecord["severity"];
+    limit: number;
+  }): Promise<SupportIssueRecord[]>;
+  listByDeliveryIds(input: {
+    deliveryIds: string[];
+    status?: SupportIssueRecord["status"];
+    severity?: SupportIssueRecord["severity"];
+    limit: number;
+  }): Promise<SupportIssueRecord[]>;
+  countOpenByStation(stationId: DeliveryRecord["originStationId"]): Promise<number>;
+}
+
+export interface SupportIssueIdentityFactory {
+  nextIssueId(): string;
+}
+
+export interface CreateSupportIssueDeps {
+  deliveries: DeliveryRepository;
+  issues: SupportIssueRepository;
+  identityFactory: SupportIssueIdentityFactory;
+  now: () => string;
+}
+
+export interface EscalateSupportIssueDeps {
+  deliveries: DeliveryRepository;
+  issues: SupportIssueRepository;
+  now: () => string;
+}
+
+export interface ResolveSupportIssueDeps {
+  deliveries: DeliveryRepository;
+  issues: SupportIssueRepository;
+  now: () => string;
+}
+
+export type IssueResponse = z.infer<typeof issueResponseSchema>;
+export type IssueListResponse = z.infer<typeof issueListResponseSchema>;
+
+export interface AccessibleDeliveryListRepository {
+  listAccessible(input: {
+    principal: AuthPrincipal;
+    limit: number;
+  }): Promise<DeliveryRecord[]>;
+}
+
+function toIssueResponse(issue: SupportIssueRecord): IssueResponse {
+  return issueResponseSchema.parse({
+    issueId: issue.issueId,
+    deliveryId: issue.deliveryId,
+    status: issue.status,
+    severity: issue.severity,
+    category: issue.category,
+    summary: issue.summary,
+    ...(issue.description === undefined ? {} : { description: issue.description }),
+    reporter: {
+      actorId: issue.reporter.actorId,
+      actorRole: issue.reporter.actorRole
+    },
+    ...(issue.escalatedAt === undefined ? {} : { escalatedAt: issue.escalatedAt }),
+    ...(issue.escalatedByActorId === undefined
+      ? {}
+      : { escalatedByActorId: issue.escalatedByActorId }),
+    ...(issue.escalationReasonCode === undefined
+      ? {}
+      : { escalationReasonCode: issue.escalationReasonCode }),
+    ...(issue.resolvedAt === undefined ? {} : { resolvedAt: issue.resolvedAt }),
+    ...(issue.resolvedByActorId === undefined ? {} : { resolvedByActorId: issue.resolvedByActorId }),
+    ...(issue.closedAt === undefined ? {} : { closedAt: issue.closedAt }),
+    ...(issue.closedByActorId === undefined ? {} : { closedByActorId: issue.closedByActorId }),
+    ...(issue.resolutionCode === undefined ? {} : { resolutionCode: issue.resolutionCode }),
+    ...(issue.resolutionNote === undefined ? {} : { resolutionNote: issue.resolutionNote }),
+    createdAt: issue.createdAt,
+    updatedAt: issue.updatedAt
+  });
+}
+
+function assertIssueCreationScope(principal: AuthPrincipal, delivery: DeliveryRecord): void {
+  if (principal.role === "sender") {
+    assertCanAccessDelivery(principal, delivery);
+    return;
+  }
+
+  if (
+    principal.role === "driver" ||
+    principal.role === "station_operator" ||
+    principal.role === "final_mile_courier"
+  ) {
+    assertCanAccessDelivery(principal, delivery);
+    return;
+  }
+
+  if (
+    principal.role === "ops_admin" ||
+    principal.role === "support_admin" ||
+    principal.role === "super_admin" ||
+    principal.role === "finance_admin"
+  ) {
+    return;
+  }
+
+  throw new ApiServiceError("FORBIDDEN", "Principal cannot create support issues.", {
+    userId: principal.userId,
+    role: principal.role
+  });
+}
+
+function assertEscalationCapability(principal: AuthPrincipal): void {
+  const allowedCapabilities: Capability[] = ["escalate_case", "resolve_operational_issue"];
+  const hasCapability = allowedCapabilities.some((capability) => canPerform(principal.role, capability));
+
+  if (!hasCapability) {
+    throw new ApiServiceError("FORBIDDEN", "Principal cannot escalate support issues.", {
+      userId: principal.userId,
+      role: principal.role
+    });
+  }
+}
+
+function assertIssueManagementCapability(principal: AuthPrincipal): void {
+  const allowedCapabilities: Capability[] = ["manage_issue_thread", "resolve_operational_issue"];
+  const hasCapability = allowedCapabilities.some((capability) => canPerform(principal.role, capability));
+
+  if (!hasCapability) {
+    throw new ApiServiceError("FORBIDDEN", "Principal cannot manage support issues.", {
+      userId: principal.userId,
+      role: principal.role
+    });
+  }
+}
+
+export async function createSupportIssue(
+  principal: AuthPrincipal,
+  input: z.input<typeof createIssueRequestSchema>,
+  deps: CreateSupportIssueDeps
+): Promise<{
+  issue: SupportIssueRecord;
+  response: IssueResponse;
+}> {
+  const parsedInput = createIssueRequestSchema.parse(input);
+  const delivery = await deps.deliveries.getById(parsedInput.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: parsedInput.deliveryId
+    });
+  }
+
+  assertIssueCreationScope(principal, delivery);
+
+  const timestamp = deps.now();
+  const issue: SupportIssueRecord = {
+    issueId: deps.identityFactory.nextIssueId(),
+    deliveryId: delivery.deliveryId,
+    status: "open",
+    severity: parsedInput.severity,
+    category: parsedInput.category,
+    summary: parsedInput.summary,
+    ...(parsedInput.description === undefined ? {} : { description: parsedInput.description }),
+    reporter: {
+      actorId: principal.userId,
+      actorRole: principal.role
+    },
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+
+  await deps.issues.create(issue);
+
+  return {
+    issue,
+    response: toIssueResponse(issue)
+  };
+}
+
+export async function getSupportIssue(
+  principal: AuthPrincipal,
+  issueId: string,
+  deps: {
+    deliveries: DeliveryRepository;
+    issues: SupportIssueRepository;
+  }
+): Promise<IssueResponse> {
+  const issue = await deps.issues.getById(issueId);
+
+  if (!issue) {
+    throw new ApiServiceError("NOT_FOUND", "Support issue was not found.", {
+      issueId
+    });
+  }
+
+  const delivery = await deps.deliveries.getById(issue.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery linked to this issue was not found.", {
+      issueId,
+      deliveryId: issue.deliveryId
+    });
+  }
+
+  if (
+    principal.role !== "ops_admin" &&
+    principal.role !== "support_admin" &&
+    principal.role !== "finance_admin" &&
+    principal.role !== "super_admin"
+  ) {
+    assertCanAccessDelivery(principal, delivery);
+  }
+
+  return toIssueResponse(issue);
+}
+
+export async function listSupportIssues(
+  principal: AuthPrincipal,
+  input: z.input<typeof issueListQuerySchema>,
+  deps: {
+    deliveries: DeliveryRepository & AccessibleDeliveryListRepository;
+    issues: SupportIssueRepository;
+  }
+): Promise<IssueListResponse> {
+  const parsedInput = issueListQuerySchema.parse(input);
+  const limit = parsedInput.limit ?? 50;
+
+  if (
+    principal.role === "ops_admin" ||
+    principal.role === "support_admin" ||
+    principal.role === "finance_admin" ||
+    principal.role === "super_admin"
+  ) {
+    const issues = parsedInput.deliveryId
+      ? await deps.issues.listByDeliveryId(parsedInput.deliveryId)
+      : await deps.issues.listRecent({
+          ...(parsedInput.status === undefined ? {} : { status: parsedInput.status }),
+          ...(parsedInput.severity === undefined ? {} : { severity: parsedInput.severity }),
+          limit
+        });
+
+    return issueListResponseSchema.parse({
+      issues: issues
+        .filter((issue) => {
+          if (parsedInput.status && issue.status !== parsedInput.status) {
+            return false;
+          }
+
+          if (parsedInput.severity && issue.severity !== parsedInput.severity) {
+            return false;
+          }
+
+          return true;
+        })
+        .slice(0, limit)
+        .map((issue) => toIssueResponse(issue))
+    });
+  }
+
+  const accessibleDeliveries = parsedInput.deliveryId
+    ? [parsedInput.deliveryId]
+    : (
+        await deps.deliveries.listAccessible({
+          principal,
+          limit: 200
+        })
+      ).map((delivery) => delivery.deliveryId);
+
+  if (accessibleDeliveries.length === 0) {
+    return issueListResponseSchema.parse({
+      issues: []
+    });
+  }
+
+  if (parsedInput.deliveryId) {
+    const delivery = await deps.deliveries.getById(parsedInput.deliveryId);
+
+    if (!delivery) {
+      throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+        deliveryId: parsedInput.deliveryId
+      });
+    }
+
+    assertCanAccessDelivery(principal, delivery);
+  }
+
+  const issues = await deps.issues.listByDeliveryIds({
+    deliveryIds: accessibleDeliveries,
+    ...(parsedInput.status === undefined ? {} : { status: parsedInput.status }),
+    ...(parsedInput.severity === undefined ? {} : { severity: parsedInput.severity }),
+    limit
+  });
+
+  return issueListResponseSchema.parse({
+    issues: issues.map((issue) => toIssueResponse(issue))
+  });
+}
+
+export async function escalateSupportIssue(
+  principal: AuthPrincipal,
+  issueId: string,
+  input: z.input<typeof escalateIssueRequestSchema>,
+  deps: EscalateSupportIssueDeps
+): Promise<{
+  issue: SupportIssueRecord;
+  response: IssueResponse;
+}> {
+  assertAdminPrincipal(principal);
+  assertEscalationCapability(principal);
+
+  const parsedInput = escalateIssueRequestSchema.parse(input);
+  const issue = await deps.issues.getById(issueId);
+
+  if (!issue) {
+    throw new ApiServiceError("NOT_FOUND", "Support issue was not found.", {
+      issueId
+    });
+  }
+
+  const delivery = await deps.deliveries.getById(issue.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery linked to this issue was not found.", {
+      issueId,
+      deliveryId: issue.deliveryId
+    });
+  }
+
+  const timestamp = deps.now();
+  const escalatedIssue: SupportIssueRecord = {
+    ...issue,
+    status: "escalated",
+    escalatedAt: timestamp,
+    escalatedByActorId: principal.userId,
+    escalationReasonCode: parsedInput.reasonCode,
+    updatedAt: timestamp
+  };
+
+  await deps.issues.save(escalatedIssue);
+
+  return {
+    issue: escalatedIssue,
+    response: toIssueResponse(escalatedIssue)
+  };
+}
+
+export async function resolveSupportIssue(
+  principal: AuthPrincipal,
+  issueId: string,
+  input: z.input<typeof resolveIssueRequestSchema>,
+  deps: ResolveSupportIssueDeps
+): Promise<{
+  issue: SupportIssueRecord;
+  response: IssueResponse;
+}> {
+  assertAdminPrincipal(principal);
+  assertIssueManagementCapability(principal);
+
+  const parsedInput = resolveIssueRequestSchema.parse(input);
+  const issue = await deps.issues.getById(issueId);
+
+  if (!issue) {
+    throw new ApiServiceError("NOT_FOUND", "Support issue was not found.", {
+      issueId
+    });
+  }
+
+  const delivery = await deps.deliveries.getById(issue.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery linked to this issue was not found.", {
+      issueId,
+      deliveryId: issue.deliveryId
+    });
+  }
+
+  if (parsedInput.nextStatus === "in_review" && issue.status !== "open") {
+    throw new ApiServiceError("INVALID_STATUS_TRANSITION", "Only open issues can move to in review.", {
+      issueId,
+      currentStatus: issue.status,
+      nextStatus: parsedInput.nextStatus
+    });
+  }
+
+  if (parsedInput.nextStatus === "resolved" && issue.status === "closed") {
+    throw new ApiServiceError("INVALID_STATUS_TRANSITION", "Closed issues cannot be resolved again.", {
+      issueId,
+      currentStatus: issue.status,
+      nextStatus: parsedInput.nextStatus
+    });
+  }
+
+  if (parsedInput.nextStatus === "closed" && issue.status !== "resolved") {
+    throw new ApiServiceError("INVALID_STATUS_TRANSITION", "Only resolved issues can be closed.", {
+      issueId,
+      currentStatus: issue.status,
+      nextStatus: parsedInput.nextStatus
+    });
+  }
+
+  const timestamp = deps.now();
+  const resolvedIssue: SupportIssueRecord = {
+    ...issue,
+    status: parsedInput.nextStatus,
+    resolutionNote: parsedInput.note,
+    ...(parsedInput.resolutionCode === undefined
+      ? {}
+      : { resolutionCode: parsedInput.resolutionCode }),
+    ...(parsedInput.nextStatus === "resolved"
+      ? {
+          resolvedAt: timestamp,
+          resolvedByActorId: principal.userId
+        }
+      : {}),
+    ...(parsedInput.nextStatus === "closed"
+      ? {
+          closedAt: timestamp,
+          closedByActorId: principal.userId
+        }
+      : {}),
+    updatedAt: timestamp
+  };
+
+  await deps.issues.save(resolvedIssue);
+
+  return {
+    issue: resolvedIssue,
+    response: toIssueResponse(resolvedIssue)
+  };
+}

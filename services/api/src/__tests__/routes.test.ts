@@ -10,16 +10,47 @@ describe("api routes", () => {
   });
 
   it("exposes public tracking routes without authenticated scope", () => {
+    expect(getApiRoute("cancel_delivery")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries/:id/cancel",
+      capability: "cancel_eligible_delivery"
+    });
+
+    expect(getApiRoute("list_deliveries")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries"
+    });
+
+    expect(getApiRoute("get_delivery")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries/:id"
+    });
+
+    expect(getApiRoute("get_delivery_timeline")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries/:id/timeline"
+    });
+
     expect(getApiRoute("get_public_tracking")).toMatchObject({
       authScope: "public",
       path: "/v1/public/track/:trackingCode",
       idempotent: true
     });
 
+    expect(getApiRoute("request_public_tracking_phone_challenge")).toMatchObject({
+      authScope: "public",
+      path: "/v1/public/track/:trackingCode/request-verification",
+      idempotent: false
+    });
+
     expect(getApiRoute("verify_public_tracking_phone")).toMatchObject({
       authScope: "public",
-      path: "/v1/public/track/:trackingCode/verify-phone"
+      path: "/v1/public/track/:trackingCode/verify-phone",
+      idempotent: true
     });
+
+    expect(getApiRoute("verify_public_tracking_phone")?.requestSchema).toBeDefined();
+    expect(getApiRoute("verify_public_tracking_phone")?.responseSchema).toBeDefined();
   });
 
   it("registers the MTN MoMo webhook under webhook auth scope", () => {
@@ -44,8 +75,35 @@ describe("api routes", () => {
       capability: "execute_refund"
     });
 
+    expect(getApiRoute("refund_payment")?.requestSchema).toBeDefined();
+    expect(getApiRoute("refund_payment")?.responseSchema).toBeDefined();
+
+    expect(getApiRoute("settle_refund_payment")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/payments/refund/settle",
+      capability: "execute_refund"
+    });
+
     expect(getApiRoute("admin_overview")).toMatchObject({
       authScope: "admin"
+    });
+
+    expect(getApiRoute("admin_overview")?.responseSchema).toBeDefined();
+    expect(getApiRoute("admin_deliveries")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/deliveries"
+    });
+    expect(getApiRoute("admin_finance")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/finance"
+    });
+    expect(getApiRoute("admin_audit_events")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/audit-events"
+    });
+    expect(getApiRoute("admin_webhook_events")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/webhook-events"
     });
   });
 
@@ -56,7 +114,28 @@ describe("api routes", () => {
       "dispatch_delivery",
       "receive_destination",
       "assign_final_mile",
+      "record_failed_attempt",
       "complete_delivery"
     ]);
+  });
+
+  it("registers issue management routes", () => {
+    expect(getApiRoute("list_issues")).toMatchObject({
+      authScope: "authenticated",
+      module: "issues",
+      path: "/v1/issues"
+    });
+    expect(getApiRoute("create_issue")).toMatchObject({
+      authScope: "authenticated",
+      module: "issues"
+    });
+    expect(getApiRoute("escalate_issue")).toMatchObject({
+      authScope: "admin",
+      capability: "escalate_case"
+    });
+    expect(getApiRoute("resolve_issue")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/issues/:id/resolve"
+    });
   });
 });

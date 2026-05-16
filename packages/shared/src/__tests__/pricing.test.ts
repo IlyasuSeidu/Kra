@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateDeliveryQuote, getBaseRouteFee } from "../domain/pricing";
+import {
+  calculateDeliveryQuote,
+  calculateDeliveryQuoteBreakdown,
+  getBaseRouteFee
+} from "../domain/pricing";
 
 describe("pricing", () => {
   it("returns the base fee for a standard small package", () => {
@@ -125,6 +129,31 @@ describe("pricing", () => {
         declaredValueGhs: 150
       })
     ).toBe(50);
+  });
+
+  it("returns a quote breakdown that matches the final total", () => {
+    expect(
+      calculateDeliveryQuoteBreakdown({
+        originStationId: "ST-ACC-01",
+        destinationStationId: "ST-KMS-01",
+        weightKg: 3,
+        sizeTier: "standard",
+        serviceType: "express",
+        doorstepRequested: true,
+        isFragile: true,
+        declaredValueGhs: 2500,
+        doorstepDistanceKm: 4
+      })
+    ).toEqual({
+      baseFee: 35,
+      weightSurcharge: 8,
+      sizeSurcharge: 0,
+      fragileSurcharge: 10,
+      declaredValueSurcharge: 20,
+      expressSurcharge: 15,
+      doorstepSurcharge: 15,
+      totalAmount: 103
+    });
   });
 
   it("rejects unsupported route or unsupported self-serve thresholds", () => {

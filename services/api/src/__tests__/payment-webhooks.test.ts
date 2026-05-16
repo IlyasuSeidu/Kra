@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { processMtnMomoWebhook } from "../payment-webhooks";
+import { listAdminWebhookEvents, processMtnMomoWebhook } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
 
 function resolve<T>(value: T): Promise<T> {
@@ -86,6 +86,9 @@ describe("MTN MoMo webhook processing", () => {
             createdEvents.push(`${event.eventId}:${event.processingStatus}`);
             return resolveVoid();
           },
+          listRecent() {
+            return resolve([]);
+          },
           updateProcessing(eventId, update) {
             updatedEvents.push(`${eventId}:${update.processingStatus}`);
             return resolveVoid();
@@ -169,6 +172,9 @@ describe("MTN MoMo webhook processing", () => {
           create() {
             throw new Error("should not create a duplicate event");
           },
+          listRecent() {
+            return resolve([]);
+          },
           updateProcessing() {
             throw new Error("should not update processing for a duplicate event");
           }
@@ -235,6 +241,9 @@ describe("MTN MoMo webhook processing", () => {
           create() {
             return resolveVoid();
           },
+          listRecent() {
+            return resolve([]);
+          },
           updateProcessing(eventId, update) {
             updatedEvents.push(`${eventId}:${update.processingStatus}`);
             return resolveVoid();
@@ -300,6 +309,9 @@ describe("MTN MoMo webhook processing", () => {
           },
           create() {
             return resolveVoid();
+          },
+          listRecent() {
+            return resolve([]);
           },
           updateProcessing(eventId, update) {
             updatedEvents.push(`${eventId}:${update.processingStatus}`);
@@ -372,6 +384,9 @@ describe("MTN MoMo webhook processing", () => {
           create() {
             return resolveVoid();
           },
+          listRecent() {
+            return resolve([]);
+          },
           updateProcessing(eventId, update) {
             updatedEvents.push(`${eventId}:${update.processingStatus}:${update.processingNotes ?? ""}`);
             return resolveVoid();
@@ -390,6 +405,64 @@ describe("MTN MoMo webhook processing", () => {
       acknowledgement: "manual_review",
       matchedPaymentId: "PAY-4001",
       matchedDeliveryId: "DEL-4001"
+    });
+  });
+
+  it("lists admin webhook events for reconciliation", async () => {
+    const response = await listAdminWebhookEvents(
+      {
+        userId: "USR-FIN-001",
+        role: "finance_admin",
+        capabilities: [],
+        authMethod: "firebase_id_token"
+      },
+      {
+        processingStatus: "manual_review"
+      },
+      {
+        webhookEvents: {
+          getByProviderReferenceAndEventType() {
+            return resolve(undefined);
+          },
+          create() {
+            return resolveVoid();
+          },
+          listRecent() {
+            return resolve([
+              {
+                eventId: "EVT-WEB-4010",
+                provider: "mtn_momo" as const,
+                providerReference: "MTN-REF-4010",
+                eventType: "payment.failed" as const,
+                amountGhs: 55,
+                currency: "GHS" as const,
+                occurredAt: "2026-05-16T08:15:00.000Z",
+                receivedAt: "2026-05-16T08:15:03.000Z",
+                signatureVerified: true as const,
+                processingStatus: "manual_review" as const,
+                retryCount: 0,
+                matchedPaymentId: "PAY-4010",
+                matchedDeliveryId: "DEL-4010",
+                processingNotes: "conflicting_final_payment_status"
+              }
+            ]);
+          },
+          updateProcessing() {
+            return resolveVoid();
+          }
+        },
+        now: () => "2026-05-16T08:20:00.000Z"
+      }
+    );
+
+    expect(response).toMatchObject({
+      generatedAt: "2026-05-16T08:20:00.000Z",
+      events: [
+        {
+          eventId: "EVT-WEB-4010",
+          processingStatus: "manual_review"
+        }
+      ]
     });
   });
 });

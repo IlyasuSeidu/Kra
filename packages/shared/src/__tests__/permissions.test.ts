@@ -17,6 +17,7 @@ describe("permissions", () => {
     expect(canPerform("station_operator", "confirm_intake")).toBe(true);
     expect(canPerform("station_operator", "assign_driver")).toBe(true);
     expect(canPerform("station_operator", "assign_final_mile")).toBe(true);
+    expect(canPerform("station_operator", "cancel_eligible_delivery")).toBe(true);
   });
 
   it("allows finance admins to execute finance actions only", () => {
@@ -29,6 +30,6 @@ describe("permissions", () => {
     expect(getCapabilities("super_admin")).toContain("manage_users_and_roles");
     expect(getCapabilities("super_admin")).toContain("approve_refund");
     expect(getCapabilities("super_admin")).toContain("reassign_delivery");
+    expect(getCapabilities("super_admin")).toContain("cancel_eligible_delivery");
   });
 });
-

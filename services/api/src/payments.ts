@@ -18,6 +18,11 @@ export interface PaymentRecord {
   initiatedAt: string;
   verifiedAt?: string;
   failureReason?: string;
+  refundAmountGhs?: number;
+  refundReason?: string;
+  refundRequestedAt?: string;
+  refundReference?: string;
+  refundSettledAt?: string;
   checkoutMode: "ussd_push";
 }
 

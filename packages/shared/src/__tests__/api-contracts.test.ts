@@ -1,14 +1,37 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adminWebhookEventListResponseSchema,
+  adminOverviewResponseSchema,
+  auditEventListResponseSchema,
   apiErrorResponseSchema,
+  assignDriverRequestSchema,
+  assignFinalMileRequestSchema,
   buildApiErrorResponse,
+  cancelDeliveryRequestSchema,
+  cancelDeliveryResponseSchema,
+  completeDeliveryRequestSchema,
+  confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
+  deliveryListResponseSchema,
+  deliveryLifecycleResponseSchema,
+  dispatchDeliveryRequestSchema,
+  issueListResponseSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
-  publicTrackingResponseSchema
+  publicTrackingResponseSchema,
+  requestPhoneVerificationChallengeRequestSchema,
+  requestPhoneVerificationChallengeResponseSchema,
+  recordFailedAttemptRequestSchema,
+  receiveDestinationRequestSchema,
+  refundPaymentRequestSchema,
+  refundPaymentResponseSchema,
+  resolveIssueRequestSchema,
+  settleRefundRequestSchema,
+  settleRefundResponseSchema,
+  verifyPhoneResponseSchema
 } from "../contracts/api";
 
 describe("api contracts", () => {
@@ -116,6 +139,136 @@ describe("api contracts", () => {
     });
   });
 
+  it("accepts a delivery list response contract", () => {
+    expect(
+      deliveryListResponseSchema.parse({
+        deliveries: [
+          {
+            deliveryId: "DEL-0001",
+            trackingCode: "KRA-0001",
+            currentStatus: "received_at_destination",
+            paymentStatus: "confirmed",
+            originStationId: "ST-ACC-01",
+            destinationStationId: "ST-KMS-01",
+            serviceType: "standard",
+            receiverName: "Kojo Asante",
+            latestOccurredAt: "2026-05-16T14:00:00.000Z",
+            latestTouchpointRole: "station_operator",
+            latestTouchpointStationId: "ST-KMS-01",
+            doorstepRequested: false
+          }
+        ]
+      })
+    ).toMatchObject({
+      deliveries: [
+        {
+          deliveryId: "DEL-0001",
+          trackingCode: "KRA-0001"
+        }
+      ]
+    });
+  });
+
+  it("accepts issue, audit, and reconciliation list response contracts", () => {
+    expect(
+      resolveIssueRequestSchema.parse({
+        nextStatus: "resolved",
+        resolutionCode: "refund_approved",
+        note: "Refund approved and sender informed."
+      })
+    ).toMatchObject({
+      nextStatus: "resolved",
+      resolutionCode: "refund_approved"
+    });
+
+    expect(
+      issueListResponseSchema.parse({
+        issues: [
+          {
+            issueId: "ISS-0001",
+            deliveryId: "DEL-0001",
+            status: "open",
+            severity: "p2",
+            category: "damage",
+            summary: "Package arrived damaged",
+            reporter: {
+              actorId: "USR-SND-001",
+              actorRole: "sender"
+            },
+            createdAt: "2026-05-16T14:00:00.000Z",
+            updatedAt: "2026-05-16T14:05:00.000Z",
+            resolvedAt: "2026-05-16T14:10:00.000Z",
+            resolvedByActorId: "USR-SUP-001",
+            resolutionCode: "refund_approved",
+            resolutionNote: "Refund approved and sender informed."
+          }
+        ]
+      })
+    ).toMatchObject({
+      issues: [
+        {
+          issueId: "ISS-0001"
+        }
+      ]
+    });
+
+    expect(
+      auditEventListResponseSchema.parse({
+        events: [
+          {
+            eventId: "AUD-0001",
+            requestId: "REQ-0001",
+            action: "assign_driver",
+            actorId: "USR-OPS-001",
+            actorRole: "station_operator",
+            occurredAt: "2026-05-16T14:10:00.000Z",
+            stationId: "ST-ACC-01",
+            targetType: "delivery",
+            targetId: "DEL-0001",
+            metadata: {
+              responseStatusCode: 200
+            }
+          }
+        ]
+      })
+    ).toMatchObject({
+      events: [
+        {
+          eventId: "AUD-0001",
+          targetType: "delivery"
+        }
+      ]
+    });
+
+    expect(
+      adminWebhookEventListResponseSchema.parse({
+        generatedAt: "2026-05-16T14:15:00.000Z",
+        events: [
+          {
+            eventId: "EVT-WEB-0001",
+            provider: "mtn_momo",
+            providerReference: "MTN-REF-0001",
+            eventType: "payment.confirmed",
+            amountGhs: 35,
+            currency: "GHS",
+            occurredAt: "2026-05-16T14:00:00.000Z",
+            receivedAt: "2026-05-16T14:00:05.000Z",
+            processingStatus: "processed",
+            matchedPaymentId: "PAY-0001",
+            matchedDeliveryId: "DEL-0001"
+          }
+        ]
+      })
+    ).toMatchObject({
+      events: [
+        {
+          eventId: "EVT-WEB-0001",
+          processingStatus: "processed"
+        }
+      ]
+    });
+  });
+
   it("accepts verify-payment request and response contracts", () => {
     expect(
       paymentVerifyRequestSchema.parse({
@@ -168,6 +321,230 @@ describe("api contracts", () => {
     ).toMatchObject({
       acknowledgement: "processed",
       matchedPaymentId: "PAY-0001"
+    });
+  });
+
+  it("accepts a public phone-verification response contract", () => {
+    expect(
+      requestPhoneVerificationChallengeRequestSchema.parse({
+        phone: "+233240000000"
+      })
+    ).toEqual({
+      phone: "+233240000000"
+    });
+
+    expect(
+      requestPhoneVerificationChallengeResponseSchema.parse({
+        deliveryId: "DEL-0001",
+        trackingCode: "KRA-0001",
+        challengeStatus: "sent",
+        challengeId: "CHL-0001",
+        channel: "sms",
+        maskedPhone: "+233*****0000",
+        expiresAt: "2026-05-16T10:10:00.000Z",
+        resendAvailableAt: "2026-05-16T10:01:00.000Z"
+      })
+    ).toMatchObject({
+      challengeStatus: "sent",
+      channel: "sms"
+    });
+
+    expect(
+      verifyPhoneResponseSchema.parse({
+        deliveryId: "DEL-0001",
+        trackingCode: "KRA-0001",
+        verificationToken: "pvt_live_delivery_scope_token_0001",
+        verifiedAt: "2026-05-16T10:00:00.000Z",
+        expiresAt: "2026-05-16T10:30:00.000Z"
+      })
+    ).toMatchObject({
+      deliveryId: "DEL-0001",
+      trackingCode: "KRA-0001"
+    });
+  });
+
+  it("accepts lifecycle mutation request and response contracts", () => {
+    expect(
+      confirmIntakeRequestSchema.parse({
+        measuredWeightKg: 1.9,
+        sizeTier: "standard",
+        condition: "ok",
+        labelScanCode: "PKG-0001"
+      })
+    ).toMatchObject({
+      condition: "ok"
+    });
+
+    expect(
+      assignDriverRequestSchema.parse({
+        driverUserId: "USR-DRV-001"
+      })
+    ).toEqual({
+      driverUserId: "USR-DRV-001"
+    });
+
+    expect(
+      dispatchDeliveryRequestSchema.parse({
+        packageScanCode: "PKG-0001"
+      })
+    ).toEqual({
+      packageScanCode: "PKG-0001"
+    });
+
+    expect(
+      receiveDestinationRequestSchema.parse({
+        packageScanCode: "PKG-0001",
+        condition: "ok",
+        nextStep: "doorstep"
+      })
+    ).toMatchObject({
+      nextStep: "doorstep"
+    });
+
+    expect(
+      assignFinalMileRequestSchema.parse({
+        courierUserId: "USR-COR-001"
+      })
+    ).toEqual({
+      courierUserId: "USR-COR-001"
+    });
+
+    expect(
+      recordFailedAttemptRequestSchema.parse({
+        reasonCode: "receiver_unavailable",
+        note: "Receiver requested a reattempt tomorrow."
+      })
+    ).toMatchObject({
+      reasonCode: "receiver_unavailable"
+    });
+
+    expect(
+      completeDeliveryRequestSchema.parse({
+        proofType: "otp",
+        proofReference: "OTP-VERIFIED",
+        receivedByName: "Kojo Asante"
+      })
+    ).toMatchObject({
+      proofType: "otp"
+    });
+
+    expect(
+      cancelDeliveryRequestSchema.parse({
+        reasonCode: "sender_changed_mind",
+        note: "Customer booked twice"
+      })
+    ).toMatchObject({
+      reasonCode: "sender_changed_mind"
+    });
+
+    expect(
+      deliveryLifecycleResponseSchema.parse({
+        eventId: "EVT-DEL-0001",
+        deliveryId: "DEL-0001",
+        status: "delivered",
+        paymentStatus: "confirmed",
+        occurredAt: "2026-05-16T10:30:00.000Z"
+      })
+    ).toMatchObject({
+      eventId: "EVT-DEL-0001",
+      status: "delivered"
+    });
+
+    expect(
+      cancelDeliveryResponseSchema.parse({
+        eventId: "EVT-DEL-0002",
+        deliveryId: "DEL-0001",
+        status: "cancelled",
+        paymentStatus: "refund_pending",
+        occurredAt: "2026-05-16T10:35:00.000Z",
+        refundStatus: "refund_pending",
+        refundAmountGhs: 35,
+        refundReason: "full_refund_pre_intake"
+      })
+    ).toMatchObject({
+      status: "cancelled",
+      refundStatus: "refund_pending"
+    });
+  });
+
+  it("accepts refund execution request and response contracts", () => {
+    expect(
+      refundPaymentRequestSchema.parse({
+        paymentId: "PAY-0001",
+        packageNeverReceivedAtOrigin: true
+      })
+    ).toEqual({
+      paymentId: "PAY-0001",
+      packageNeverReceivedAtOrigin: true
+    });
+
+    expect(
+      refundPaymentResponseSchema.parse({
+        paymentId: "PAY-0001",
+        deliveryId: "DEL-0001",
+        refundStatus: "refund_pending",
+        refundAmountGhs: 35,
+        refundReason: "never_received_at_origin",
+        requiresManualReview: false,
+        requestedAt: "2026-05-16T11:00:00.000Z"
+      })
+    ).toMatchObject({
+      paymentId: "PAY-0001",
+      refundAmountGhs: 35
+    });
+
+    expect(
+      settleRefundRequestSchema.parse({
+        paymentId: "PAY-0001",
+        refundReference: "RFD-MTN-0001"
+      })
+    ).toEqual({
+      paymentId: "PAY-0001",
+      refundReference: "RFD-MTN-0001"
+    });
+
+    expect(
+      settleRefundResponseSchema.parse({
+        paymentId: "PAY-0001",
+        deliveryId: "DEL-0001",
+        refundStatus: "refunded",
+        refundAmountGhs: 35,
+        refundReason: "never_received_at_origin",
+        refundReference: "RFD-MTN-0001",
+        settledAt: "2026-05-16T11:30:00.000Z"
+      })
+    ).toMatchObject({
+      refundStatus: "refunded",
+      refundReference: "RFD-MTN-0001"
+    });
+  });
+
+  it("accepts an admin overview response contract", () => {
+    expect(
+      adminOverviewResponseSchema.parse({
+        generatedAt: "2026-05-16T12:00:00.000Z",
+        deliveryStatusCounts: [
+          {
+            status: "awaiting_driver_assignment",
+            count: 4
+          }
+        ],
+        paymentStatusCounts: [
+          {
+            status: "confirmed",
+            count: 11
+          }
+        ],
+        operationalAlerts: {
+          openIssueLikeDeliveries: 3,
+          unmatchedWebhookEvents: 2,
+          manualReviewWebhookEvents: 1
+        }
+      })
+    ).toMatchObject({
+      operationalAlerts: {
+        openIssueLikeDeliveries: 3
+      }
     });
   });
 });

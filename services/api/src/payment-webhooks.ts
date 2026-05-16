@@ -1,3 +1,11 @@
+import {
+  adminWebhookEventListQuerySchema,
+  adminWebhookEventListResponseSchema
+} from "@kra/shared";
+import type { z } from "zod";
+
+import type { AuthPrincipal } from "./auth";
+import { assertAdminPrincipal } from "./auth";
 import type { DeliveryRepository } from "./deliveries";
 import type { PaymentRecord, PaymentRepository } from "./payments";
 
@@ -51,6 +59,10 @@ export interface WebhookEventRepository {
     eventType: MtnMomoWebhookEventType
   ): Promise<WebhookEventRecord | undefined>;
   create(event: WebhookEventRecord): Promise<void>;
+  listRecent(input: {
+    processingStatus?: WebhookEventRecord["processingStatus"];
+    limit: number;
+  }): Promise<WebhookEventRecord[]>;
   updateProcessing(
     eventId: string,
     update: {
@@ -84,6 +96,8 @@ export interface ProcessMtnMomoWebhookResponse {
   matchedPaymentId?: string;
   matchedDeliveryId?: string;
 }
+
+export type AdminWebhookEventListResponse = z.infer<typeof adminWebhookEventListResponseSchema>;
 
 function mapEventTypeToStatus(
   eventType: MtnMomoWebhookEventType
@@ -316,4 +330,28 @@ export async function processMtnMomoWebhook(
       matchedDeliveryId
     })
   };
+}
+
+export async function listAdminWebhookEvents(
+  principal: AuthPrincipal,
+  input: z.input<typeof adminWebhookEventListQuerySchema>,
+  deps: {
+    webhookEvents: WebhookEventRepository;
+    now: () => string;
+  }
+): Promise<AdminWebhookEventListResponse> {
+  assertAdminPrincipal(principal);
+
+  const parsedInput = adminWebhookEventListQuerySchema.parse(input);
+  const events = await deps.webhookEvents.listRecent({
+    ...(parsedInput.processingStatus === undefined
+      ? {}
+      : { processingStatus: parsedInput.processingStatus }),
+    limit: parsedInput.limit ?? 50
+  });
+
+  return adminWebhookEventListResponseSchema.parse({
+    generatedAt: deps.now(),
+    events
+  });
 }
