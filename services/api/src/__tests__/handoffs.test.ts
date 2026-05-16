@@ -7,6 +7,8 @@ import {
   completeDelivery,
   confirmOriginIntake,
   dispatchDelivery,
+  markDeliveryInTransit,
+  markDeliveryOutForDelivery,
   recordFinalMileFailedAttempt,
   receiveDestination,
   type DeliveryEventRecord,
@@ -218,6 +220,55 @@ describe("delivery lifecycle services", () => {
     expect(savedDeliveries.at(-1)?.currentStatus).toBe("dispatched_from_origin");
   });
 
+  it("lets the assigned driver mark the package in transit", async () => {
+    let currentDelivery = makeDelivery({
+      currentStatus: "dispatched_from_origin",
+      assignedDriverId: "USR-DRV-001",
+      currentCustodyRole: "driver",
+      currentCustodyActorId: "USR-DRV-001"
+    });
+
+    const result = await markDeliveryInTransit(
+      {
+        deliveryId: "DEL-6001",
+        note: "Departed Accra station"
+      },
+      {
+        actorId: "USR-DRV-001",
+        role: "driver"
+      },
+      {
+        deliveries: {
+          getById() {
+            return resolve(currentDelivery);
+          },
+          save(delivery) {
+            currentDelivery = delivery;
+            return resolveVoid();
+          }
+        },
+        deliveryEvents: {
+          create() {
+            return resolveVoid();
+          }
+        },
+        handoffEvents: {
+          create() {
+            return resolveVoid();
+          }
+        },
+        identityFactory: {
+          nextDeliveryEventId: () => "EVT-DEL-6004A",
+          nextHandoffEventId: () => "EVT-HO-UNUSED"
+        },
+        now: () => "2026-05-16T08:20:00.000Z"
+      }
+    );
+
+    expect(result.response.status).toBe("in_transit");
+    expect(currentDelivery.currentStatus).toBe("in_transit");
+  });
+
   it("receives a delivery at destination and routes it into the final-mile queue", async () => {
     const deliveryEvents: string[] = [];
     let currentDelivery = makeDelivery({
@@ -363,6 +414,55 @@ describe("delivery lifecycle services", () => {
       "destination_station_to_final_mile_courier",
       "delivery_completion"
     ]);
+  });
+
+  it("lets the assigned final-mile courier mark the package out for delivery", async () => {
+    let currentDelivery = makeDelivery({
+      currentStatus: "assigned_for_final_mile",
+      assignedFinalMileCourierId: "USR-COR-001",
+      currentCustodyRole: "final_mile_courier",
+      currentCustodyActorId: "USR-COR-001"
+    });
+
+    const result = await markDeliveryOutForDelivery(
+      {
+        deliveryId: "DEL-6001",
+        note: "Courier departed destination station"
+      },
+      {
+        actorId: "USR-COR-001",
+        role: "final_mile_courier"
+      },
+      {
+        deliveries: {
+          getById() {
+            return resolve(currentDelivery);
+          },
+          save(delivery) {
+            currentDelivery = delivery;
+            return resolveVoid();
+          }
+        },
+        deliveryEvents: {
+          create() {
+            return resolveVoid();
+          }
+        },
+        handoffEvents: {
+          create() {
+            return resolveVoid();
+          }
+        },
+        identityFactory: {
+          nextDeliveryEventId: () => "EVT-DEL-6009A",
+          nextHandoffEventId: () => "EVT-HO-UNUSED"
+        },
+        now: () => "2026-05-16T14:05:00.000Z"
+      }
+    );
+
+    expect(result.response.status).toBe("out_for_delivery");
+    expect(currentDelivery.currentStatus).toBe("out_for_delivery");
   });
 
   it("supports station pickup completion and blocks wrong-station or unpaid transport actions", async () => {

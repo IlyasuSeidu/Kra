@@ -112,8 +112,10 @@ describe("api routes", () => {
       "confirm_intake",
       "assign_driver",
       "dispatch_delivery",
+      "mark_in_transit",
       "receive_destination",
       "assign_final_mile",
+      "mark_out_for_delivery",
       "record_failed_attempt",
       "complete_delivery"
     ]);

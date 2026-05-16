@@ -17,6 +17,8 @@ import {
   deliveryLifecycleResponseSchema,
   dispatchDeliveryRequestSchema,
   issueListResponseSchema,
+  markInTransitRequestSchema,
+  markOutForDeliveryRequestSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
   paymentVerifyRequestSchema,
@@ -290,6 +292,24 @@ describe("api contracts", () => {
     ).toMatchObject({
       paymentId: "PAY-0001",
       paymentStatus: "confirmed"
+    });
+  });
+
+  it("accepts explicit driver and final-mile progress request contracts", () => {
+    expect(
+      markInTransitRequestSchema.parse({
+        note: "Departed Accra station"
+      })
+    ).toEqual({
+      note: "Departed Accra station"
+    });
+
+    expect(
+      markOutForDeliveryRequestSchema.parse({
+        note: "Courier en route to receiver"
+      })
+    ).toEqual({
+      note: "Courier en route to receiver"
     });
   });
 
