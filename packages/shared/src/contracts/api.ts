@@ -14,6 +14,19 @@ export const paymentStatusSchema = z.enum([
   "refund_pending",
   "refunded"
 ]);
+export const roleSchema = z.enum([
+  "sender",
+  "driver",
+  "station_operator",
+  "final_mile_courier",
+  "ops_admin",
+  "finance_admin",
+  "support_admin",
+  "super_admin"
+]);
+export const userStatusSchema = z.enum(["active", "inactive"]);
+export const stationOperatingStatusSchema = z.enum(["active", "paused"]);
+export const stationIntakeStatusSchema = z.enum(["open", "restricted"]);
 export const issueSeveritySchema = z.enum(["p1", "p2", "p3"]);
 export const issueStatusSchema = z.enum([
   "open",
@@ -315,7 +328,17 @@ export const assignDriverRequestSchema = z.object({
   driverUserId: userIdSchema
 });
 
+export const acceptRunRequestSchema = z.object({
+  note: z.string().trim().min(3).max(240).optional()
+});
+
 export const dispatchDeliveryRequestSchema = z.object({
+  packageScanCode: z.string().trim().min(4).max(80),
+  fallbackUsed: z.boolean().optional(),
+  supervisorOverrideActorId: userIdSchema.optional()
+});
+
+export const confirmDriverPickupRequestSchema = z.object({
   packageScanCode: z.string().trim().min(4).max(80),
   fallbackUsed: z.boolean().optional(),
   supervisorOverrideActorId: userIdSchema.optional()
@@ -335,6 +358,10 @@ export const receiveDestinationRequestSchema = z.object({
 
 export const assignFinalMileRequestSchema = z.object({
   courierUserId: userIdSchema
+});
+
+export const acceptFinalMileAssignmentRequestSchema = z.object({
+  note: z.string().trim().min(3).max(240).optional()
 });
 
 export const markOutForDeliveryRequestSchema = z.object({
@@ -612,6 +639,12 @@ export const adminDeliveryListResponseSchema = z.object({
   )
 });
 
+export const adminStationServiceAvailabilitySchema = z.object({
+  standard: z.boolean(),
+  express: z.boolean(),
+  doorstep: z.boolean()
+});
+
 export const adminStationListResponseSchema = z.object({
   generatedAt: z.string().datetime(),
   stations: z.array(
@@ -619,10 +652,111 @@ export const adminStationListResponseSchema = z.object({
       stationId: stationIdSchema,
       name: z.string().trim().min(3).max(120),
       city: z.string().trim().min(2).max(120),
+      operatingStatus: stationOperatingStatusSchema,
+      intakeStatus: stationIntakeStatusSchema,
+      serviceAvailability: adminStationServiceAvailabilitySchema,
       activeQueueCount: z.number().int().nonnegative(),
-      issueCount: z.number().int().nonnegative()
+      issueCount: z.number().int().nonnegative(),
+      note: z.string().trim().min(3).max(240).optional(),
+      updatedAt: z.string().datetime()
     })
   )
+});
+
+export const adminUserListQuerySchema = z.object({
+  role: roleSchema.optional(),
+  status: userStatusSchema.optional(),
+  stationId: stationIdSchema.optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const adminUserResponseSchema = z.object({
+  userId: userIdSchema,
+  fullName: z.string().trim().min(2).max(120),
+  role: roleSchema,
+  status: userStatusSchema,
+  stationId: stationIdSchema.optional(),
+  email: z.string().trim().email().max(254).optional(),
+  phone: phoneSchema.optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  activatedAt: z.string().datetime().optional(),
+  deactivatedAt: z.string().datetime().optional()
+});
+
+function enforceRoleStationRule(
+  value: {
+    role: z.infer<typeof roleSchema>;
+    stationId?: z.infer<typeof stationIdSchema> | undefined;
+  },
+  ctx: z.RefinementCtx
+): void {
+  const requiresStation = value.role === "station_operator";
+  const forbidsStation =
+    value.role === "sender" ||
+    value.role === "ops_admin" ||
+    value.role === "finance_admin" ||
+    value.role === "support_admin" ||
+    value.role === "super_admin";
+
+  if (requiresStation && value.stationId === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "stationId is required for station operators.",
+      path: ["stationId"]
+    });
+  }
+
+  if (forbidsStation && value.stationId !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "stationId is not allowed for this role.",
+      path: ["stationId"]
+    });
+  }
+}
+
+export const adminUpsertUserRequestSchema = z
+  .object({
+    userId: userIdSchema,
+    fullName: z.string().trim().min(2).max(120),
+    role: roleSchema,
+    status: userStatusSchema.optional(),
+    stationId: stationIdSchema.optional(),
+    email: z.string().trim().email().max(254).optional(),
+    phone: phoneSchema.optional()
+  })
+  .superRefine(enforceRoleStationRule);
+
+export const adminUpdateUserAccessRequestSchema = z
+  .object({
+    role: roleSchema,
+    status: userStatusSchema,
+    stationId: stationIdSchema.optional()
+  })
+  .superRefine(enforceRoleStationRule);
+
+export const adminUserListResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  users: z.array(adminUserResponseSchema)
+});
+
+export const adminUpdateStationStatusRequestSchema = z.object({
+  operatingStatus: stationOperatingStatusSchema,
+  intakeStatus: stationIntakeStatusSchema,
+  serviceAvailability: adminStationServiceAvailabilitySchema,
+  note: z.string().trim().min(3).max(240).optional()
+});
+
+export const adminUpdateStationStatusResponseSchema = z.object({
+  stationId: stationIdSchema,
+  name: z.string().trim().min(3).max(120),
+  city: z.string().trim().min(2).max(120),
+  operatingStatus: stationOperatingStatusSchema,
+  intakeStatus: stationIntakeStatusSchema,
+  serviceAvailability: adminStationServiceAvailabilitySchema,
+  note: z.string().trim().min(3).max(240).optional(),
+  updatedAt: z.string().datetime()
 });
 
 export const adminFinanceResponseSchema = z.object({

@@ -35,23 +35,27 @@ import type {
   PublicTrackingVerificationRepository
 } from "../public-tracking-verification";
 import type { RefundPaymentRepository } from "../refunds";
+import type { StationRepository } from "../stations";
+import type { UserRepository, UserRecord } from "../users";
 import {
+  auditEventConverter,
   deliveryConverter,
   deliveryDocumentPath,
   deliveryEventConverter,
   firestoreCollections,
   handoffEventConverter,
+  idempotencyRecordConverter,
   paymentConverter,
   publicTrackingPhoneChallengeConverter,
   publicTrackingVerificationAttemptConverter,
   publicTrackingVerificationGrantConverter,
+  stationConverter,
   supportIssueConverter,
-  webhookEventConverter,
-  idempotencyRecordConverter,
-  auditEventConverter,
   type DeliveryDocument,
   type IdempotencyRecordDocument,
-  type PaymentDocument
+  type PaymentDocument,
+  userConverter,
+  webhookEventConverter
 } from "./schema";
 
 function toDeliveryDocument(delivery: DeliveryRecord, updatedAt: string): DeliveryDocument {
@@ -82,6 +86,35 @@ function fromPaymentDocument(document: PaymentDocument): PaymentRecord {
 
 function fromIdempotencyRecordDocument(document: IdempotencyRecordDocument): IdempotencyRecord {
   return document;
+}
+
+function sortUsersByUpdatedAt(users: UserRecord[]): UserRecord[] {
+  return [...users].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+function filterUsers(
+  users: UserRecord[],
+  input: {
+    role?: UserRecord["role"];
+    status?: UserRecord["status"];
+    stationId?: UserRecord["stationId"];
+  }
+): UserRecord[] {
+  return users.filter((user) => {
+    if (input.role && user.role !== input.role) {
+      return false;
+    }
+
+    if (input.status && user.status !== input.status) {
+      return false;
+    }
+
+    if (input.stationId && user.stationId !== input.stationId) {
+      return false;
+    }
+
+    return true;
+  });
 }
 
 const activeQueueStatuses: DeliveryRecord["currentStatus"][] = [
@@ -152,6 +185,63 @@ function filterSupportIssues(
 
 function sortAuditEventsByOccurredAt(events: AuditEventRecord[]): AuditEventRecord[] {
   return [...events].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+}
+
+export function createFirestoreUserRepository(
+  firestore: Firestore
+): UserRepository {
+  const usersCollection = firestore.collection(firestoreCollections.users).withConverter(userConverter);
+
+  return {
+    async getById(userId) {
+      const snapshot = await usersCollection.doc(userId).get();
+
+      if (!snapshot.exists) {
+        return undefined;
+      }
+
+      return snapshot.data();
+    },
+    async save(user) {
+      await usersCollection.doc(user.userId).set(user);
+    },
+    async list(input) {
+      const snapshot = await usersCollection.orderBy("updatedAt", "desc").limit(Math.max(input.limit * 3, 100)).get();
+
+      return filterUsers(
+        sortUsersByUpdatedAt(snapshot.docs.map((document) => document.data())),
+        input
+      ).slice(0, input.limit);
+    }
+  };
+}
+
+export function createFirestoreStationRepository(
+  firestore: Firestore
+): StationRepository {
+  const stationsCollection = firestore
+    .collection(firestoreCollections.stations)
+    .withConverter(stationConverter);
+
+  return {
+    async getById(stationId) {
+      const snapshot = await stationsCollection.doc(stationId).get();
+
+      if (!snapshot.exists) {
+        return undefined;
+      }
+
+      return snapshot.data();
+    },
+    async list() {
+      const snapshot = await stationsCollection.orderBy("updatedAt", "desc").get();
+
+      return snapshot.docs.map((document) => document.data());
+    },
+    async save(station) {
+      await stationsCollection.doc(station.stationId).set(station);
+    }
+  };
 }
 
 export function createFirestoreDeliveryRepository(
@@ -883,6 +973,8 @@ export function createFirestoreApiRepositories(
   now: () => string
 ) {
   return {
+    users: createFirestoreUserRepository(firestore),
+    stations: createFirestoreStationRepository(firestore),
     deliveries: createFirestoreDeliveryRepository(firestore, now),
     payments: createFirestorePaymentRepository(firestore, now),
     issues: createFirestoreSupportIssueRepository(firestore, now),

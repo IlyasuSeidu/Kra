@@ -84,6 +84,28 @@ function makeAppDeps(): ApiAppDeps {
         });
       }
     },
+    users: {
+      getById() {
+        return resolve(undefined);
+      },
+      save() {
+        return resolveVoid();
+      },
+      list() {
+        return resolve([]);
+      }
+    },
+    stations: {
+      getById() {
+        return resolve(undefined);
+      },
+      list() {
+        return resolve([]);
+      },
+      save() {
+        return resolveVoid();
+      }
+    },
     deliveries: {
       create() {
         return resolveVoid();
@@ -338,6 +360,95 @@ describe("api app", () => {
     });
   });
 
+  it("allows an assigned driver to accept a run", async () => {
+    const deps = makeAppDeps();
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-DRV-001",
+          role: "driver",
+          capabilities: ["accept_run"],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.deliveries.getById = () =>
+      resolve(
+        makeDelivery({
+          currentStatus: "assigned_to_driver",
+          assignedDriverId: "USR-DRV-001",
+          currentCustodyRole: "station_operator",
+          currentCustodyActorId: "USR-OP-001"
+        })
+      );
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries/DEL-9401/accept-run",
+      headers: {
+        authorization: "Bearer token-driver"
+      },
+      payload: {
+        note: "Accepted for departure"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      deliveryId: "DEL-9401",
+      status: "assigned_to_driver"
+    });
+  });
+
+  it("lets a super admin create a managed user record", async () => {
+    const deps = makeAppDeps();
+    let savedUserId: string | undefined;
+
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-SUP-001",
+          role: "super_admin",
+          capabilities: ["manage_users_and_roles", "override_queue_state"],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.users.save = (user) => {
+      savedUserId = user.userId;
+      return resolveVoid();
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/admin/users",
+      headers: {
+        authorization: "Bearer token-super-admin"
+      },
+      payload: {
+        userId: "USR-OPS-777",
+        fullName: "Yaw Mensah",
+        role: "station_operator",
+        stationId: "ST-ACC-01",
+        status: "active"
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(savedUserId).toBe("USR-OPS-777");
+    expect(response.json()).toMatchObject({
+      userId: "USR-OPS-777",
+      role: "station_operator",
+      stationId: "ST-ACC-01"
+    });
+  });
+
   it("lists accessible deliveries over the authenticated route surface", async () => {
     const app = createApiApp(makeAppDeps());
     appsToClose.push(app);
@@ -392,6 +503,49 @@ describe("api app", () => {
       error: {
         code: "FORBIDDEN"
       }
+    });
+  });
+
+  it("allows drivers to create delay issues through the report-delay capability path", async () => {
+    const deps = makeAppDeps();
+    deps.authVerifier.verifyBearerToken = () =>
+      resolve({
+        userId: "USR-DRV-001",
+        role: "driver",
+        capabilities: ["report_delay"],
+        authMethod: "firebase_id_token" as const
+      });
+    deps.deliveries.getById = () =>
+      resolve(
+        makeDelivery({
+          assignedDriverId: "USR-DRV-001",
+          currentCustodyRole: "driver",
+          currentCustodyActorId: "USR-DRV-001"
+        })
+      );
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/issues",
+      headers: {
+        authorization: "Bearer token-123"
+      },
+      payload: {
+        deliveryId: "DEL-9401",
+        category: "delay",
+        severity: "p2",
+        summary: "Traffic delayed the line-haul departure"
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      issueId: "ISS-9401",
+      deliveryId: "DEL-9401",
+      category: "delay"
     });
   });
 

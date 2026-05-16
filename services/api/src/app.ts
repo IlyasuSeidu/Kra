@@ -3,11 +3,17 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import {
+  acceptFinalMileAssignmentRequestSchema,
+  acceptRunRequestSchema,
+  adminUpdateStationStatusRequestSchema,
+  adminUpdateUserAccessRequestSchema,
+  adminUpsertUserRequestSchema,
   assignDriverRequestSchema,
   assignFinalMileRequestSchema,
   buildApiErrorResponse,
   cancelDeliveryRequestSchema,
   completeDeliveryRequestSchema,
+  confirmDriverPickupRequestSchema,
   confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
   createIssueRequestSchema,
@@ -72,9 +78,12 @@ import {
 } from "./firestore/client";
 import { createFirestoreApiRepositories } from "./firestore/repositories";
 import {
+  acceptDriverRun,
+  acceptFinalMileAssignment,
   assignDriver,
   assignFinalMileCourier,
   completeDelivery,
+  confirmDriverPickup,
   confirmOriginIntake,
   dispatchDelivery,
   markDeliveryInTransit,
@@ -133,6 +142,13 @@ import {
   type RefundPaymentRepository
 } from "./refunds";
 import { ApiServiceError } from "./service-errors";
+import { updateStationStatus, type StationRepository } from "./stations";
+import {
+  listAdminUsers,
+  updateAdminUserAccess,
+  upsertAdminUser,
+  type UserRepository
+} from "./users";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -155,6 +171,8 @@ type SharedIdentityFactory = PaymentIdentityFactory &
 export interface ApiAppDeps {
   config: ApiRuntimeConfig;
   authVerifier: AuthVerifier;
+  users: UserRepository;
+  stations: StationRepository;
   deliveries: DeliveryRepository &
     DeliveryLifecycleRepository &
     DeliveryListRepository &
@@ -428,6 +446,8 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
   return {
     config,
     authVerifier: createFirebaseAuthVerifier(getFirebaseAdminApp(config)),
+    users: repositories.users,
+    stations: repositories.stations,
     deliveries: repositories.deliveries,
     deliveryEvents: repositories.deliveryEvents,
     handoffEvents: repositories.handoffEvents,
@@ -601,6 +621,24 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         });
       }
     };
+    const requireIssueCreationAccess = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = createIssueRequestSchema.parse(request.body);
+
+      if (principal.capabilities.includes("open_issue")) {
+        return;
+      }
+
+      if (principal.capabilities.includes("report_delay") && input.category === "delay") {
+        return;
+      }
+
+      throw new ApiServiceError("FORBIDDEN", "Principal cannot create this kind of support issue.", {
+        userId: principal.userId,
+        role: principal.role,
+        category: input.category
+      });
+    };
     const requireFinanceAdmin = async (request: FastifyRequest) => {
       const principal = await authenticateRequest(request, deps.authVerifier);
       assertAdminPrincipal(principal);
@@ -611,6 +649,11 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           role: principal.role
         });
       }
+    };
+    const requireStationManagement = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+      assertCapabilityForPrincipal(principal, "override_queue_state");
     };
     const requirePaymentInitializationAccess = async (request: FastifyRequest) => {
       const principal = await authenticateRequest(request, deps.authVerifier);
@@ -904,7 +947,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       }));
     });
 
-    rateLimitedApp.post("/v1/payments/refund", { preHandler: [adminMutationPreHandler, requireAdminCapability("execute_refund")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    rateLimitedApp.post("/v1/payments/refund", { preHandler: [adminMutationPreHandler, requireAdminCapability("approve_refund")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const input = refundPaymentRequestSchema.parse(request.body);
       return runIdempotentMutation(request, reply, deps, {
         routeKey: "refund_payment",
@@ -1056,6 +1099,38 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       }));
     });
 
+    rateLimitedApp.post("/v1/deliveries/:id/accept-run", { preHandler: [authenticatedMutationPreHandler, requireCapability("accept_run")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = acceptRunRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "accept_run",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await acceptDriverRun(
+            {
+              deliveryId,
+              ...withOptionalValue("note", input.note)
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
+    });
+
     rateLimitedApp.post("/v1/deliveries/:id/dispatch", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_dispatch")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = dispatchDeliveryRequestSchema.parse(request.body);
@@ -1071,6 +1146,40 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         statusCode: 200,
         responseBody: (
           await dispatchDelivery(
+            {
+              deliveryId,
+              packageScanCode: input.packageScanCode,
+              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/confirm-pickup", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_pickup")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = confirmDriverPickupRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "confirm_pickup",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await confirmDriverPickup(
             {
               deliveryId,
               packageScanCode: input.packageScanCode,
@@ -1176,6 +1285,38 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             {
               deliveryId,
               courierUserId: input.courierUserId
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/accept-final-mile-assignment", { preHandler: [authenticatedMutationPreHandler, requireCapability("accept_final_mile_assignment")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = acceptFinalMileAssignmentRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "accept_final_mile_assignment",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await acceptFinalMileAssignment(
+            {
+              deliveryId,
+              ...withOptionalValue("note", input.note)
             },
             mapPrincipalToOperationalActor(principal),
             {
@@ -1298,7 +1439,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
-    rateLimitedApp.post("/v1/issues", { preHandler: [authenticatedMutationPreHandler, requireCapability("open_issue")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    rateLimitedApp.post("/v1/issues", { preHandler: [authenticatedMutationPreHandler, requireIssueCreationAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = createIssueRequestSchema.parse(request.body);
       return runIdempotentMutation(request, reply, deps, {
@@ -1399,8 +1540,28 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       return listAdminStations({
         deliveries: deps.deliveries,
         issues: deps.issues,
+        stations: deps.stations,
         now: deps.now
       });
+    });
+
+    rateLimitedApp.post("/v1/admin/stations/:id/status", { preHandler: [adminMutationPreHandler, requireStationManagement] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const input = adminUpdateStationStatusRequestSchema.parse(request.body);
+      const stationId = (request.params as { id: Parameters<StationRepository["getById"]>[0] }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "admin_update_station_status",
+        fingerprint: {
+          stationId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: await updateStationStatus(stationId, input, {
+          stations: deps.stations,
+          now: deps.now
+        })
+      }));
     });
 
     rateLimitedApp.get("/v1/admin/finance", { preHandler: [authenticatedReadPreHandler, requireFinanceAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
@@ -1409,6 +1570,53 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         payments: deps.payments,
         now: deps.now
       });
+    });
+
+    rateLimitedApp.get("/v1/admin/users", { preHandler: [authenticatedReadPreHandler, requireAdminCapability("manage_users_and_roles")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      setNoStore(reply);
+      return listAdminUsers((request.query as Record<string, unknown>) ?? {}, {
+        users: deps.users,
+        now: deps.now
+      });
+    });
+
+    rateLimitedApp.post("/v1/admin/users", { preHandler: [adminMutationPreHandler, requireAdminCapability("manage_users_and_roles")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = adminUpsertUserRequestSchema.parse(request.body);
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "admin_upsert_user",
+        fingerprint: {
+          userId: input.userId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 201,
+        responseBody: await upsertAdminUser(principal, input, {
+          users: deps.users,
+          now: deps.now
+        })
+      }));
+    });
+
+    rateLimitedApp.post("/v1/admin/users/:id/access", { preHandler: [adminMutationPreHandler, requireAdminCapability("manage_users_and_roles")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = adminUpdateUserAccessRequestSchema.parse(request.body);
+      const userId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "admin_update_user_access",
+        fingerprint: {
+          userId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: await updateAdminUserAccess(principal, userId, input, {
+          users: deps.users,
+          now: deps.now
+        })
+      }));
     });
 
     rateLimitedApp.get("/v1/admin/audit-events", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (request: FastifyRequest, reply: FastifyReply) => {

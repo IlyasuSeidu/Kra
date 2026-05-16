@@ -25,13 +25,16 @@ type LifecycleEventType =
   | "delivery_received_at_origin"
   | "delivery_queued_for_driver_assignment"
   | "driver_assigned"
+  | "driver_assignment_accepted"
   | "delivery_dispatched_from_origin"
+  | "driver_pickup_confirmed"
   | "delivery_marked_in_transit"
   | "delivery_received_at_destination"
   | "delivery_routed_to_pickup_queue"
   | "delivery_routed_to_final_mile_queue"
   | "delivery_routed_to_issue_queue"
   | "final_mile_courier_assigned"
+  | "final_mile_assignment_accepted"
   | "delivery_marked_out_for_delivery"
   | "delivery_completed"
   | "delivery_cancelled"
@@ -170,6 +173,50 @@ function buildLifecycleResponse(
     paymentStatus: delivery.paymentStatus,
     occurredAt
   });
+}
+
+async function recordCheckpoint(
+  input: {
+    delivery: DeliveryRecord;
+    eventType: LifecycleEventType;
+    actor: OperationalActor;
+    occurredAt: string;
+    stationId?: StationId;
+    metadata?: Record<string, unknown>;
+  },
+  deps: DeliveryLifecycleDeps
+): Promise<{
+  delivery: DeliveryRecord;
+  event: DeliveryEventRecord;
+}> {
+  const event: DeliveryEventRecord = {
+    eventId: deps.identityFactory.nextDeliveryEventId(),
+    deliveryId: input.delivery.deliveryId,
+    type: input.eventType,
+    previousStatus: input.delivery.currentStatus,
+    nextStatus: input.delivery.currentStatus,
+    occurredAt: input.occurredAt,
+    actorId: input.actor.actorId,
+    actorRole: input.actor.role,
+    ...(input.stationId === undefined ? {} : { stationId: input.stationId }),
+    ...(input.metadata === undefined ? {} : { metadata: input.metadata })
+  };
+
+  const nextDelivery: DeliveryRecord = {
+    ...input.delivery,
+    latestEvent: {
+      type: input.eventType,
+      occurredAt: input.occurredAt
+    }
+  };
+
+  await deps.deliveries.save(nextDelivery);
+  await deps.deliveryEvents.create(event);
+
+  return {
+    delivery: nextDelivery,
+    event
+  };
 }
 
 async function applyTransition(
@@ -506,6 +553,146 @@ export async function dispatchDelivery(
   };
 }
 
+export async function acceptDriverRun(
+  input: {
+    deliveryId: string;
+    note?: string;
+  },
+  actor: OperationalActor,
+  deps: DeliveryLifecycleDeps
+): Promise<{
+  delivery: DeliveryRecord;
+  response: DeliveryLifecycleResponse;
+}> {
+  assertCapability(actor, "accept_run");
+
+  const delivery = await deps.deliveries.getById(input.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  if (actor.role !== "driver") {
+    throw new ApiServiceError("FORBIDDEN", "Only the assigned driver can accept a run.", {
+      deliveryId: input.deliveryId,
+      actorId: actor.actorId,
+      actorRole: actor.role
+    });
+  }
+
+  if (delivery.assignedDriverId !== actor.actorId) {
+    throw new ApiServiceError("FORBIDDEN", "This delivery is assigned to a different driver.", {
+      deliveryId: input.deliveryId,
+      assignedDriverId: delivery.assignedDriverId,
+      actorId: actor.actorId
+    });
+  }
+
+  if (delivery.currentStatus !== "assigned_to_driver") {
+    throw new ApiServiceError("INVALID_STATUS_TRANSITION", "Only assigned runs can be accepted.", {
+      deliveryId: input.deliveryId,
+      currentStatus: delivery.currentStatus
+    });
+  }
+
+  const occurredAt = deps.now();
+  const { delivery: updatedDelivery, event } = await recordCheckpoint(
+    {
+      delivery,
+      eventType: "driver_assignment_accepted",
+      actor,
+      occurredAt,
+      metadata: {
+        ...(input.note === undefined ? {} : { note: input.note })
+      }
+    },
+    deps
+  );
+
+  return {
+    delivery: updatedDelivery,
+    response: buildLifecycleResponse(event.eventId, updatedDelivery, occurredAt)
+  };
+}
+
+export async function confirmDriverPickup(
+  input: {
+    deliveryId: string;
+    packageScanCode: string;
+    fallbackUsed?: boolean;
+    supervisorOverrideActorId?: string;
+  },
+  actor: OperationalActor,
+  deps: DeliveryLifecycleDeps
+): Promise<{
+  delivery: DeliveryRecord;
+  response: DeliveryLifecycleResponse;
+}> {
+  assertCapability(actor, "confirm_pickup");
+
+  const delivery = await deps.deliveries.getById(input.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  if (actor.role !== "driver") {
+    throw new ApiServiceError("FORBIDDEN", "Only the assigned driver can confirm pickup.", {
+      deliveryId: input.deliveryId,
+      actorId: actor.actorId,
+      actorRole: actor.role
+    });
+  }
+
+  if (delivery.assignedDriverId !== actor.actorId) {
+    throw new ApiServiceError("FORBIDDEN", "This delivery is assigned to a different driver.", {
+      deliveryId: input.deliveryId,
+      assignedDriverId: delivery.assignedDriverId,
+      actorId: actor.actorId
+    });
+  }
+
+  if (
+    delivery.currentStatus !== "assigned_to_driver" &&
+    delivery.currentStatus !== "dispatched_from_origin"
+  ) {
+    throw new ApiServiceError(
+      "INVALID_STATUS_TRANSITION",
+      "Driver pickup confirmation is only allowed after assignment and before in-transit progression.",
+      {
+        deliveryId: input.deliveryId,
+        currentStatus: delivery.currentStatus
+      }
+    );
+  }
+
+  const occurredAt = deps.now();
+  const { delivery: updatedDelivery, event } = await recordCheckpoint(
+    {
+      delivery,
+      eventType: "driver_pickup_confirmed",
+      actor,
+      occurredAt,
+      stationId: delivery.originStationId,
+      metadata: {
+        packageScanCode: input.packageScanCode,
+        fallbackUsed: input.fallbackUsed ?? false,
+        supervisorOverrideActorId: input.supervisorOverrideActorId
+      }
+    },
+    deps
+  );
+
+  return {
+    delivery: updatedDelivery,
+    response: buildLifecycleResponse(event.eventId, updatedDelivery, occurredAt)
+  };
+}
+
 export async function markDeliveryInTransit(
   input: {
     deliveryId: string;
@@ -756,6 +943,75 @@ export async function assignFinalMileCourier(
       proof: {
         reference: `${delivery.deliveryId}:${input.courierUserId}`,
         type: "package_scan"
+      }
+    },
+    deps
+  );
+
+  return {
+    delivery: updatedDelivery,
+    response: buildLifecycleResponse(event.eventId, updatedDelivery, occurredAt)
+  };
+}
+
+export async function acceptFinalMileAssignment(
+  input: {
+    deliveryId: string;
+    note?: string;
+  },
+  actor: OperationalActor,
+  deps: DeliveryLifecycleDeps
+): Promise<{
+  delivery: DeliveryRecord;
+  response: DeliveryLifecycleResponse;
+}> {
+  assertCapability(actor, "accept_final_mile_assignment");
+
+  const delivery = await deps.deliveries.getById(input.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  if (actor.role !== "final_mile_courier") {
+    throw new ApiServiceError("FORBIDDEN", "Only the assigned courier can accept final-mile work.", {
+      deliveryId: input.deliveryId,
+      actorId: actor.actorId,
+      actorRole: actor.role
+    });
+  }
+
+  if (delivery.assignedFinalMileCourierId !== actor.actorId) {
+    throw new ApiServiceError("FORBIDDEN", "This delivery is assigned to a different courier.", {
+      deliveryId: input.deliveryId,
+      assignedFinalMileCourierId: delivery.assignedFinalMileCourierId,
+      actorId: actor.actorId
+    });
+  }
+
+  if (delivery.currentStatus !== "assigned_for_final_mile") {
+    throw new ApiServiceError(
+      "INVALID_STATUS_TRANSITION",
+      "Final-mile assignment can only be accepted while waiting for dispatch to receiver.",
+      {
+        deliveryId: input.deliveryId,
+        currentStatus: delivery.currentStatus
+      }
+    );
+  }
+
+  const occurredAt = deps.now();
+  const { delivery: updatedDelivery, event } = await recordCheckpoint(
+    {
+      delivery,
+      eventType: "final_mile_assignment_accepted",
+      actor,
+      occurredAt,
+      stationId: delivery.destinationStationId,
+      metadata: {
+        ...(input.note === undefined ? {} : { note: input.note })
       }
     },
     deps

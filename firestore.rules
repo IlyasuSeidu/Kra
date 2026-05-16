@@ -10,6 +10,12 @@ service cloud.firestore {
       return request.auth.token.kra_role;
     }
 
+    function normalizedUserId() {
+      return request.auth.uid.matches('^USR-.*$')
+        ? request.auth.uid
+        : 'USR-' + request.auth.uid;
+    }
+
     function stationId() {
       return request.auth.token.kra_station_id;
     }
@@ -27,16 +33,21 @@ service cloud.firestore {
     }
 
     function canReadDelivery(delivery) {
-      return delivery.senderId == request.auth.uid ||
-        (role() == 'driver' && delivery.assignedDriverId == request.auth.uid) ||
-        (role() == 'final_mile_courier' && delivery.assignedFinalMileCourierId == request.auth.uid) ||
+      return delivery.senderId == normalizedUserId() ||
+        (role() == 'driver' && delivery.assignedDriverId == normalizedUserId()) ||
+        (role() == 'final_mile_courier' && delivery.assignedFinalMileCourierId == normalizedUserId()) ||
         (role() == 'station_operator' &&
           (delivery.originStationId == stationId() || delivery.destinationStationId == stationId())) ||
         isAdmin();
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read: if isAuthenticated() && (normalizedUserId() == userId || isAdmin());
+      allow create, update, delete: if false;
+    }
+
+    match /stations/{stationIdValue} {
+      allow read: if isAuthenticated();
       allow create, update, delete: if false;
     }
 
