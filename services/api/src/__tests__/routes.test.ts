@@ -21,6 +21,14 @@ describe("api routes", () => {
     });
   });
 
+  it("registers the MTN MoMo webhook under webhook auth scope", () => {
+    expect(getApiRoute("ingest_mtn_momo_webhook")).toMatchObject({
+      authScope: "webhook",
+      path: "/v1/webhooks/payments/mtn-momo",
+      module: "payments"
+    });
+  });
+
   it("requires admin scope for refund and admin overview endpoints", () => {
     expect(getApiRoute("verify_payment")).toMatchObject({
       authScope: "authenticated",

@@ -4,6 +4,8 @@ import {
   apiErrorResponseSchema,
   buildApiErrorResponse,
   createDeliveryRequestSchema,
+  mtnMomoWebhookRequestSchema,
+  mtnMomoWebhookResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
   publicTrackingResponseSchema
@@ -135,6 +137,37 @@ describe("api contracts", () => {
     ).toMatchObject({
       paymentId: "PAY-0001",
       paymentStatus: "confirmed"
+    });
+  });
+
+  it("accepts MTN MoMo webhook request and acknowledgement contracts", () => {
+    expect(
+      mtnMomoWebhookRequestSchema.parse({
+        providerEventId: "EVT-001",
+        providerReference: "MTN-REF-0001",
+        eventType: "payment.confirmed",
+        amountGhs: 35,
+        currency: "GHS",
+        occurredAt: "2026-05-15T13:30:00.000Z",
+        rawPayload: {
+          externalId: "abc123"
+        }
+      })
+    ).toMatchObject({
+      providerReference: "MTN-REF-0001",
+      eventType: "payment.confirmed"
+    });
+
+    expect(
+      mtnMomoWebhookResponseSchema.parse({
+        eventId: "EVT-WEB-0001",
+        acknowledgement: "processed",
+        matchedPaymentId: "PAY-0001",
+        matchedDeliveryId: "DEL-0001"
+      })
+    ).toMatchObject({
+      acknowledgement: "processed",
+      matchedPaymentId: "PAY-0001"
     });
   });
 });

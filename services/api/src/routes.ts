@@ -2,6 +2,8 @@ import {
   apiErrorResponseSchema,
   createDeliveryRequestSchema,
   createDeliveryResponseSchema,
+  mtnMomoWebhookRequestSchema,
+  mtnMomoWebhookResponseSchema,
   paymentInitializeRequestSchema,
   paymentInitializeResponseSchema,
   paymentVerifyRequestSchema,
@@ -72,6 +74,17 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: verifyPhoneRequestSchema,
     responseSchema: emptySuccessSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "ingest_mtn_momo_webhook",
+    method: "POST",
+    path: "/v1/webhooks/payments/mtn-momo",
+    module: "payments",
+    authScope: "webhook",
+    idempotent: true,
+    requestSchema: mtnMomoWebhookRequestSchema,
+    responseSchema: mtnMomoWebhookResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

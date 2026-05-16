@@ -128,6 +128,29 @@ export const paymentVerifyResponseSchema = z.object({
   verificationCheckedAt: z.string().datetime()
 });
 
+export const mtnMomoWebhookRequestSchema = z.object({
+  providerEventId: z.string().trim().min(3).max(120).optional(),
+  providerReference: z.string().trim().min(6).max(120),
+  eventType: z.enum(["payment.pending", "payment.confirmed", "payment.failed"]),
+  amountGhs: z.number().int().positive(),
+  currency: z.literal("GHS"),
+  occurredAt: z.string().datetime(),
+  rawPayload: z.record(z.unknown()).optional()
+});
+
+export const mtnMomoWebhookResponseSchema = z.object({
+  eventId: z.string().regex(/^EVT-WEB-[A-Z0-9-]+$/),
+  acknowledgement: z.enum([
+    "processed",
+    "duplicate",
+    "unmatched",
+    "accepted_pending",
+    "manual_review"
+  ]),
+  matchedPaymentId: z.string().regex(/^PAY-[A-Z0-9-]+$/).optional(),
+  matchedDeliveryId: deliveryIdSchema.optional()
+});
+
 export const publicTrackingResponseSchema = z.object({
   deliveryId: deliveryIdSchema,
   trackingCode: trackingCodeSchema,

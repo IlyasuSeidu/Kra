@@ -15,6 +15,7 @@ export const apiHealthContract = {
 };
 
 export * from "./deliveries";
+export * from "./payment-webhooks";
 export * from "./payments";
 export * from "./public-tracking";
 export * from "./routes";
