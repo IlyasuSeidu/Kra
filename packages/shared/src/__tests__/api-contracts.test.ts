@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adminWebhookEventListResponseSchema,
   adminOverviewResponseSchema,
+  auditEventListResponseSchema,
   apiErrorResponseSchema,
   assignDriverRequestSchema,
   assignFinalMileRequestSchema,
@@ -14,6 +16,7 @@ import {
   deliveryListResponseSchema,
   deliveryLifecycleResponseSchema,
   dispatchDeliveryRequestSchema,
+  issueListResponseSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
   paymentVerifyRequestSchema,
@@ -160,6 +163,91 @@ describe("api contracts", () => {
         {
           deliveryId: "DEL-0001",
           trackingCode: "KRA-0001"
+        }
+      ]
+    });
+  });
+
+  it("accepts issue, audit, and reconciliation list response contracts", () => {
+    expect(
+      issueListResponseSchema.parse({
+        issues: [
+          {
+            issueId: "ISS-0001",
+            deliveryId: "DEL-0001",
+            status: "open",
+            severity: "p2",
+            category: "damage",
+            summary: "Package arrived damaged",
+            reporter: {
+              actorId: "USR-SND-001",
+              actorRole: "sender"
+            },
+            createdAt: "2026-05-16T14:00:00.000Z",
+            updatedAt: "2026-05-16T14:05:00.000Z"
+          }
+        ]
+      })
+    ).toMatchObject({
+      issues: [
+        {
+          issueId: "ISS-0001"
+        }
+      ]
+    });
+
+    expect(
+      auditEventListResponseSchema.parse({
+        events: [
+          {
+            eventId: "AUD-0001",
+            requestId: "REQ-0001",
+            action: "assign_driver",
+            actorId: "USR-OPS-001",
+            actorRole: "station_operator",
+            occurredAt: "2026-05-16T14:10:00.000Z",
+            stationId: "ST-ACC-01",
+            targetType: "delivery",
+            targetId: "DEL-0001",
+            metadata: {
+              responseStatusCode: 200
+            }
+          }
+        ]
+      })
+    ).toMatchObject({
+      events: [
+        {
+          eventId: "AUD-0001",
+          targetType: "delivery"
+        }
+      ]
+    });
+
+    expect(
+      adminWebhookEventListResponseSchema.parse({
+        generatedAt: "2026-05-16T14:15:00.000Z",
+        events: [
+          {
+            eventId: "EVT-WEB-0001",
+            provider: "mtn_momo",
+            providerReference: "MTN-REF-0001",
+            eventType: "payment.confirmed",
+            amountGhs: 35,
+            currency: "GHS",
+            occurredAt: "2026-05-16T14:00:00.000Z",
+            receivedAt: "2026-05-16T14:00:05.000Z",
+            processingStatus: "processed",
+            matchedPaymentId: "PAY-0001",
+            matchedDeliveryId: "DEL-0001"
+          }
+        ]
+      })
+    ).toMatchObject({
+      events: [
+        {
+          eventId: "EVT-WEB-0001",
+          processingStatus: "processed"
         }
       ]
     });

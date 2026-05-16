@@ -467,6 +467,78 @@ export const issueResponseSchema = z.object({
   updatedAt: z.string().datetime()
 });
 
+export const issueListQuerySchema = z.object({
+  deliveryId: deliveryIdSchema.optional(),
+  status: issueStatusSchema.optional(),
+  severity: issueSeveritySchema.optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const issueListResponseSchema = z.object({
+  issues: z.array(issueResponseSchema)
+});
+
+export const auditTargetTypeSchema = z.enum(["delivery", "payment", "issue", "tracking"]);
+
+export const auditEventListQuerySchema = z.object({
+  actorId: userIdSchema.optional(),
+  targetType: auditTargetTypeSchema.optional(),
+  targetId: z.string().trim().min(3).max(120).optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const auditEventListResponseSchema = z.object({
+  events: z.array(
+    z.object({
+      eventId: z.string().regex(/^AUD-[A-Z0-9-]+$/),
+      requestId: requestIdSchema,
+      action: z.string().trim().min(3).max(120),
+      actorId: userIdSchema,
+      actorRole: z.string().trim().min(3).max(80),
+      occurredAt: z.string().datetime(),
+      stationId: stationIdSchema.optional(),
+      targetType: auditTargetTypeSchema.optional(),
+      targetId: z.string().trim().min(3).max(120).optional(),
+      metadata: z.record(z.unknown()).optional()
+    })
+  )
+});
+
+export const webhookProcessingStatusSchema = z.enum([
+  "received",
+  "processed",
+  "duplicate",
+  "unmatched",
+  "accepted_pending",
+  "manual_review"
+]);
+
+export const adminWebhookEventListQuerySchema = z.object({
+  processingStatus: webhookProcessingStatusSchema.optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const adminWebhookEventListResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  events: z.array(
+    z.object({
+      eventId: z.string().regex(/^EVT-WEB-[A-Z0-9-]+$/),
+      provider: z.literal("mtn_momo"),
+      providerEventId: z.string().trim().min(3).max(120).optional(),
+      providerReference: z.string().trim().min(6).max(120),
+      eventType: z.enum(["payment.pending", "payment.confirmed", "payment.failed"]),
+      amountGhs: z.number().int().positive(),
+      currency: z.literal("GHS"),
+      occurredAt: z.string().datetime(),
+      receivedAt: z.string().datetime(),
+      processingStatus: webhookProcessingStatusSchema,
+      matchedPaymentId: paymentIdSchema.optional(),
+      matchedDeliveryId: deliveryIdSchema.optional(),
+      processingNotes: z.string().trim().min(3).max(120).optional()
+    })
+  )
+});
+
 export const adminOverviewResponseSchema = z.object({
   generatedAt: z.string().datetime(),
   deliveryStatusCounts: z.array(

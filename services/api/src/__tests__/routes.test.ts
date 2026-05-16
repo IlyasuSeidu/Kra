@@ -97,6 +97,14 @@ describe("api routes", () => {
       authScope: "admin",
       path: "/v1/admin/finance"
     });
+    expect(getApiRoute("admin_audit_events")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/audit-events"
+    });
+    expect(getApiRoute("admin_webhook_events")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/webhook-events"
+    });
   });
 
   it("groups handoff operations under the handoffs module", () => {
@@ -112,6 +120,11 @@ describe("api routes", () => {
   });
 
   it("registers issue management routes", () => {
+    expect(getApiRoute("list_issues")).toMatchObject({
+      authScope: "authenticated",
+      module: "issues",
+      path: "/v1/issues"
+    });
     expect(getApiRoute("create_issue")).toMatchObject({
       authScope: "authenticated",
       module: "issues"

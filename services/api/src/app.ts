@@ -46,6 +46,7 @@ import {
   type AdminWebhookMetricsRepository
 } from "./admin";
 import {
+  listAdminAuditEvents,
   type AuditEventRecord,
   type AuditEventRepository,
   type AuditIdentityFactory
@@ -90,6 +91,7 @@ import {
   createSupportIssue,
   escalateSupportIssue,
   getSupportIssue,
+  listSupportIssues,
   type SupportIssueIdentityFactory,
   type SupportIssueRepository
 } from "./issues";
@@ -99,6 +101,7 @@ import {
   type PublicTrackingOtpNotificationGateway
 } from "./notifications";
 import {
+  listAdminWebhookEvents,
   processMtnMomoWebhook,
   type PaymentLookupRepository,
   type PaymentWebhookIdentityFactory,
@@ -1201,6 +1204,15 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       }));
     });
 
+    rateLimitedApp.get("/v1/issues", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      setNoStore(reply);
+      return listSupportIssues(principal, (request.query as Record<string, unknown>) ?? {}, {
+        deliveries: deps.deliveries,
+        issues: deps.issues
+      });
+    });
+
     rateLimitedApp.post("/v1/issues", { preHandler: [authenticatedMutationPreHandler, requireCapability("open_issue")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = createIssueRequestSchema.parse(request.body);
@@ -1287,6 +1299,23 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       setNoStore(reply);
       return listAdminFinance({
         payments: deps.payments,
+        now: deps.now
+      });
+    });
+
+    rateLimitedApp.get("/v1/admin/audit-events", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      setNoStore(reply);
+      return listAdminAuditEvents(principal, (request.query as Record<string, unknown>) ?? {}, {
+        auditEvents: deps.auditEvents
+      });
+    });
+
+    rateLimitedApp.get("/v1/admin/webhook-events", { preHandler: [authenticatedReadPreHandler, requireAdminCapability("review_reconciliation")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      setNoStore(reply);
+      return listAdminWebhookEvents(principal, (request.query as Record<string, unknown>) ?? {}, {
+        webhookEvents: deps.webhookEvents,
         now: deps.now
       });
     });

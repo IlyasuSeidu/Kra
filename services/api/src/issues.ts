@@ -2,6 +2,8 @@ import {
   canPerform,
   createIssueRequestSchema,
   escalateIssueRequestSchema,
+  issueListQuerySchema,
+  issueListResponseSchema,
   issueResponseSchema,
   type Capability,
   type Role
@@ -37,6 +39,17 @@ export interface SupportIssueRepository {
   getById(issueId: string): Promise<SupportIssueRecord | undefined>;
   save(issue: SupportIssueRecord): Promise<void>;
   listByDeliveryId(deliveryId: string): Promise<SupportIssueRecord[]>;
+  listRecent(input: {
+    status?: SupportIssueRecord["status"];
+    severity?: SupportIssueRecord["severity"];
+    limit: number;
+  }): Promise<SupportIssueRecord[]>;
+  listByDeliveryIds(input: {
+    deliveryIds: string[];
+    status?: SupportIssueRecord["status"];
+    severity?: SupportIssueRecord["severity"];
+    limit: number;
+  }): Promise<SupportIssueRecord[]>;
   countOpenByStation(stationId: DeliveryRecord["originStationId"]): Promise<number>;
 }
 
@@ -58,6 +71,14 @@ export interface EscalateSupportIssueDeps {
 }
 
 export type IssueResponse = z.infer<typeof issueResponseSchema>;
+export type IssueListResponse = z.infer<typeof issueListResponseSchema>;
+
+export interface AccessibleDeliveryListRepository {
+  listAccessible(input: {
+    principal: AuthPrincipal;
+    limit: number;
+  }): Promise<DeliveryRecord[]>;
+}
 
 function toIssueResponse(issue: SupportIssueRecord): IssueResponse {
   return issueResponseSchema.parse({
@@ -205,6 +226,88 @@ export async function getSupportIssue(
   }
 
   return toIssueResponse(issue);
+}
+
+export async function listSupportIssues(
+  principal: AuthPrincipal,
+  input: z.input<typeof issueListQuerySchema>,
+  deps: {
+    deliveries: DeliveryRepository & AccessibleDeliveryListRepository;
+    issues: SupportIssueRepository;
+  }
+): Promise<IssueListResponse> {
+  const parsedInput = issueListQuerySchema.parse(input);
+  const limit = parsedInput.limit ?? 50;
+
+  if (
+    principal.role === "ops_admin" ||
+    principal.role === "support_admin" ||
+    principal.role === "finance_admin" ||
+    principal.role === "super_admin"
+  ) {
+    const issues = parsedInput.deliveryId
+      ? await deps.issues.listByDeliveryId(parsedInput.deliveryId)
+      : await deps.issues.listRecent({
+          ...(parsedInput.status === undefined ? {} : { status: parsedInput.status }),
+          ...(parsedInput.severity === undefined ? {} : { severity: parsedInput.severity }),
+          limit
+        });
+
+    return issueListResponseSchema.parse({
+      issues: issues
+        .filter((issue) => {
+          if (parsedInput.status && issue.status !== parsedInput.status) {
+            return false;
+          }
+
+          if (parsedInput.severity && issue.severity !== parsedInput.severity) {
+            return false;
+          }
+
+          return true;
+        })
+        .slice(0, limit)
+        .map((issue) => toIssueResponse(issue))
+    });
+  }
+
+  const accessibleDeliveries = parsedInput.deliveryId
+    ? [parsedInput.deliveryId]
+    : (
+        await deps.deliveries.listAccessible({
+          principal,
+          limit: 200
+        })
+      ).map((delivery) => delivery.deliveryId);
+
+  if (accessibleDeliveries.length === 0) {
+    return issueListResponseSchema.parse({
+      issues: []
+    });
+  }
+
+  if (parsedInput.deliveryId) {
+    const delivery = await deps.deliveries.getById(parsedInput.deliveryId);
+
+    if (!delivery) {
+      throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+        deliveryId: parsedInput.deliveryId
+      });
+    }
+
+    assertCanAccessDelivery(principal, delivery);
+  }
+
+  const issues = await deps.issues.listByDeliveryIds({
+    deliveryIds: accessibleDeliveries,
+    ...(parsedInput.status === undefined ? {} : { status: parsedInput.status }),
+    ...(parsedInput.severity === undefined ? {} : { severity: parsedInput.severity }),
+    limit
+  });
+
+  return issueListResponseSchema.parse({
+    issues: issues.map((issue) => toIssueResponse(issue))
+  });
 }
 
 export async function escalateSupportIssue(

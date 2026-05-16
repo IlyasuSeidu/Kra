@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createSupportIssue, escalateSupportIssue, getSupportIssue } from "../issues";
+import {
+  createSupportIssue,
+  escalateSupportIssue,
+  getSupportIssue,
+  listSupportIssues
+} from "../issues";
 import type { DeliveryRecord } from "../deliveries";
 
 function resolve<T>(value: T): Promise<T> {
@@ -100,6 +105,12 @@ describe("support issue services", () => {
           listByDeliveryId() {
             return resolve([]);
           },
+          listRecent() {
+            return resolve([]);
+          },
+          listByDeliveryIds() {
+            return resolve([]);
+          },
           countOpenByStation() {
             return resolve(0);
           }
@@ -176,6 +187,12 @@ describe("support issue services", () => {
           listByDeliveryId() {
             return resolve([]);
           },
+          listRecent() {
+            return resolve([]);
+          },
+          listByDeliveryIds() {
+            return resolve([]);
+          },
           countOpenByStation() {
             return resolve(0);
           }
@@ -227,6 +244,12 @@ describe("support issue services", () => {
           listByDeliveryId() {
             return resolve([]);
           },
+          listRecent() {
+            return resolve([]);
+          },
+          listByDeliveryIds() {
+            return resolve([]);
+          },
           countOpenByStation() {
             return resolve(0);
           }
@@ -238,6 +261,88 @@ describe("support issue services", () => {
     expect(fetched).toMatchObject({
       issueId: "ISS-9301",
       escalatedByActorId: "USR-OPS-001"
+    });
+  });
+
+  it("lists accessible issues for a station operator across accessible deliveries", async () => {
+    const response = await listSupportIssues(
+      {
+        userId: "USR-OP-002",
+        role: "station_operator",
+        stationId: "ST-KMS-01",
+        capabilities: [],
+        authMethod: "firebase_id_token"
+      },
+      {
+        status: "open"
+      },
+      {
+        deliveries: {
+          create() {
+            return resolveVoid();
+          },
+          getById() {
+            return resolve(makeDelivery());
+          },
+          getByTrackingCode() {
+            return resolve(undefined);
+          },
+          updatePaymentStatus() {
+            return resolveVoid();
+          },
+          listAccessible() {
+            return resolve([makeDelivery()]);
+          }
+        },
+        issues: {
+          create() {
+            return resolveVoid();
+          },
+          getById() {
+            return resolve(undefined);
+          },
+          save() {
+            return resolveVoid();
+          },
+          listByDeliveryId() {
+            return resolve([]);
+          },
+          listRecent() {
+            return resolve([]);
+          },
+          listByDeliveryIds() {
+            return resolve([
+              {
+                issueId: "ISS-9302",
+                deliveryId: "DEL-9301",
+                status: "open" as const,
+                severity: "p2" as const,
+                category: "handoff" as const,
+                summary: "Destination intake needs attention",
+                reporter: {
+                  actorId: "USR-OP-002",
+                  actorRole: "station_operator" as const
+                },
+                createdAt: "2026-05-16T14:30:00.000Z",
+                updatedAt: "2026-05-16T14:35:00.000Z"
+              }
+            ]);
+          },
+          countOpenByStation() {
+            return resolve(0);
+          }
+        }
+      }
+    );
+
+    expect(response).toMatchObject({
+      issues: [
+        {
+          issueId: "ISS-9302",
+          deliveryId: "DEL-9301",
+          status: "open"
+        }
+      ]
     });
   });
 });

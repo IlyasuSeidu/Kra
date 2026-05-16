@@ -7,7 +7,7 @@ import type {
   AdminPaymentMetricsRepository,
   AdminWebhookMetricsRepository
 } from "../admin";
-import type { AuditEventRepository } from "../audit";
+import type { AuditEventRecord, AuditEventRepository } from "../audit";
 import type { AuthPrincipal } from "../auth";
 import type { DeliveryRecord, DeliveryRepository } from "../deliveries";
 import type {
@@ -20,7 +20,7 @@ import type {
   DeliveryLifecycleRepository,
   HandoffEventRepository
 } from "../handoffs";
-import type { SupportIssueRepository } from "../issues";
+import type { SupportIssueRecord, SupportIssueRepository } from "../issues";
 import type {
   PaymentRecord,
   PaymentRepository
@@ -124,6 +124,34 @@ function filterDeliveries(
 
     return true;
   });
+}
+
+function sortSupportIssuesByUpdatedAt(issues: SupportIssueRecord[]): SupportIssueRecord[] {
+  return [...issues].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+function filterSupportIssues(
+  issues: SupportIssueRecord[],
+  input: {
+    status?: SupportIssueRecord["status"];
+    severity?: SupportIssueRecord["severity"];
+  }
+): SupportIssueRecord[] {
+  return issues.filter((issue) => {
+    if (input.status && issue.status !== input.status) {
+      return false;
+    }
+
+    if (input.severity && issue.severity !== input.severity) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function sortAuditEventsByOccurredAt(events: AuditEventRecord[]): AuditEventRecord[] {
+  return [...events].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
 }
 
 export function createFirestoreDeliveryRepository(
@@ -540,6 +568,17 @@ export function createFirestoreWebhookEventRepository(
     async create(event) {
       await webhookEventsCollection.doc(event.eventId).set(event);
     },
+    async listRecent(input) {
+      const baseQuery = input.processingStatus
+        ? webhookEventsCollection
+            .where("processingStatus", "==", input.processingStatus)
+            .orderBy("receivedAt", "desc")
+        : webhookEventsCollection.orderBy("receivedAt", "desc");
+
+      const snapshot = await baseQuery.limit(input.limit).get();
+
+      return snapshot.docs.map((document) => document.data());
+    },
     async updateProcessing(eventId, update) {
       await webhookEventsCollection.doc(eventId).set(update, { merge: true });
     },
@@ -648,6 +687,66 @@ export function createFirestoreSupportIssueRepository(
 
       return snapshot.docs.map((document) => document.data());
     },
+    async listRecent(input) {
+      let snapshot;
+
+      if (input.status && input.severity) {
+        snapshot = await issuesCollection
+          .where("status", "==", input.status)
+          .where("severity", "==", input.severity)
+          .orderBy("createdAt", "desc")
+          .limit(input.limit)
+          .get();
+      } else if (input.status) {
+        snapshot = await issuesCollection
+          .where("status", "==", input.status)
+          .orderBy("updatedAt", "desc")
+          .limit(input.limit)
+          .get();
+      } else if (input.severity) {
+        snapshot = await issuesCollection
+          .where("severity", "==", input.severity)
+          .orderBy("updatedAt", "desc")
+          .limit(input.limit)
+          .get();
+      } else {
+        snapshot = await issuesCollection.orderBy("updatedAt", "desc").limit(input.limit).get();
+      }
+
+      return sortSupportIssuesByUpdatedAt(
+        filterSupportIssues(
+          snapshot.docs.map((document) => document.data()),
+          input
+        )
+      ).slice(0, input.limit);
+    },
+    async listByDeliveryIds(input) {
+      const uniqueIds = [...new Set(input.deliveryIds)];
+
+      if (uniqueIds.length === 0) {
+        return [];
+      }
+
+      const chunks: string[][] = [];
+
+      for (let index = 0; index < uniqueIds.length; index += 10) {
+        chunks.push(uniqueIds.slice(index, index + 10));
+      }
+
+      const issues = await Promise.all(
+        chunks.map(async (chunk) => {
+          const snapshot = await issuesCollection.where("deliveryId", "in", chunk).get();
+          return snapshot.docs.map((document) => document.data());
+        })
+      );
+
+      return sortSupportIssuesByUpdatedAt(
+        filterSupportIssues(
+          issues.flat(),
+          input
+        )
+      ).slice(0, input.limit);
+    },
     async countOpenByStation(stationId) {
       const deliveryIdsSnapshot = await firestore
         .collection(firestoreCollections.deliveries)
@@ -735,6 +834,46 @@ export function createFirestoreAuditEventRepository(
   return {
     async create(event) {
       await auditEventsCollection.doc(event.eventId).set(event);
+    },
+    async listRecent(input) {
+      if (input.actorId) {
+        const snapshot = await auditEventsCollection
+          .where("actorId", "==", input.actorId)
+          .orderBy("occurredAt", "desc")
+          .limit(input.limit)
+          .get();
+
+        return snapshot.docs.map((document) => document.data());
+      }
+
+      if (input.targetType && input.targetId) {
+        const snapshot = await auditEventsCollection
+          .where("targetType", "==", input.targetType)
+          .where("targetId", "==", input.targetId)
+          .orderBy("occurredAt", "desc")
+          .limit(input.limit)
+          .get();
+
+        return snapshot.docs.map((document) => document.data());
+      }
+
+      const snapshot = await auditEventsCollection.orderBy("occurredAt", "desc").limit(input.limit).get();
+
+      return sortAuditEventsByOccurredAt(
+        snapshot.docs
+          .map((document) => document.data())
+          .filter((event) => {
+            if (input.targetType && event.targetType !== input.targetType) {
+              return false;
+            }
+
+            if (input.targetId && event.targetId !== input.targetId) {
+              return false;
+            }
+
+            return true;
+          })
+      ).slice(0, input.limit);
     }
   };
 }

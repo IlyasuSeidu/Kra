@@ -171,6 +171,12 @@ function makeAppDeps(): ApiAppDeps {
       listByDeliveryId() {
         return resolve([]);
       },
+      listRecent() {
+        return resolve([]);
+      },
+      listByDeliveryIds() {
+        return resolve([]);
+      },
       countOpenByStation() {
         return resolve(0);
       }
@@ -205,6 +211,9 @@ function makeAppDeps(): ApiAppDeps {
       create() {
         return resolveVoid();
       },
+      listRecent() {
+        return resolve([]);
+      },
       updateProcessing() {
         return resolveVoid();
       },
@@ -229,6 +238,9 @@ function makeAppDeps(): ApiAppDeps {
     auditEvents: {
       create() {
         return resolveVoid();
+      },
+      listRecent() {
+        return resolve([]);
       }
     },
     gateway: {
@@ -349,6 +361,37 @@ describe("api app", () => {
           doorstepRequested: false
         }
       ]
+    });
+  });
+
+  it("lists authenticated issues and rejects reconciliation reads for sender scope", async () => {
+    const app = createApiApp(makeAppDeps());
+    appsToClose.push(app);
+
+    const issuesResponse = await app.inject({
+      method: "GET",
+      url: "/v1/issues?deliveryId=DEL-9401",
+      headers: {
+        authorization: "Bearer token-123"
+      }
+    });
+    const webhookEventsResponse = await app.inject({
+      method: "GET",
+      url: "/v1/admin/webhook-events?processingStatus=manual_review",
+      headers: {
+        authorization: "Bearer token-123"
+      }
+    });
+
+    expect(issuesResponse.statusCode).toBe(200);
+    expect(issuesResponse.json()).toEqual({
+      issues: []
+    });
+    expect(webhookEventsResponse.statusCode).toBe(403);
+    expect(webhookEventsResponse.json()).toMatchObject({
+      error: {
+        code: "FORBIDDEN"
+      }
     });
   });
 

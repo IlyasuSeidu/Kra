@@ -1,4 +1,6 @@
 import {
+  adminWebhookEventListQuerySchema,
+  adminWebhookEventListResponseSchema,
   adminOverviewResponseSchema,
   adminDeliveryListResponseSchema,
   adminFinanceResponseSchema,
@@ -13,6 +15,8 @@ import {
   createIssueRequestSchema,
   createDeliveryRequestSchema,
   createDeliveryResponseSchema,
+  auditEventListQuerySchema,
+  auditEventListResponseSchema,
   deliveryListQuerySchema,
   deliveryListResponseSchema,
   deliveryDetailResponseSchema,
@@ -20,6 +24,8 @@ import {
   deliveryTimelineResponseSchema,
   dispatchDeliveryRequestSchema,
   escalateIssueRequestSchema,
+  issueListQuerySchema,
+  issueListResponseSchema,
   issueResponseSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
@@ -299,6 +305,17 @@ export const apiRoutes = [
     errorSchema: apiErrorResponseSchema
   },
   {
+    operationId: "list_issues",
+    method: "GET",
+    path: "/v1/issues",
+    module: "issues",
+    authScope: "authenticated",
+    idempotent: true,
+    requestSchema: issueListQuerySchema,
+    responseSchema: issueListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
     operationId: "create_issue",
     method: "POST",
     path: "/v1/issues",
@@ -370,6 +387,28 @@ export const apiRoutes = [
     authScope: "admin",
     idempotent: true,
     responseSchema: adminFinanceResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_audit_events",
+    method: "GET",
+    path: "/v1/admin/audit-events",
+    module: "admin",
+    authScope: "admin",
+    idempotent: true,
+    requestSchema: auditEventListQuerySchema,
+    responseSchema: auditEventListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_webhook_events",
+    method: "GET",
+    path: "/v1/admin/webhook-events",
+    module: "admin",
+    authScope: "admin",
+    idempotent: true,
+    requestSchema: adminWebhookEventListQuerySchema,
+    responseSchema: adminWebhookEventListResponseSchema,
     errorSchema: apiErrorResponseSchema
   }
 ] as const satisfies readonly ApiRouteDefinition[];
