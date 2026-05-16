@@ -21,6 +21,7 @@ import type {
   HandoffEventRepository
 } from "../handoffs";
 import type { SupportIssueRecord, SupportIssueRepository } from "../issues";
+import type { NotificationRepository } from "../notification-feed";
 import type {
   PaymentRecord,
   PaymentRepository
@@ -45,6 +46,7 @@ import {
   firestoreCollections,
   handoffEventConverter,
   idempotencyRecordConverter,
+  notificationConverter,
   paymentConverter,
   publicTrackingPhoneChallengeConverter,
   publicTrackingVerificationAttemptConverter,
@@ -240,6 +242,35 @@ export function createFirestoreStationRepository(
     },
     async save(station) {
       await stationsCollection.doc(station.stationId).set(station);
+    }
+  };
+}
+
+export function createFirestoreNotificationRepository(
+  firestore: Firestore
+): NotificationRepository {
+  const notificationsCollection = firestore
+    .collection(firestoreCollections.notifications)
+    .withConverter(notificationConverter);
+
+  return {
+    async getByDedupeKey(dedupeKey) {
+      const snapshot = await notificationsCollection.where("dedupeKey", "==", dedupeKey).limit(1).get();
+      const match = snapshot.docs[0];
+
+      return match?.data();
+    },
+    async create(notification) {
+      await notificationsCollection.doc(notification.notificationId).set(notification);
+    },
+    async listByRecipientUserId(input) {
+      const snapshot = await notificationsCollection
+        .where("recipientUserId", "==", input.recipientUserId)
+        .orderBy("createdAt", "desc")
+        .limit(input.limit)
+        .get();
+
+      return snapshot.docs.map((document) => document.data());
     }
   };
 }
@@ -975,6 +1006,7 @@ export function createFirestoreApiRepositories(
   return {
     users: createFirestoreUserRepository(firestore),
     stations: createFirestoreStationRepository(firestore),
+    notificationFeed: createFirestoreNotificationRepository(firestore),
     deliveries: createFirestoreDeliveryRepository(firestore, now),
     payments: createFirestorePaymentRepository(firestore, now),
     issues: createFirestoreSupportIssueRepository(firestore, now),

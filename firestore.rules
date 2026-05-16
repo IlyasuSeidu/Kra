@@ -51,6 +51,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.recipientUserId == normalizedUserId();
+      allow create, update, delete: if false;
+    }
+
     match /deliveries/{deliveryId} {
       allow read: if isAuthenticated() && canReadDelivery(resource.data);
       allow create, update, delete: if false;

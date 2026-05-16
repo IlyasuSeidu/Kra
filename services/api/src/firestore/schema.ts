@@ -6,6 +6,7 @@ import type { IdempotencyRecord } from "../idempotency";
 import type { SupportIssueRecord } from "../issues";
 import type { WebhookEventRecord } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
+import type { NotificationRecord } from "../notification-feed";
 import type { AuditEventRecord } from "../audit";
 import type { StationRecord } from "../stations";
 import type {
@@ -18,6 +19,7 @@ import type { UserRecord } from "../users";
 export const firestoreCollections = {
   users: "users",
   stations: "stations",
+  notifications: "notifications",
   deliveries: "deliveries",
   deliveryEvents: "events",
   payments: "payments",
@@ -33,6 +35,7 @@ export const firestoreCollections = {
 
 export type UserDocument = UserRecord;
 export type StationDocument = StationRecord;
+export type NotificationDocument = NotificationRecord;
 export interface DeliveryDocument extends DeliveryRecord {
   updatedAt: string;
 }
@@ -68,6 +71,7 @@ function createPassThroughConverter<T extends DocumentData>(): FirestoreDataConv
 
 export const userConverter = createPassThroughConverter<UserDocument>();
 export const stationConverter = createPassThroughConverter<StationDocument>();
+export const notificationConverter = createPassThroughConverter<NotificationDocument>();
 export const deliveryConverter = createPassThroughConverter<DeliveryDocument>();
 export const paymentConverter = createPassThroughConverter<PaymentDocument>();
 export const deliveryEventConverter = createPassThroughConverter<DeliveryEventDocument>();
@@ -89,6 +93,10 @@ export function userDocumentPath(userId: string): string {
 
 export function stationDocumentPath(stationId: string): string {
   return `${firestoreCollections.stations}/${stationId}`;
+}
+
+export function notificationDocumentPath(notificationId: string): string {
+  return `${firestoreCollections.notifications}/${notificationId}`;
 }
 
 export function deliveryDocumentPath(deliveryId: string): string {

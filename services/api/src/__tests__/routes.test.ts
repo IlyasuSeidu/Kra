@@ -61,6 +61,21 @@ describe("api routes", () => {
     });
   });
 
+  it("registers authenticated notification feed routes", () => {
+    expect(getApiRoute("list_notifications")).toMatchObject({
+      authScope: "authenticated",
+      module: "notifications",
+      path: "/v1/notifications",
+      idempotent: true
+    });
+
+    expect(listApiRoutesByModule("notifications").map((route) => route.operationId)).toEqual([
+      "list_notifications"
+    ]);
+    expect(getApiRoute("list_notifications")?.requestSchema).toBeDefined();
+    expect(getApiRoute("list_notifications")?.responseSchema).toBeDefined();
+  });
+
   it("requires admin scope for refund and admin overview endpoints", () => {
     expect(getApiRoute("verify_payment")).toMatchObject({
       authScope: "authenticated",

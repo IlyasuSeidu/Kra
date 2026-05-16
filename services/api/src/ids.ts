@@ -28,6 +28,9 @@ export function createApiIdentityFactory() {
     nextIssueId() {
       return buildPrefixedId("ISS");
     },
+    nextNotificationId() {
+      return buildPrefixedId("NTF");
+    },
     nextChallengeId() {
       return buildPrefixedId("CHL");
     },

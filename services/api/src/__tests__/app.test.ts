@@ -106,6 +106,17 @@ function makeAppDeps(): ApiAppDeps {
         return resolveVoid();
       }
     },
+    notificationFeed: {
+      getByDedupeKey() {
+        return resolve(undefined);
+      },
+      create() {
+        return resolveVoid();
+      },
+      listByRecipientUserId() {
+        return resolve([]);
+      }
+    },
     deliveries: {
       create() {
         return resolveVoid();
@@ -288,6 +299,7 @@ function makeAppDeps(): ApiAppDeps {
       nextPaymentId: () => "PAY-9401",
       nextWebhookEventId: () => "EVT-WEB-9401",
       nextIssueId: () => "ISS-9401",
+      nextNotificationId: () => "NTF-9401",
       nextChallengeId: () => "CHL-9401",
       nextDeliveryEventId: () => "EVT-DEL-9401",
       nextHandoffEventId: () => "EVT-HOF-9401",
@@ -470,6 +482,51 @@ describe("api app", () => {
           currentStatus: "received_at_destination",
           receiverName: "Kojo Asante",
           doorstepRequested: false
+        }
+      ]
+    });
+  });
+
+  it("lists authenticated notifications for the current user", async () => {
+    const deps = makeAppDeps();
+
+    deps.notificationFeed.listByRecipientUserId = (input) =>
+      resolve([
+        {
+          notificationId: "NTF-9401",
+          recipientUserId: input.recipientUserId,
+          type: "ready_for_pickup",
+          status: "unread",
+          title: "Ready for pickup",
+          body: "Your package is ready for receiver pickup at the destination station.",
+          deliveryId: "DEL-9401",
+          dedupeKey: "delivery:DEL-9401:ready_for_pickup",
+          createdAt: "2026-05-16T15:00:00.000Z"
+        }
+      ]);
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/notifications?limit=10",
+      headers: {
+        authorization: "Bearer token-123"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      notifications: [
+        {
+          notificationId: "NTF-9401",
+          type: "ready_for_pickup",
+          status: "unread",
+          title: "Ready for pickup",
+          body: "Your package is ready for receiver pickup at the destination station.",
+          deliveryId: "DEL-9401",
+          createdAt: "2026-05-16T15:00:00.000Z"
         }
       ]
     });

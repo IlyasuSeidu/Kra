@@ -6,6 +6,7 @@ import {
   deliveryEventDocumentPath,
   firestoreCollections,
   handoffEventDocumentPath,
+  notificationDocumentPath,
   paymentDocumentPath,
   publicTrackingPhoneChallengeDocumentPath,
   publicTrackingVerificationAttemptDocumentPath,
@@ -21,6 +22,7 @@ describe("firestore schema helpers", () => {
     expect(firestoreCollections).toEqual({
       users: "users",
       stations: "stations",
+      notifications: "notifications",
       deliveries: "deliveries",
       deliveryEvents: "events",
       payments: "payments",
@@ -38,6 +40,7 @@ describe("firestore schema helpers", () => {
   it("builds stable document paths for the main operational collections", () => {
     expect(userDocumentPath("USR-1001")).toBe("users/USR-1001");
     expect(stationDocumentPath("ST-ACC-01")).toBe("stations/ST-ACC-01");
+    expect(notificationDocumentPath("NTF-1001")).toBe("notifications/NTF-1001");
     expect(deliveryDocumentPath("DEL-1001")).toBe("deliveries/DEL-1001");
     expect(deliveryEventDocumentPath("DEL-1001", "EVT-DEL-1001")).toBe(
       "deliveries/DEL-1001/events/EVT-DEL-1001"

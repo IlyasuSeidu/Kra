@@ -43,10 +43,25 @@ export const issueCategorySchema = z.enum([
   "handoff",
   "other"
 ]);
+export const notificationTypeSchema = z.enum([
+  "delivery_created",
+  "payment_confirmed",
+  "payment_failed",
+  "received_at_origin",
+  "dispatched",
+  "received_at_destination",
+  "ready_for_pickup",
+  "out_for_delivery",
+  "delivered",
+  "issue_updated",
+  "refund_completed"
+]);
+export const notificationStatusSchema = z.enum(["unread", "read"]);
 export const requestIdSchema = z.string().regex(/^REQ-[A-Z0-9-]+$/);
 export const deliveryIdSchema = z.string().regex(/^DEL-[A-Z0-9-]+$/);
 export const paymentIdSchema = z.string().regex(/^PAY-[A-Z0-9-]+$/);
 export const issueIdSchema = z.string().regex(/^ISS-[A-Z0-9-]+$/);
+export const notificationIdSchema = z.string().regex(/^NTF-[A-Z0-9-]+$/);
 export const trackingCodeSchema = z.string().regex(/^KRA-[A-Z0-9-]+$/);
 export const challengeIdSchema = z.string().regex(/^CHL-[A-Z0-9-]+$/);
 export const userIdSchema = z.string().regex(/^USR-[A-Z0-9-]+$/);
@@ -538,6 +553,25 @@ export const issueListQuerySchema = z.object({
 
 export const issueListResponseSchema = z.object({
   issues: z.array(issueResponseSchema)
+});
+
+export const notificationListQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const notificationResponseSchema = z.object({
+  notificationId: notificationIdSchema,
+  type: notificationTypeSchema,
+  status: notificationStatusSchema,
+  title: z.string().trim().min(3).max(120),
+  body: z.string().trim().min(3).max(280),
+  deliveryId: deliveryIdSchema.optional(),
+  createdAt: z.string().datetime(),
+  readAt: z.string().datetime().optional()
+});
+
+export const notificationListResponseSchema = z.object({
+  notifications: z.array(notificationResponseSchema)
 });
 
 export const auditTargetTypeSchema = z.enum(["delivery", "payment", "issue", "tracking"]);
