@@ -47,6 +47,19 @@ describe("api runtime config", () => {
     ).toThrow("All MTN MoMo runtime variables must be set together when MoMo payments are enabled.");
   });
 
+  it("loads the internal task shared secret when configured", () => {
+    expect(
+      loadApiRuntimeConfig({
+        FIREBASE_PROJECT_ID: "kra-prod",
+        INTERNAL_TASK_SHARED_SECRET: "internal-task-secret-123456"
+      })
+    ).toEqual({
+      firebaseProjectId: "kra-prod",
+      apiPort: 8080,
+      internalTaskSharedSecret: "internal-task-secret-123456"
+    });
+  });
+
   it("loads and validates Hubtel SMS runtime configuration", () => {
     expect(
       loadApiRuntimeConfig({

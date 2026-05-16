@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  dispatchDueOutboundNotifications,
   dispatchReceiverSmsOutboxRecord,
   queueAndDispatchReceiverDeliverySms,
   type OutboundNotificationRecord,
@@ -183,6 +184,65 @@ describe("outbound notifications", () => {
         name: "Error",
         message: "Hubtel rejected message"
       }
+    });
+  });
+
+  it("dispatches due outbox records and returns batch counters", async () => {
+    const records = [
+      makeRecord({
+        outboundNotificationId: "ONF-9401",
+        dedupeKey: "receiver-sms:DEL-9401:out_for_delivery",
+        trackingCode: "KRA-9401"
+      }),
+      makeRecord({
+        outboundNotificationId: "ONF-9402",
+        dedupeKey: "receiver-sms:DEL-9402:ready_for_pickup",
+        deliveryId: "DEL-9402",
+        trackingCode: "KRA-9402",
+        eventType: "ready_for_pickup"
+      })
+    ];
+    const sentMessages: string[] = [];
+
+    const result = await dispatchDueOutboundNotifications(
+      {
+        limit: 25
+      },
+      {
+        outboundNotifications: makeRepository(records),
+        notifications: {
+          sendReceiverDeliverySms(input) {
+            sentMessages.push(input.trackingCode);
+
+            if (input.trackingCode === "KRA-9402") {
+              return Promise.reject(new Error("Hubtel timeout"));
+            }
+
+            return resolveVoid();
+          }
+        },
+        now: () => "2026-05-16T15:00:00.000Z"
+      }
+    );
+
+    expect(sentMessages).toEqual(["KRA-9401", "KRA-9402"]);
+    expect(result).toEqual({
+      processed: 2,
+      sent: 1,
+      failed: 1,
+      deadLettered: 0,
+      results: [
+        {
+          outboundNotificationId: "ONF-9401",
+          status: "sent",
+          attemptCount: 1
+        },
+        {
+          outboundNotificationId: "ONF-9402",
+          status: "failed",
+          attemptCount: 1
+        }
+      ]
     });
   });
 });

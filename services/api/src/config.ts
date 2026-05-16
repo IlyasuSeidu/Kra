@@ -7,6 +7,7 @@ const apiRuntimeEnvSchema = z
     FIREBASE_PRIVATE_KEY: z.string().trim().min(1).optional(),
     FIRESTORE_EMULATOR_HOST: z.string().trim().min(1).optional(),
     API_PORT: z.coerce.number().int().positive().max(65535).optional(),
+    INTERNAL_TASK_SHARED_SECRET: z.string().trim().min(16).optional(),
     MTN_MOMO_BASE_URL: z.string().trim().url().optional(),
     MTN_MOMO_COLLECTION_PRIMARY_KEY: z.string().trim().min(8).optional(),
     MTN_MOMO_API_USER: z.string().trim().min(8).optional(),
@@ -78,6 +79,7 @@ export interface ApiRuntimeConfig {
   firebasePrivateKey?: string;
   firestoreEmulatorHost?: string;
   apiPort: number;
+  internalTaskSharedSecret?: string;
   mtnMomo?: {
     baseUrl: string;
     collectionPrimaryKey: string;
@@ -104,6 +106,7 @@ export function loadApiRuntimeConfig(
     FIREBASE_PRIVATE_KEY: env.FIREBASE_PRIVATE_KEY,
     FIRESTORE_EMULATOR_HOST: env.FIRESTORE_EMULATOR_HOST,
     API_PORT: env.API_PORT,
+    INTERNAL_TASK_SHARED_SECRET: env.INTERNAL_TASK_SHARED_SECRET,
     MTN_MOMO_BASE_URL: env.MTN_MOMO_BASE_URL,
     MTN_MOMO_COLLECTION_PRIMARY_KEY: env.MTN_MOMO_COLLECTION_PRIMARY_KEY,
     MTN_MOMO_API_USER: env.MTN_MOMO_API_USER,
@@ -129,6 +132,9 @@ export function loadApiRuntimeConfig(
     ...(parsed.FIRESTORE_EMULATOR_HOST === undefined
       ? {}
       : { firestoreEmulatorHost: parsed.FIRESTORE_EMULATOR_HOST }),
+    ...(parsed.INTERNAL_TASK_SHARED_SECRET === undefined
+      ? {}
+      : { internalTaskSharedSecret: parsed.INTERNAL_TASK_SHARED_SECRET }),
     ...(parsed.MTN_MOMO_BASE_URL === undefined
       ? {}
       : {

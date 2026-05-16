@@ -45,6 +45,8 @@ import {
   mtnMomoWebhookResponseSchema,
   notificationListQuerySchema,
   notificationListResponseSchema,
+  outboundNotificationDispatchRequestSchema,
+  outboundNotificationDispatchResponseSchema,
   paymentInitializeRequestSchema,
   paymentInitializeResponseSchema,
   refundPaymentRequestSchema,
@@ -74,7 +76,7 @@ export type ApiModule =
   | "admin";
 
 export type HttpMethod = "GET" | "POST";
-export type AuthScope = "public" | "authenticated" | "staff" | "admin" | "webhook";
+export type AuthScope = "public" | "authenticated" | "staff" | "admin" | "webhook" | "internal";
 
 export interface ApiRouteDefinition {
   operationId: string;
@@ -223,6 +225,17 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: notificationListQuerySchema,
     responseSchema: notificationListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "dispatch_due_outbound_notifications",
+    method: "POST",
+    path: "/v1/internal/outbound-notifications/dispatch-due",
+    module: "notifications",
+    authScope: "internal",
+    idempotent: false,
+    requestSchema: outboundNotificationDispatchRequestSchema,
+    responseSchema: outboundNotificationDispatchResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

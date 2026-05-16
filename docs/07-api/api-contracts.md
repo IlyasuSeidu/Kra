@@ -46,6 +46,7 @@
 
 ## Notification APIs
 - `GET /v1/notifications`
+- `POST /v1/internal/outbound-notifications/dispatch-due`
 
 ## Admin APIs
 - `GET /v1/admin/overview`
@@ -130,6 +131,34 @@ Request:
   "packageScanCode": "PKG-0001",
   "condition": "ok",
   "receivedByUserId": "USR-OP-002"
+}
+```
+
+### `POST /v1/internal/outbound-notifications/dispatch-due`
+Auth:
+- `X-Kra-Internal-Task-Secret: <INTERNAL_TASK_SHARED_SECRET>`
+
+Request:
+```json
+{
+  "limit": 25
+}
+```
+
+Response:
+```json
+{
+  "processed": 2,
+  "sent": 1,
+  "failed": 1,
+  "deadLettered": 0,
+  "results": [
+    {
+      "outboundNotificationId": "ONF-0001",
+      "status": "sent",
+      "attemptCount": 1
+    }
+  ]
 }
 ```
 

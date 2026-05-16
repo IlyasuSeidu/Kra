@@ -34,6 +34,8 @@ import {
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
   notificationListResponseSchema,
+  outboundNotificationDispatchRequestSchema,
+  outboundNotificationDispatchResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
   publicTrackingResponseSchema,
@@ -306,6 +308,41 @@ describe("api contracts", () => {
           type: "ready_for_pickup"
         }
       ]
+    });
+  });
+
+  it("accepts outbound notification dispatch worker contracts", () => {
+    expect(
+      outboundNotificationDispatchRequestSchema.parse({
+        limit: "10"
+      })
+    ).toEqual({
+      limit: 10
+    });
+
+    expect(
+      outboundNotificationDispatchResponseSchema.parse({
+        processed: 2,
+        sent: 1,
+        failed: 1,
+        deadLettered: 0,
+        results: [
+          {
+            outboundNotificationId: "ONF-0001",
+            status: "sent",
+            attemptCount: 1
+          },
+          {
+            outboundNotificationId: "ONF-0002",
+            status: "failed",
+            attemptCount: 1
+          }
+        ]
+      })
+    ).toMatchObject({
+      processed: 2,
+      sent: 1,
+      failed: 1
     });
   });
 

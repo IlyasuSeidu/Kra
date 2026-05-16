@@ -85,6 +85,7 @@ Deliver only meaningful updates to the right user at the right time.
 - Provider failure updates the outbox record to `failed`, schedules one retry at `30 minutes`, and preserves `lastError` for operations review.
 - A second failed SMS attempt moves the record to `dead_letter`; customer support must review the affected delivery before suppressing or manually re-sending.
 - Lifecycle state mutation must not roll back only because an SMS provider is temporarily unavailable; the outbox is the recovery mechanism.
+- Cloud Tasks or a scheduler must call the internal dispatch endpoint with `X-Kra-Internal-Task-Secret` to process due outbox records.
 
 ## Copy Baseline
 - Payment confirmed: `Payment confirmed. Kra has started processing your delivery.`

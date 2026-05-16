@@ -66,6 +66,7 @@ function makeAppDeps(): ApiAppDeps {
     config: {
       firebaseProjectId: "kra-test",
       apiPort: 8080,
+      internalTaskSharedSecret: "internal-task-secret-123456",
       mtnMomo: {
         baseUrl: "https://sandbox.example.test",
         collectionPrimaryKey: "primary-key-123456",
@@ -602,6 +603,127 @@ describe("api app", () => {
         }
       })
     ]);
+  });
+
+  it("dispatches due outbound notifications over the secured internal task route", async () => {
+    const deps = makeAppDeps();
+    const outboxRecords: OutboundNotificationRecord[] = [
+      {
+        outboundNotificationId: "ONF-9401",
+        channel: "sms",
+        provider: "hubtel",
+        kind: "receiver_delivery_sms",
+        status: "failed",
+        dedupeKey: "receiver-sms:DEL-9401:out_for_delivery",
+        deliveryId: "DEL-9401",
+        recipientPhone: "+233240000000",
+        trackingCode: "KRA-9401",
+        eventType: "out_for_delivery",
+        stationName: "Kumasi Adum",
+        attemptCount: 1,
+        maxAttempts: 2,
+        nextAttemptAt: "2026-05-16T15:00:00.000Z",
+        lastAttemptAt: "2026-05-16T14:30:00.000Z",
+        createdAt: "2026-05-16T14:30:00.000Z",
+        updatedAt: "2026-05-16T14:30:00.000Z"
+      }
+    ];
+    const sentMessages: string[] = [];
+
+    deps.notifications = {
+      sendPublicTrackingOtp() {
+        return resolveVoid();
+      },
+      sendReceiverDeliverySms(input) {
+        sentMessages.push(input.trackingCode);
+        return resolveVoid();
+      }
+    };
+    deps.outboundNotifications = {
+      getByDedupeKey() {
+        return resolve(undefined);
+      },
+      create() {
+        return resolveVoid();
+      },
+      markSent(input) {
+        const record = outboxRecords.find(
+          (item) => item.outboundNotificationId === input.outboundNotificationId
+        );
+
+        if (record) {
+          Object.assign(record, {
+            status: "sent",
+            attemptCount: input.attemptCount,
+            lastAttemptAt: input.attemptedAt,
+            sentAt: input.attemptedAt,
+            updatedAt: input.attemptedAt
+          });
+        }
+
+        return resolveVoid();
+      },
+      markFailed() {
+        return resolveVoid();
+      },
+      listDue(input) {
+        expect(input).toEqual({
+          now: "2026-05-16T15:00:00.000Z",
+          limit: 10
+        });
+        return resolve(outboxRecords);
+      }
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/internal/outbound-notifications/dispatch-due",
+      headers: {
+        "x-kra-internal-task-secret": "internal-task-secret-123456"
+      },
+      payload: {
+        limit: 10
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      processed: 1,
+      sent: 1,
+      failed: 0,
+      deadLettered: 0,
+      results: [
+        {
+          outboundNotificationId: "ONF-9401",
+          status: "sent",
+          attemptCount: 2
+        }
+      ]
+    });
+    expect(sentMessages).toEqual(["KRA-9401"]);
+  });
+
+  it("rejects internal outbound notification dispatch without the task secret", async () => {
+    const app = createApiApp(makeAppDeps());
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/internal/outbound-notifications/dispatch-due",
+      payload: {
+        limit: 10
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "FORBIDDEN"
+      }
+    });
   });
 
   it("lets a super admin create a managed user record", async () => {
