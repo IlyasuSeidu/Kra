@@ -848,6 +848,15 @@ export async function completeDelivery(
   const occurredAt = deps.now();
 
   if (delivery.currentStatus === "awaiting_receiver_pickup") {
+    if (actor.role !== "station_operator") {
+      throw new ApiServiceError("FORBIDDEN", "Pickup completion requires a station operator.", {
+        deliveryId: delivery.deliveryId,
+        actorId: actor.actorId,
+        actorRole: actor.role
+      });
+    }
+
+    assertCapability(actor, "confirm_destination_receipt");
     assertStationScope(actor, delivery.destinationStationId, "complete_delivery");
     const { delivery: updatedDelivery, event } = await applyTransition(
       {

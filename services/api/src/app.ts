@@ -624,6 +624,46 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
 
       assertCanAccessDelivery(principal, delivery);
     };
+    const requireDeliveryCompletionAccess = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const deliveryId = (request.params as { id: string }).id;
+      const delivery = await deps.deliveries.getById(deliveryId);
+
+      if (!delivery) {
+        throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+          deliveryId
+        });
+      }
+
+      if (delivery.currentStatus === "awaiting_receiver_pickup") {
+        if (principal.role !== "station_operator" || principal.stationId !== delivery.destinationStationId) {
+          throw new ApiServiceError(
+            "FORBIDDEN",
+            "Pickup completion is restricted to the destination station operator.",
+            {
+              deliveryId,
+              userId: principal.userId,
+              role: principal.role
+            }
+          );
+        }
+
+        return;
+      }
+
+      assertCapabilityForPrincipal(principal, "complete_delivery_with_proof");
+    };
+    const requireMtnMomoWebhookSignature = (request: FastifyRequest) => {
+      const payload = mtnMomoWebhookRequestSchema.parse(request.body);
+
+      verifyWebhookSignature(
+        payload,
+        typeof request.headers["x-kra-webhook-signature"] === "string"
+          ? request.headers["x-kra-webhook-signature"]
+          : undefined,
+        deps.config.mtnMomo?.webhookSharedSecret
+      );
+    };
 
     rateLimitedApp.get("/v1/deliveries", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
@@ -898,16 +938,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       }));
     });
 
-    rateLimitedApp.post("/v1/webhooks/payments/mtn-momo", { preHandler: webhookPreHandler }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/webhooks/payments/mtn-momo", { preHandler: [webhookPreHandler, requireMtnMomoWebhookSignature] }, async (request: FastifyRequest) => {
       const payload = mtnMomoWebhookRequestSchema.parse(request.body);
-
-      verifyWebhookSignature(
-        payload,
-        typeof request.headers["x-kra-webhook-signature"] === "string"
-          ? request.headers["x-kra-webhook-signature"]
-          : undefined,
-        deps.config.mtnMomo?.webhookSharedSecret
-      );
 
       return (
         await processMtnMomoWebhook(
@@ -1135,7 +1167,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       }));
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: [authenticatedMutationPreHandler, requireCapability("complete_delivery_with_proof")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: [authenticatedMutationPreHandler, requireDeliveryCompletionAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = completeDeliveryRequestSchema.parse(request.body);
       const deliveryId = (request.params as { id: string }).id;

@@ -293,7 +293,6 @@ export const apiRoutes = [
     path: "/v1/deliveries/:id/complete",
     module: "handoffs",
     authScope: "staff",
-    capability: "complete_delivery_with_proof",
     idempotent: true,
     requestSchema: completeDeliveryRequestSchema,
     responseSchema: deliveryLifecycleResponseSchema,
