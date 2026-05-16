@@ -70,10 +70,18 @@ describe("api routes", () => {
     });
 
     expect(listApiRoutesByModule("notifications").map((route) => route.operationId)).toEqual([
-      "list_notifications"
+      "list_notifications",
+      "dispatch_due_outbound_notifications"
     ]);
     expect(getApiRoute("list_notifications")?.requestSchema).toBeDefined();
     expect(getApiRoute("list_notifications")?.responseSchema).toBeDefined();
+    expect(getApiRoute("dispatch_due_outbound_notifications")).toMatchObject({
+      authScope: "internal",
+      module: "notifications",
+      path: "/v1/internal/outbound-notifications/dispatch-due"
+    });
+    expect(getApiRoute("dispatch_due_outbound_notifications")?.requestSchema).toBeDefined();
+    expect(getApiRoute("dispatch_due_outbound_notifications")?.responseSchema).toBeDefined();
   });
 
   it("requires admin scope for refund and admin overview endpoints", () => {

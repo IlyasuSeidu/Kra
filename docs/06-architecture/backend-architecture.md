@@ -62,6 +62,7 @@ Business logic should live in application services, not in route handlers and no
 - Outbox records carry `status`, `attemptCount`, `nextAttemptAt`, provider, channel, dedupe key, delivery ID, recipient phone, and last error metadata.
 - Receiver SMS uses a stricter v1 policy than generic notification tasks: first attempt plus one retry after `30 minutes`, then `dead_letter`.
 - Delivery lifecycle writes remain authoritative even when the SMS provider is degraded; operations recover from the outbox instead of losing the event.
+- Due outbox records are processed by the secured internal task endpoint `POST /v1/internal/outbound-notifications/dispatch-due` using `X-Kra-Internal-Task-Secret`.
 
 ## Baseline Status
 This file is now concrete enough to guide backend scaffolding and async workflow design.

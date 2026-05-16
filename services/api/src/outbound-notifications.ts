@@ -72,6 +72,20 @@ export interface QueueReceiverDeliverySmsDeps {
   now: () => string;
 }
 
+export interface OutboundNotificationDispatchResult {
+  outboundNotificationId: string;
+  status: Extract<OutboundNotificationStatus, "sent" | "failed" | "dead_letter">;
+  attemptCount: number;
+}
+
+export interface DispatchDueOutboundNotificationsResponse {
+  processed: number;
+  sent: number;
+  failed: number;
+  deadLettered: number;
+  results: OutboundNotificationDispatchResult[];
+}
+
 const receiverSmsMaxAttempts = 2;
 const receiverSmsRetryDelayMinutes = 30;
 
@@ -160,7 +174,7 @@ async function getOrCreateReceiverSmsOutboxRecord(
 export async function dispatchReceiverSmsOutboxRecord(
   record: OutboundNotificationRecord,
   deps: Pick<QueueReceiverDeliverySmsDeps, "outboundNotifications" | "notifications" | "now">
-): Promise<void> {
+): Promise<OutboundNotificationDispatchResult> {
   const attemptedAt = deps.now();
   const attemptCount = record.attemptCount + 1;
 
@@ -177,6 +191,12 @@ export async function dispatchReceiverSmsOutboxRecord(
       attemptCount,
       attemptedAt
     });
+
+    return {
+      outboundNotificationId: record.outboundNotificationId,
+      status: "sent",
+      attemptCount
+    };
   } catch (error) {
     const nextStatus = attemptCount >= record.maxAttempts ? "dead_letter" : "failed";
     const nextAttemptAt =
@@ -192,6 +212,12 @@ export async function dispatchReceiverSmsOutboxRecord(
       nextAttemptAt,
       lastError: summarizeDeliveryError(error)
     });
+
+    return {
+      outboundNotificationId: record.outboundNotificationId,
+      status: nextStatus,
+      attemptCount
+    };
   }
 }
 
@@ -206,4 +232,27 @@ export async function queueAndDispatchReceiverDeliverySms(
   }
 
   await dispatchReceiverSmsOutboxRecord(record, deps);
+}
+
+export async function dispatchDueOutboundNotifications(
+  input: { limit?: number | undefined },
+  deps: Pick<QueueReceiverDeliverySmsDeps, "outboundNotifications" | "notifications" | "now">
+): Promise<DispatchDueOutboundNotificationsResponse> {
+  const dueRecords = await deps.outboundNotifications.listDue({
+    now: deps.now(),
+    limit: input.limit ?? 25
+  });
+  const results: OutboundNotificationDispatchResult[] = [];
+
+  for (const record of dueRecords) {
+    results.push(await dispatchReceiverSmsOutboxRecord(record, deps));
+  }
+
+  return {
+    processed: results.length,
+    sent: results.filter((result) => result.status === "sent").length,
+    failed: results.filter((result) => result.status === "failed").length,
+    deadLettered: results.filter((result) => result.status === "dead_letter").length,
+    results
+  };
 }

@@ -23,6 +23,8 @@ import {
   markInTransitRequestSchema,
   markOutForDeliveryRequestSchema,
   mtnMomoWebhookRequestSchema,
+  outboundNotificationDispatchRequestSchema,
+  outboundNotificationDispatchResponseSchema,
   paymentInitializeRequestSchema,
   paymentVerifyRequestSchema,
   recordFailedAttemptRequestSchema,
@@ -127,6 +129,7 @@ import {
   type QueueNotificationInput
 } from "./notification-feed";
 import {
+  dispatchDueOutboundNotifications,
   queueAndDispatchReceiverDeliverySms,
   type OutboundNotificationIdentityFactory,
   type OutboundNotificationRepository
@@ -320,6 +323,35 @@ function verifyWebhookSignature(
   ) {
     throw new ApiServiceError("FORBIDDEN", "Webhook signature is invalid.", {
       reason: "webhook_signature_invalid"
+    });
+  }
+}
+
+function verifyInternalTaskSecret(
+  secretHeader: string | undefined,
+  sharedSecret: string | undefined
+): void {
+  if (!sharedSecret) {
+    throw new ApiServiceError("ROUTE_NOT_ENABLED", "Internal task authentication is not configured.", {
+      reason: "missing_internal_task_secret"
+    });
+  }
+
+  if (!secretHeader) {
+    throw new ApiServiceError("FORBIDDEN", "Internal task secret header is required.", {
+      reason: "missing_internal_task_secret_header"
+    });
+  }
+
+  const expectedBuffer = Buffer.from(sharedSecret, "utf8");
+  const receivedBuffer = Buffer.from(secretHeader, "utf8");
+
+  if (
+    expectedBuffer.length !== receivedBuffer.length ||
+    !timingSafeEqual(expectedBuffer, receivedBuffer)
+  ) {
+    throw new ApiServiceError("FORBIDDEN", "Internal task secret is invalid.", {
+      reason: "internal_task_secret_invalid"
     });
   }
 }
@@ -839,6 +871,11 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       timeWindow: "1 minute",
       skipOnError: false
     });
+    const internalTaskPreHandler = rateLimitedApp.rateLimit({
+      max: 120,
+      timeWindow: "1 minute",
+      skipOnError: false
+    });
     const requireAuthenticated = async (request: FastifyRequest) => {
       const principal = await authenticateRequest(request, deps.authVerifier);
       assertAuthenticatedPrincipal(principal);
@@ -972,17 +1009,27 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
 
       assertCapabilityForPrincipal(principal, "complete_delivery_with_proof");
     };
-    const requireMtnMomoWebhookSignature = (request: FastifyRequest) => {
-      const payload = mtnMomoWebhookRequestSchema.parse(request.body);
+    const requireMtnMomoWebhookSignature = (request: FastifyRequest) =>
+      Promise.resolve().then(() => {
+        const payload = mtnMomoWebhookRequestSchema.parse(request.body);
 
-      verifyWebhookSignature(
-        payload,
-        typeof request.headers["x-kra-webhook-signature"] === "string"
-          ? request.headers["x-kra-webhook-signature"]
-          : undefined,
-        deps.config.mtnMomo?.webhookSharedSecret
-      );
-    };
+        verifyWebhookSignature(
+          payload,
+          typeof request.headers["x-kra-webhook-signature"] === "string"
+            ? request.headers["x-kra-webhook-signature"]
+            : undefined,
+          deps.config.mtnMomo?.webhookSharedSecret
+        );
+      });
+    const requireInternalTaskSecret = (request: FastifyRequest) =>
+      Promise.resolve().then(() => {
+        verifyInternalTaskSecret(
+          typeof request.headers["x-kra-internal-task-secret"] === "string"
+            ? request.headers["x-kra-internal-task-secret"]
+            : undefined,
+          deps.config.internalTaskSharedSecret
+        );
+      });
 
     rateLimitedApp.get("/v1/notifications", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
@@ -990,6 +1037,25 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       return listNotifications(principal, (request.query as Record<string, unknown>) ?? {}, {
         notificationFeed: deps.notificationFeed
       });
+    });
+
+    rateLimitedApp.post("/v1/internal/outbound-notifications/dispatch-due", { preHandler: [internalTaskPreHandler, requireInternalTaskSecret] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!deps.notifications) {
+        throw new ApiServiceError("ROUTE_NOT_ENABLED", "Outbound notification dispatch is not configured.", {
+          reason: "missing_notification_gateway"
+        });
+      }
+
+      setNoStore(reply);
+
+      const input = outboundNotificationDispatchRequestSchema.parse(request.body ?? {});
+      const result = await dispatchDueOutboundNotifications(input, {
+        outboundNotifications: deps.outboundNotifications,
+        notifications: deps.notifications,
+        now: deps.now
+      });
+
+      return outboundNotificationDispatchResponseSchema.parse(result);
     });
 
     rateLimitedApp.get("/v1/deliveries", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {

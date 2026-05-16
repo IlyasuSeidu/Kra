@@ -574,6 +574,24 @@ export const notificationListResponseSchema = z.object({
   notifications: z.array(notificationResponseSchema)
 });
 
+export const outboundNotificationDispatchRequestSchema = z.object({
+  limit: z.coerce.number().int().positive().max(50).optional()
+});
+
+export const outboundNotificationDispatchResponseSchema = z.object({
+  processed: z.number().int().nonnegative(),
+  sent: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  deadLettered: z.number().int().nonnegative(),
+  results: z.array(
+    z.object({
+      outboundNotificationId: z.string().regex(/^ONF-[A-Z0-9-]+$/),
+      status: z.enum(["sent", "failed", "dead_letter"]),
+      attemptCount: z.number().int().nonnegative()
+    })
+  )
+});
+
 export const auditTargetTypeSchema = z.enum(["delivery", "payment", "issue", "tracking"]);
 
 export const auditEventListQuerySchema = z.object({
