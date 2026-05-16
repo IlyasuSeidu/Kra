@@ -14,13 +14,35 @@ export const paymentStatusSchema = z.enum([
   "refund_pending",
   "refunded"
 ]);
+export const issueSeveritySchema = z.enum(["p1", "p2", "p3"]);
+export const issueStatusSchema = z.enum([
+  "open",
+  "in_review",
+  "escalated",
+  "resolved",
+  "closed"
+]);
+export const issueCategorySchema = z.enum([
+  "delay",
+  "damage",
+  "loss",
+  "payment",
+  "handoff",
+  "other"
+]);
 export const requestIdSchema = z.string().regex(/^REQ-[A-Z0-9-]+$/);
 export const deliveryIdSchema = z.string().regex(/^DEL-[A-Z0-9-]+$/);
 export const paymentIdSchema = z.string().regex(/^PAY-[A-Z0-9-]+$/);
+export const issueIdSchema = z.string().regex(/^ISS-[A-Z0-9-]+$/);
 export const trackingCodeSchema = z.string().regex(/^KRA-[A-Z0-9-]+$/);
 export const userIdSchema = z.string().regex(/^USR-[A-Z0-9-]+$/);
 export const publicTouchpointRoleSchema = z.enum([
   "system",
+  "station_operator",
+  "driver",
+  "final_mile_courier"
+]);
+export const deliveryCustodyRoleSchema = z.enum([
   "station_operator",
   "driver",
   "final_mile_courier"
@@ -169,6 +191,61 @@ export const publicTrackingResponseSchema = z.object({
   etaLabel: z.string().min(3).optional()
 });
 
+export const deliveryDetailResponseSchema = z.object({
+  deliveryId: deliveryIdSchema,
+  trackingCode: trackingCodeSchema,
+  senderId: userIdSchema,
+  originStationId: stationIdSchema,
+  destinationStationId: stationIdSchema,
+  currentStatus: deliveryStatusSchema,
+  paymentStatus: paymentStatusSchema,
+  serviceType: serviceTypeSchema,
+  doorstepRequested: z.boolean(),
+  doorstepDistanceKm: z.number().positive().max(10).optional(),
+  receiver: deliveryReceiverSchema,
+  package: deliveryPackageSchema,
+  quote: moneySchema,
+  currentCustodyRole: deliveryCustodyRoleSchema.nullable(),
+  currentCustodyActorId: userIdSchema.nullable(),
+  assignedDriverId: userIdSchema.optional(),
+  assignedFinalMileCourierId: userIdSchema.optional(),
+  latestEvent: z.object({
+    type: z.string().min(3),
+    occurredAt: z.string().datetime()
+  }),
+  latestTouchpoint: z.object({
+    role: publicTouchpointRoleSchema,
+    stationId: stationIdSchema.optional(),
+    occurredAt: z.string().datetime()
+  }),
+  finalProof: z
+    .object({
+      type: deliveryProofTypeSchema,
+      reference: z.string().trim().min(3).max(120),
+      receivedByName: z.string().trim().min(2).max(120),
+      capturedAt: z.string().datetime()
+    })
+    .optional(),
+  createdAt: z.string().datetime()
+});
+
+export const deliveryTimelineEntrySchema = z.object({
+  entryId: z.string().trim().min(3).max(120),
+  entryType: z.enum(["delivery_event", "handoff_event", "issue_event"]),
+  occurredAt: z.string().datetime(),
+  label: z.string().trim().min(3).max(240),
+  actorId: userIdSchema.optional(),
+  actorRole: z.string().trim().min(3).max(80).optional(),
+  stationId: stationIdSchema.optional(),
+  metadata: z.record(z.unknown()).optional()
+});
+
+export const deliveryTimelineResponseSchema = z.object({
+  deliveryId: deliveryIdSchema,
+  trackingCode: trackingCodeSchema,
+  entries: z.array(deliveryTimelineEntrySchema)
+});
+
 export const verifyPhoneRequestSchema = z.object({
   phone: phoneSchema,
   otp: z.string().trim().min(4).max(8)
@@ -254,6 +331,45 @@ export const deliveryLifecycleResponseSchema = z.object({
   occurredAt: z.string().datetime()
 });
 
+export const createIssueRequestSchema = z.object({
+  deliveryId: deliveryIdSchema,
+  category: issueCategorySchema,
+  severity: issueSeveritySchema,
+  summary: z.string().trim().min(5).max(160),
+  description: z.string().trim().min(5).max(500).optional()
+});
+
+export const escalateIssueRequestSchema = z.object({
+  reasonCode: z.enum([
+    "sender_request",
+    "sla_breach",
+    "payment_dispute",
+    "loss_investigation",
+    "fraud_review",
+    "management_attention"
+  ]),
+  note: z.string().trim().min(5).max(400)
+});
+
+export const issueResponseSchema = z.object({
+  issueId: issueIdSchema,
+  deliveryId: deliveryIdSchema,
+  status: issueStatusSchema,
+  severity: issueSeveritySchema,
+  category: issueCategorySchema,
+  summary: z.string().trim().min(5).max(160),
+  description: z.string().trim().min(5).max(500).optional(),
+  reporter: z.object({
+    actorId: userIdSchema,
+    actorRole: z.string().trim().min(3).max(80)
+  }),
+  escalatedAt: z.string().datetime().optional(),
+  escalatedByActorId: userIdSchema.optional(),
+  escalationReasonCode: z.string().trim().min(3).max(80).optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
 export const adminOverviewResponseSchema = z.object({
   generatedAt: z.string().datetime(),
   deliveryStatusCounts: z.array(
@@ -273,6 +389,58 @@ export const adminOverviewResponseSchema = z.object({
     unmatchedWebhookEvents: z.number().int().nonnegative(),
     manualReviewWebhookEvents: z.number().int().nonnegative()
   })
+});
+
+export const adminDeliveryListResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  deliveries: z.array(
+    z.object({
+      deliveryId: deliveryIdSchema,
+      trackingCode: trackingCodeSchema,
+      currentStatus: deliveryStatusSchema,
+      paymentStatus: paymentStatusSchema,
+      originStationId: stationIdSchema,
+      destinationStationId: stationIdSchema,
+      senderId: userIdSchema,
+      latestOccurredAt: z.string().datetime(),
+      receiverName: z.string().trim().min(2).max(120)
+    })
+  )
+});
+
+export const adminStationListResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  stations: z.array(
+    z.object({
+      stationId: stationIdSchema,
+      name: z.string().trim().min(3).max(120),
+      city: z.string().trim().min(2).max(120),
+      activeQueueCount: z.number().int().nonnegative(),
+      issueCount: z.number().int().nonnegative()
+    })
+  )
+});
+
+export const adminFinanceResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  totals: z.object({
+    confirmedAmountGhs: z.number().nonnegative(),
+    refundPendingAmountGhs: z.number().nonnegative(),
+    refundedAmountGhs: z.number().nonnegative()
+  }),
+  payments: z.array(
+    z.object({
+      paymentId: paymentIdSchema,
+      deliveryId: deliveryIdSchema,
+      provider: z.literal("mtn_momo"),
+      providerReference: z.string().trim().min(6).max(120),
+      status: paymentStatusSchema,
+      amountGhs: z.number().int().positive(),
+      initiatedAt: z.string().datetime(),
+      verifiedAt: z.string().datetime().optional(),
+      refundAmountGhs: z.number().nonnegative().optional()
+    })
+  )
 });
 
 export const apiErrorCodeSchema = z.enum([

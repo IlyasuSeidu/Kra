@@ -13,6 +13,12 @@ describe("admin overview", () => {
             { status: "on_hold", count: 1 },
             { status: "delivered", count: 9 }
           ]);
+        },
+        listRecent() {
+          return Promise.resolve([]);
+        },
+        countActiveQueuesByStation() {
+          return Promise.resolve([]);
         }
       },
       payments: {
@@ -22,6 +28,9 @@ describe("admin overview", () => {
             { status: "confirmed", count: 11 },
             { status: "refund_pending", count: 1 }
           ]);
+        },
+        listRecent() {
+          return Promise.resolve([]);
         }
       },
       webhookEvents: {

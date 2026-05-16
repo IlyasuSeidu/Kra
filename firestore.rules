@@ -1,0 +1,109 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.kra_role;
+    }
+
+    function stationId() {
+      return request.auth.token.kra_station_id;
+    }
+
+    function isAdmin() {
+      return role() in ['ops_admin', 'finance_admin', 'support_admin', 'super_admin'];
+    }
+
+    function isFinanceAdmin() {
+      return role() in ['finance_admin', 'super_admin'];
+    }
+
+    function isSupportOrOpsAdmin() {
+      return role() in ['ops_admin', 'support_admin', 'super_admin'];
+    }
+
+    function canReadDelivery(delivery) {
+      return delivery.senderId == request.auth.uid ||
+        (role() == 'driver' && delivery.assignedDriverId == request.auth.uid) ||
+        (role() == 'final_mile_courier' && delivery.assignedFinalMileCourierId == request.auth.uid) ||
+        (role() == 'station_operator' &&
+          (delivery.originStationId == stationId() || delivery.destinationStationId == stationId())) ||
+        isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create, update, delete: if false;
+    }
+
+    match /deliveries/{deliveryId} {
+      allow read: if isAuthenticated() && canReadDelivery(resource.data);
+      allow create, update, delete: if false;
+
+      match /events/{eventId} {
+        allow read: if isAuthenticated() && canReadDelivery(get(/databases/$(database)/documents/deliveries/$(deliveryId)).data);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        (
+          resource.data.deliveryId != null &&
+          canReadDelivery(get(/databases/$(database)/documents/deliveries/$(resource.data.deliveryId)).data)
+        ) ||
+        isFinanceAdmin()
+      );
+      allow create, update, delete: if false;
+    }
+
+    match /support_issues/{issueId} {
+      allow read: if isAuthenticated() && (
+        isSupportOrOpsAdmin() ||
+        isFinanceAdmin() ||
+        canReadDelivery(get(/databases/$(database)/documents/deliveries/$(resource.data.deliveryId)).data)
+      );
+      allow create, update, delete: if false;
+    }
+
+    match /handoff_events/{eventId} {
+      allow read: if isAuthenticated() &&
+        canReadDelivery(get(/databases/$(database)/documents/deliveries/$(resource.data.deliveryId)).data);
+      allow create, update, delete: if false;
+    }
+
+    match /provider_webhook_events/{eventId} {
+      allow read: if isAuthenticated() && isFinanceAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /public_tracking_phone_challenges/{challengeId} {
+      allow read, write: if false;
+    }
+
+    match /public_tracking_verification_failed_attempts/{attemptId} {
+      allow read, write: if false;
+    }
+
+    match /public_tracking_verification_grants/{verificationId} {
+      allow read, write: if false;
+    }
+
+    match /audit_events/{eventId} {
+      allow read: if isAuthenticated() && isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /idempotency_records/{recordId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

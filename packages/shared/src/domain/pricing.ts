@@ -6,6 +6,31 @@ export type StationId = (typeof stationIds)[number];
 export type SizeTier = (typeof sizeTiers)[number];
 export type ServiceType = (typeof serviceTypes)[number];
 
+export const stationCatalog: Record<
+  StationId,
+  {
+    name: string;
+    city: string;
+    code: string;
+  }
+> = {
+  "ST-ACC-01": {
+    name: "Accra Central",
+    city: "Accra",
+    code: "ACC"
+  },
+  "ST-KMS-01": {
+    name: "Kumasi Adum",
+    city: "Kumasi",
+    code: "KMS"
+  },
+  "ST-TML-01": {
+    name: "Tamale Central",
+    city: "Tamale",
+    code: "TML"
+  }
+};
+
 export interface QuoteInput {
   originStationId: StationId;
   destinationStationId: StationId;

@@ -9,6 +9,7 @@ import {
   publicTrackingPhoneChallengeDocumentPath,
   publicTrackingVerificationAttemptDocumentPath,
   publicTrackingVerificationGrantDocumentPath,
+  supportIssueDocumentPath,
   webhookEventDocumentPath
 } from "../firestore/schema";
 
@@ -20,9 +21,11 @@ describe("firestore schema helpers", () => {
       payments: "payments",
       handoffEvents: "handoff_events",
       webhookEvents: "provider_webhook_events",
+      supportIssues: "support_issues",
       publicTrackingPhoneChallenges: "public_tracking_phone_challenges",
       publicTrackingVerificationAttempts: "public_tracking_verification_failed_attempts",
-      publicTrackingVerificationGrants: "public_tracking_verification_grants"
+      publicTrackingVerificationGrants: "public_tracking_verification_grants",
+      idempotencyRecords: "idempotency_records"
     });
   });
 
@@ -36,6 +39,7 @@ describe("firestore schema helpers", () => {
     expect(webhookEventDocumentPath("EVT-WEB-1001")).toBe(
       "provider_webhook_events/EVT-WEB-1001"
     );
+    expect(supportIssueDocumentPath("ISS-1001")).toBe("support_issues/ISS-1001");
     expect(publicTrackingPhoneChallengeDocumentPath("CHL-1001")).toBe(
       "public_tracking_phone_challenges/CHL-1001"
     );

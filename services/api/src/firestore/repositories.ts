@@ -3,15 +3,18 @@ import { deliveryStatuses } from "@kra/shared";
 
 import type {
   AdminDeliveryMetricsRepository,
+  AdminIssueMetricsRepository,
   AdminPaymentMetricsRepository,
   AdminWebhookMetricsRepository
 } from "../admin";
 import type { DeliveryRecord, DeliveryRepository } from "../deliveries";
+import type { DeliveryEventReadRepository, HandoffEventReadRepository } from "../delivery-queries";
 import type {
   DeliveryEventRepository,
   DeliveryLifecycleRepository,
   HandoffEventRepository
 } from "../handoffs";
+import type { SupportIssueRepository } from "../issues";
 import type {
   PaymentRecord,
   PaymentRepository
@@ -35,6 +38,7 @@ import {
   publicTrackingPhoneChallengeConverter,
   publicTrackingVerificationAttemptConverter,
   publicTrackingVerificationGrantConverter,
+  supportIssueConverter,
   webhookEventConverter,
   type DeliveryDocument,
   type PaymentDocument
@@ -65,6 +69,22 @@ function fromPaymentDocument(document: PaymentDocument): PaymentRecord {
 
   return payment;
 }
+
+const activeQueueStatuses: DeliveryRecord["currentStatus"][] = [
+  "created",
+  "received_at_origin",
+  "awaiting_driver_assignment",
+  "assigned_to_driver",
+  "dispatched_from_origin",
+  "in_transit",
+  "received_at_destination",
+  "awaiting_receiver_pickup",
+  "awaiting_final_mile_assignment",
+  "assigned_for_final_mile",
+  "out_for_delivery",
+  "issue_reported",
+  "on_hold"
+];
 
 export function createFirestoreDeliveryRepository(
   firestore: Firestore,
@@ -112,6 +132,46 @@ export function createFirestoreDeliveryRepository(
         toDeliveryDocument(delivery, now()),
         { merge: true }
       );
+    },
+    async listRecent(limit) {
+      const snapshot = await deliveriesCollection
+        .orderBy("latestEvent.occurredAt", "desc")
+        .limit(limit)
+        .get();
+
+      return snapshot.docs.map((document) => fromDeliveryDocument(document.data()));
+    },
+    async countActiveQueuesByStation() {
+      const counts = await Promise.all(
+        deliveryStatuses.map(async (status) => {
+          if (!activeQueueStatuses.includes(status)) {
+            return [];
+          }
+
+          const snapshot = await deliveriesCollection
+            .where("originStationId", "in", ["ST-ACC-01", "ST-KMS-01", "ST-TML-01"])
+            .where("currentStatus", "==", status)
+            .get();
+
+          return snapshot.docs.map((document) => document.data());
+        })
+      );
+
+      const aggregate = new Map<DeliveryRecord["originStationId"], number>();
+
+      for (const deliveries of counts) {
+        for (const delivery of deliveries) {
+          aggregate.set(
+            delivery.originStationId,
+            (aggregate.get(delivery.originStationId) ?? 0) + 1
+          );
+        }
+      }
+
+      return [...aggregate.entries()].map(([stationId, count]) => ({
+        stationId,
+        count
+      }));
     },
     async countByStatus() {
       const counts = await Promise.all(
@@ -201,6 +261,14 @@ export function createFirestorePaymentRepository(
       }
 
       return fromPaymentDocument(snapshot.data() as PaymentDocument);
+    },
+    async listRecent(limit: number) {
+      const snapshot = await paymentsCollection
+        .orderBy("initiatedAt", "desc")
+        .limit(limit)
+        .get();
+
+      return snapshot.docs.map((document) => fromPaymentDocument(document.data()));
     },
     async markRefundPending(input: {
       paymentId: string;
@@ -350,7 +418,7 @@ export function createFirestoreWebhookEventRepository(
 
 export function createFirestoreDeliveryEventRepository(
   firestore: Firestore
-): DeliveryEventRepository {
+): DeliveryEventRepository & DeliveryEventReadRepository {
   return {
     async create(event) {
       await firestore
@@ -359,13 +427,23 @@ export function createFirestoreDeliveryEventRepository(
         .withConverter(deliveryEventConverter)
         .doc(event.eventId)
         .set(event);
+    },
+    async listByDeliveryId(deliveryId) {
+      const snapshot = await firestore
+        .doc(deliveryDocumentPath(deliveryId))
+        .collection(firestoreCollections.deliveryEvents)
+        .withConverter(deliveryEventConverter)
+        .orderBy("occurredAt", "desc")
+        .get();
+
+      return snapshot.docs.map((document) => document.data());
     }
   };
 }
 
 export function createFirestoreHandoffEventRepository(
   firestore: Firestore
-): HandoffEventRepository {
+): HandoffEventRepository & HandoffEventReadRepository {
   const handoffEventsCollection = firestore
     .collection(firestoreCollections.handoffEvents)
     .withConverter(handoffEventConverter);
@@ -373,6 +451,91 @@ export function createFirestoreHandoffEventRepository(
   return {
     async create(event) {
       await handoffEventsCollection.doc(event.handoffEventId).set(event);
+    },
+    async listByDeliveryId(deliveryId) {
+      const snapshot = await handoffEventsCollection
+        .where("deliveryId", "==", deliveryId)
+        .orderBy("occurredAt", "desc")
+        .get();
+
+      return snapshot.docs.map((document) => document.data());
+    }
+  };
+}
+
+export function createFirestoreSupportIssueRepository(
+  firestore: Firestore,
+  now: () => string
+): SupportIssueRepository & AdminIssueMetricsRepository {
+  const issuesCollection = firestore
+    .collection(firestoreCollections.supportIssues)
+    .withConverter(supportIssueConverter);
+
+  return {
+    async create(issue) {
+      await issuesCollection.doc(issue.issueId).set(issue);
+    },
+    async getById(issueId) {
+      const snapshot = await issuesCollection.doc(issueId).get();
+
+      if (!snapshot.exists) {
+        return undefined;
+      }
+
+      return snapshot.data();
+    },
+    async save(issue) {
+      await issuesCollection.doc(issue.issueId).set(
+        {
+          ...issue,
+          updatedAt: now()
+        },
+        { merge: true }
+      );
+    },
+    async listByDeliveryId(deliveryId) {
+      const snapshot = await issuesCollection
+        .where("deliveryId", "==", deliveryId)
+        .orderBy("updatedAt", "desc")
+        .get();
+
+      return snapshot.docs.map((document) => document.data());
+    },
+    async countOpenByStation(stationId) {
+      const deliveryIdsSnapshot = await firestore
+        .collection(firestoreCollections.deliveries)
+        .withConverter(deliveryConverter)
+        .where("originStationId", "==", stationId)
+        .get();
+      const deliveryIds = deliveryIdsSnapshot.docs.map((document) => document.id);
+
+      if (deliveryIds.length === 0) {
+        return 0;
+      }
+
+      const chunks: string[][] = [];
+
+      for (let index = 0; index < deliveryIds.length; index += 10) {
+        chunks.push(deliveryIds.slice(index, index + 10));
+      }
+
+      let count = 0;
+
+      for (const chunk of chunks) {
+        const snapshot = await issuesCollection
+          .where("deliveryId", "in", chunk)
+          .get();
+
+        count += snapshot.docs
+          .map((document) => document.data())
+          .filter((issue) =>
+            issue.status === "open" ||
+            issue.status === "in_review" ||
+            issue.status === "escalated"
+          ).length;
+      }
+
+      return count;
     }
   };
 }
@@ -384,6 +547,7 @@ export function createFirestoreApiRepositories(
   return {
     deliveries: createFirestoreDeliveryRepository(firestore, now),
     payments: createFirestorePaymentRepository(firestore, now),
+    issues: createFirestoreSupportIssueRepository(firestore, now),
     verification: createFirestorePublicTrackingVerificationRepository(firestore),
     webhookEvents: createFirestoreWebhookEventRepository(firestore),
     deliveryEvents: createFirestoreDeliveryEventRepository(firestore),

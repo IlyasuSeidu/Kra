@@ -1,14 +1,22 @@
 import {
   adminOverviewResponseSchema,
+  adminDeliveryListResponseSchema,
+  adminFinanceResponseSchema,
+  adminStationListResponseSchema,
   apiErrorResponseSchema,
   assignDriverRequestSchema,
   assignFinalMileRequestSchema,
   completeDeliveryRequestSchema,
   confirmIntakeRequestSchema,
+  createIssueRequestSchema,
   createDeliveryRequestSchema,
   createDeliveryResponseSchema,
+  deliveryDetailResponseSchema,
   deliveryLifecycleResponseSchema,
+  deliveryTimelineResponseSchema,
   dispatchDeliveryRequestSchema,
+  escalateIssueRequestSchema,
+  issueResponseSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
   paymentInitializeRequestSchema,
@@ -60,6 +68,28 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: createDeliveryRequestSchema,
     responseSchema: createDeliveryResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "get_delivery",
+    method: "GET",
+    path: "/v1/deliveries/:id",
+    module: "deliveries",
+    authScope: "authenticated",
+    capability: "view_own_delivery",
+    idempotent: true,
+    responseSchema: deliveryDetailResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "get_delivery_timeline",
+    method: "GET",
+    path: "/v1/deliveries/:id/timeline",
+    module: "deliveries",
+    authScope: "authenticated",
+    capability: "view_own_delivery",
+    idempotent: true,
+    responseSchema: deliveryTimelineResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -203,6 +233,40 @@ export const apiRoutes = [
     errorSchema: apiErrorResponseSchema
   },
   {
+    operationId: "create_issue",
+    method: "POST",
+    path: "/v1/issues",
+    module: "issues",
+    authScope: "authenticated",
+    capability: "open_issue",
+    idempotent: true,
+    requestSchema: createIssueRequestSchema,
+    responseSchema: issueResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "get_issue",
+    method: "GET",
+    path: "/v1/issues/:id",
+    module: "issues",
+    authScope: "authenticated",
+    idempotent: true,
+    responseSchema: issueResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "escalate_issue",
+    method: "POST",
+    path: "/v1/issues/:id/escalate",
+    module: "issues",
+    authScope: "admin",
+    capability: "escalate_case",
+    idempotent: true,
+    requestSchema: escalateIssueRequestSchema,
+    responseSchema: issueResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
     operationId: "admin_overview",
     method: "GET",
     path: "/v1/admin/overview",
@@ -210,6 +274,36 @@ export const apiRoutes = [
     authScope: "admin",
     idempotent: false,
     responseSchema: adminOverviewResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_deliveries",
+    method: "GET",
+    path: "/v1/admin/deliveries",
+    module: "admin",
+    authScope: "admin",
+    idempotent: true,
+    responseSchema: adminDeliveryListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_stations",
+    method: "GET",
+    path: "/v1/admin/stations",
+    module: "admin",
+    authScope: "admin",
+    idempotent: true,
+    responseSchema: adminStationListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_finance",
+    method: "GET",
+    path: "/v1/admin/finance",
+    module: "admin",
+    authScope: "admin",
+    idempotent: true,
+    responseSchema: adminFinanceResponseSchema,
     errorSchema: apiErrorResponseSchema
   }
 ] as const satisfies readonly ApiRouteDefinition[];

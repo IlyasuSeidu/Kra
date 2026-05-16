@@ -2,6 +2,7 @@ import type { DocumentData, FirestoreDataConverter, QueryDocumentSnapshot } from
 
 import type { DeliveryRecord } from "../deliveries";
 import type { DeliveryEventRecord, HandoffEventRecord } from "../handoffs";
+import type { SupportIssueRecord } from "../issues";
 import type { WebhookEventRecord } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
 import type {
@@ -16,9 +17,11 @@ export const firestoreCollections = {
   payments: "payments",
   handoffEvents: "handoff_events",
   webhookEvents: "provider_webhook_events",
+  supportIssues: "support_issues",
   publicTrackingPhoneChallenges: "public_tracking_phone_challenges",
   publicTrackingVerificationAttempts: "public_tracking_verification_failed_attempts",
-  publicTrackingVerificationGrants: "public_tracking_verification_grants"
+  publicTrackingVerificationGrants: "public_tracking_verification_grants",
+  idempotencyRecords: "idempotency_records"
 } as const;
 
 export interface DeliveryDocument extends DeliveryRecord {
@@ -35,6 +38,7 @@ export interface PaymentDocument extends PaymentRecord {
 export type DeliveryEventDocument = DeliveryEventRecord;
 export type HandoffEventDocument = HandoffEventRecord;
 export type WebhookEventDocument = WebhookEventRecord;
+export type SupportIssueDocument = SupportIssueRecord;
 export type PublicTrackingPhoneChallengeDocument = PublicTrackingPhoneChallengeRecord;
 export type PublicTrackingVerificationAttemptDocument =
   PublicTrackingVerificationFailedAttemptRecord;
@@ -56,6 +60,7 @@ export const paymentConverter = createPassThroughConverter<PaymentDocument>();
 export const deliveryEventConverter = createPassThroughConverter<DeliveryEventDocument>();
 export const handoffEventConverter = createPassThroughConverter<HandoffEventDocument>();
 export const webhookEventConverter = createPassThroughConverter<WebhookEventDocument>();
+export const supportIssueConverter = createPassThroughConverter<SupportIssueDocument>();
 export const publicTrackingPhoneChallengeConverter =
   createPassThroughConverter<PublicTrackingPhoneChallengeDocument>();
 export const publicTrackingVerificationAttemptConverter =
@@ -85,6 +90,10 @@ export function webhookEventDocumentPath(eventId: string): string {
 
 export function publicTrackingPhoneChallengeDocumentPath(challengeId: string): string {
   return `${firestoreCollections.publicTrackingPhoneChallenges}/${challengeId}`;
+}
+
+export function supportIssueDocumentPath(issueId: string): string {
+  return `${firestoreCollections.supportIssues}/${issueId}`;
 }
 
 export function publicTrackingVerificationAttemptDocumentPath(attemptId: string): string {

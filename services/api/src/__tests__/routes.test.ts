@@ -10,6 +10,16 @@ describe("api routes", () => {
   });
 
   it("exposes public tracking routes without authenticated scope", () => {
+    expect(getApiRoute("get_delivery")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries/:id"
+    });
+
+    expect(getApiRoute("get_delivery_timeline")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries/:id/timeline"
+    });
+
     expect(getApiRoute("get_public_tracking")).toMatchObject({
       authScope: "public",
       path: "/v1/public/track/:trackingCode",
@@ -56,6 +66,14 @@ describe("api routes", () => {
     });
 
     expect(getApiRoute("admin_overview")?.responseSchema).toBeDefined();
+    expect(getApiRoute("admin_deliveries")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/deliveries"
+    });
+    expect(getApiRoute("admin_finance")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/finance"
+    });
   });
 
   it("groups handoff operations under the handoffs module", () => {
@@ -67,5 +85,16 @@ describe("api routes", () => {
       "assign_final_mile",
       "complete_delivery"
     ]);
+  });
+
+  it("registers issue management routes", () => {
+    expect(getApiRoute("create_issue")).toMatchObject({
+      authScope: "authenticated",
+      module: "issues"
+    });
+    expect(getApiRoute("escalate_issue")).toMatchObject({
+      authScope: "admin",
+      capability: "escalate_case"
+    });
   });
 });

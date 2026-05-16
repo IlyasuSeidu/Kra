@@ -5,13 +5,16 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter @kra/shared build && tsc -p tsconfig.build.json",
+    "dev": "pnpm --filter @kra/shared build && node --watch dist/server.js",
     "lint": "pnpm --filter @kra/shared build && eslint src",
+    "start": "node dist/server.js",
     "test": "pnpm --filter @kra/shared build && vitest run",
     "test:coverage": "pnpm --filter @kra/shared build && vitest run --coverage",
     "typecheck": "pnpm --filter @kra/shared build && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@kra/shared": "workspace:*",
+    "fastify": "^5.6.1",
     "firebase-admin": "^13.10.0"
   }
 }
