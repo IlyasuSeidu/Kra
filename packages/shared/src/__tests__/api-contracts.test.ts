@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   acceptFinalMileAssignmentRequestSchema,
   acceptRunRequestSchema,
+  adminStationListResponseSchema,
   adminUpdateStationStatusRequestSchema,
   adminUpdateStationStatusResponseSchema,
+  adminUpdateStationValidationRequestSchema,
+  adminUpdateStationValidationResponseSchema,
   adminUpdateUserAccessRequestSchema,
   adminUserListResponseSchema,
   adminUserResponseSchema,
@@ -694,6 +697,107 @@ describe("api contracts", () => {
     ).toMatchObject({
       stationId: "ST-ACC-01",
       intakeStatus: "restricted"
+    });
+
+    expect(
+      adminUpdateStationValidationRequestSchema.parse({
+        dryRunBusinessDaysCompleted: 2,
+        controlledPilotBusinessDaysCompleted: 3,
+        checklist: {
+          activeOperatorsCanSignIn: true,
+          intakeDispatchReceiptAudited: true,
+          scanOrManualFallbackTested: true,
+          noUnresolvedP1Incidents: true,
+          escalationAndRefundHandoffTested: true,
+          openingHoursStorageAndHandoffConfirmed: true
+        },
+        scanFallbackSuccessRatePercent: 97,
+        startedAt: "2026-05-11T07:00:00.000Z",
+        completedAt: "2026-05-15T19:00:00.000Z"
+      })
+    ).toMatchObject({
+      dryRunBusinessDaysCompleted: 2,
+      controlledPilotBusinessDaysCompleted: 3
+    });
+
+    expect(
+      adminUpdateStationValidationResponseSchema.parse({
+        stationId: "ST-ACC-01",
+        name: "Accra Central",
+        city: "Accra",
+        validation: {
+          status: "ready",
+          dryRunBusinessDaysCompleted: 2,
+          controlledPilotBusinessDaysCompleted: 3,
+          checklist: {
+            activeOperatorsCanSignIn: true,
+            intakeDispatchReceiptAudited: true,
+            scanOrManualFallbackTested: true,
+            noUnresolvedP1Incidents: true,
+            escalationAndRefundHandoffTested: true,
+            openingHoursStorageAndHandoffConfirmed: true
+          },
+          scanFallbackSuccessRatePercent: 97,
+          goLiveEligible: true,
+          blockers: [],
+          startedAt: "2026-05-11T07:00:00.000Z",
+          completedAt: "2026-05-15T19:00:00.000Z",
+          updatedAt: "2026-05-16T12:15:00.000Z"
+        }
+      })
+    ).toMatchObject({
+      validation: {
+        status: "ready",
+        goLiveEligible: true
+      }
+    });
+
+    expect(
+      adminStationListResponseSchema.parse({
+        generatedAt: "2026-05-16T12:20:00.000Z",
+        stations: [
+          {
+            stationId: "ST-ACC-01",
+            name: "Accra Central",
+            city: "Accra",
+            operatingStatus: "active",
+            intakeStatus: "open",
+            serviceAvailability: {
+              standard: true,
+              express: true,
+              doorstep: true
+            },
+            activeQueueCount: 0,
+            issueCount: 0,
+            validation: {
+              status: "ready",
+              dryRunBusinessDaysCompleted: 2,
+              controlledPilotBusinessDaysCompleted: 3,
+              checklist: {
+                activeOperatorsCanSignIn: true,
+                intakeDispatchReceiptAudited: true,
+                scanOrManualFallbackTested: true,
+                noUnresolvedP1Incidents: true,
+                escalationAndRefundHandoffTested: true,
+                openingHoursStorageAndHandoffConfirmed: true
+              },
+              scanFallbackSuccessRatePercent: 97,
+              goLiveEligible: true,
+              blockers: [],
+              updatedAt: "2026-05-16T12:15:00.000Z"
+            },
+            updatedAt: "2026-05-16T12:15:00.000Z"
+          }
+        ]
+      })
+    ).toMatchObject({
+      stations: [
+        {
+          validation: {
+            status: "ready"
+          }
+        }
+      ]
     });
   });
 

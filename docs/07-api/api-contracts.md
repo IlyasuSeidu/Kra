@@ -7,35 +7,58 @@
 - Payment provider callbacks use signed webhook verification and never Firebase bearer auth.
 
 ## Delivery APIs
+- `GET /v1/deliveries`
 - `POST /v1/deliveries`
 - `GET /v1/deliveries/:id`
 - `GET /v1/deliveries/:id/timeline`
+- `POST /v1/deliveries/:id/cancel`
 - `POST /v1/deliveries/:id/intake`
 - `POST /v1/deliveries/:id/assign-driver`
+- `POST /v1/deliveries/:id/accept-run`
 - `POST /v1/deliveries/:id/dispatch`
+- `POST /v1/deliveries/:id/confirm-pickup`
+- `POST /v1/deliveries/:id/mark-in-transit`
 - `POST /v1/deliveries/:id/receive-destination`
 - `POST /v1/deliveries/:id/assign-final-mile`
+- `POST /v1/deliveries/:id/accept-final-mile-assignment`
+- `POST /v1/deliveries/:id/out-for-delivery`
+- `POST /v1/deliveries/:id/final-mile-failed-attempt`
 - `POST /v1/deliveries/:id/complete`
 
 ## Payment APIs
 - `POST /v1/payments/initialize`
 - `POST /v1/payments/verify`
 - `POST /v1/payments/refund`
+- `POST /v1/payments/refund/settle`
+- `POST /v1/webhooks/payments/mtn-momo`
 
 ## Support APIs
+- `GET /v1/issues`
 - `POST /v1/issues`
 - `GET /v1/issues/:id`
 - `POST /v1/issues/:id/escalate`
+- `POST /v1/issues/:id/resolve`
 
 ## Public Access APIs
 - `GET /v1/public/track/:trackingCode`
+- `POST /v1/public/track/:trackingCode/request-verification`
 - `POST /v1/public/track/:trackingCode/verify-phone`
+
+## Notification APIs
+- `GET /v1/notifications`
 
 ## Admin APIs
 - `GET /v1/admin/overview`
 - `GET /v1/admin/deliveries`
 - `GET /v1/admin/stations`
+- `POST /v1/admin/stations/:id/status`
+- `POST /v1/admin/stations/:id/validation`
 - `GET /v1/admin/finance`
+- `GET /v1/admin/users`
+- `POST /v1/admin/users`
+- `POST /v1/admin/users/:id/access`
+- `GET /v1/admin/audit-events`
+- `GET /v1/admin/webhook-events`
 
 ## Request And Response Baselines
 ### `POST /v1/deliveries`
@@ -144,6 +167,41 @@ Response:
 }
 ```
 
+### `POST /v1/admin/stations/:id/validation`
+Request:
+```json
+{
+  "dryRunBusinessDaysCompleted": 2,
+  "controlledPilotBusinessDaysCompleted": 3,
+  "checklist": {
+    "activeOperatorsCanSignIn": true,
+    "intakeDispatchReceiptAudited": true,
+    "scanOrManualFallbackTested": true,
+    "noUnresolvedP1Incidents": true,
+    "escalationAndRefundHandoffTested": true,
+    "openingHoursStorageAndHandoffConfirmed": true
+  },
+  "scanFallbackSuccessRatePercent": 97
+}
+```
+Response:
+```json
+{
+  "stationId": "ST-ACC-01",
+  "name": "Accra Central",
+  "city": "Accra",
+  "validation": {
+    "status": "ready",
+    "dryRunBusinessDaysCompleted": 2,
+    "controlledPilotBusinessDaysCompleted": 3,
+    "goLiveEligible": true,
+    "blockers": [],
+    "scanFallbackSuccessRatePercent": 97,
+    "updatedAt": "2026-05-16T12:15:00.000Z"
+  }
+}
+```
+
 ## Error Response Format
 All non-2xx responses must use:
 ```json
@@ -177,6 +235,11 @@ All non-2xx responses must use:
 - Public tracking endpoints do not require a full receiver account in v1.
 - Receiver-sensitive actions may require delivery-linked phone verification.
 - Public endpoints must return only customer-safe fields.
+
+## Station Go-Live Validation Rule
+- A station is not `goLiveEligible` until it records `2` dry-run business days and `3` controlled pilot-volume business days.
+- The validation checklist and scan or manual-fallback success rate are enforced server-side.
+- Manual blockers and unresolved `P1` incident confirmation keep the station in `blocked` status.
 
 ## Baseline Status
 This contract is now concrete enough to unblock backend scaffolding, shared types, and client integration planning for v1.

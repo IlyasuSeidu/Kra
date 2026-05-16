@@ -1,6 +1,8 @@
 import {
   acceptFinalMileAssignmentRequestSchema,
   acceptRunRequestSchema,
+  adminUpdateStationValidationRequestSchema,
+  adminUpdateStationValidationResponseSchema,
   adminUpdateStationStatusRequestSchema,
   adminUpdateStationStatusResponseSchema,
   adminUpdateUserAccessRequestSchema,
@@ -531,6 +533,18 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: adminUpdateStationStatusRequestSchema,
     responseSchema: adminUpdateStationStatusResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_update_station_validation",
+    method: "POST",
+    path: "/v1/admin/stations/:id/validation",
+    module: "admin",
+    authScope: "admin",
+    capability: "override_queue_state",
+    idempotent: true,
+    requestSchema: adminUpdateStationValidationRequestSchema,
+    responseSchema: adminUpdateStationValidationResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

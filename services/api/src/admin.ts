@@ -136,6 +136,7 @@ export async function listAdminStations(
       serviceAvailability: station.serviceAvailability,
       activeQueueCount: activeQueueMap.get(station.stationId) ?? 0,
       issueCount: await deps.issues.countOpenByStation(station.stationId),
+      validation: station.validation,
       ...(station.note === undefined ? {} : { note: station.note }),
       updatedAt: station.updatedAt
     }))
