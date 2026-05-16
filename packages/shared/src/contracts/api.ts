@@ -247,6 +247,31 @@ export const deliveryTimelineResponseSchema = z.object({
   entries: z.array(deliveryTimelineEntrySchema)
 });
 
+export const deliveryListQuerySchema = z.object({
+  status: deliveryStatusSchema.optional(),
+  paymentStatus: paymentStatusSchema.optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const deliveryListResponseSchema = z.object({
+  deliveries: z.array(
+    z.object({
+      deliveryId: deliveryIdSchema,
+      trackingCode: trackingCodeSchema,
+      currentStatus: deliveryStatusSchema,
+      paymentStatus: paymentStatusSchema,
+      originStationId: stationIdSchema,
+      destinationStationId: stationIdSchema,
+      serviceType: serviceTypeSchema,
+      receiverName: z.string().trim().min(2).max(120),
+      latestOccurredAt: z.string().datetime(),
+      latestTouchpointRole: publicTouchpointRoleSchema,
+      latestTouchpointStationId: stationIdSchema.optional(),
+      doorstepRequested: z.boolean()
+    })
+  )
+});
+
 export const verifyPhoneRequestSchema = z.object({
   phone: phoneSchema,
   otp: z.string().trim().min(4).max(8)
@@ -312,6 +337,19 @@ export const completeDeliveryRequestSchema = z.object({
   proofType: deliveryProofTypeSchema,
   proofReference: z.string().trim().min(3).max(120),
   receivedByName: z.string().trim().min(2).max(120)
+});
+
+export const recordFailedAttemptRequestSchema = z.object({
+  reasonCode: z.enum([
+    "receiver_unreachable",
+    "receiver_unavailable",
+    "address_not_found",
+    "unsafe_to_complete",
+    "receiver_refused",
+    "proof_failed",
+    "package_issue_detected"
+  ]),
+  note: z.string().trim().min(5).max(400).optional()
 });
 
 export const cancelDeliveryRequestSchema = z.object({

@@ -1,4 +1,6 @@
 import {
+  deliveryListQuerySchema,
+  deliveryListResponseSchema,
   deliveryDetailResponseSchema,
   deliveryTimelineResponseSchema,
   type StationId
@@ -24,8 +26,18 @@ export interface DeliveryIssueReadRepository {
   listByDeliveryId(deliveryId: string): Promise<SupportIssueRecord[]>;
 }
 
+export interface DeliveryListRepository {
+  listAccessible(input: {
+    principal: AuthPrincipal;
+    status?: DeliveryRecord["currentStatus"];
+    paymentStatus?: DeliveryRecord["paymentStatus"];
+    limit: number;
+  }): Promise<DeliveryRecord[]>;
+}
+
 export type DeliveryDetailResponse = z.infer<typeof deliveryDetailResponseSchema>;
 export type DeliveryTimelineResponse = z.infer<typeof deliveryTimelineResponseSchema>;
+export type DeliveryListResponse = z.infer<typeof deliveryListResponseSchema>;
 
 function toStationTouchpoint(
   touchpoint: DeliveryRecord["latestTouchpoint"]
@@ -174,5 +186,42 @@ export async function getDeliveryTimeline(
     deliveryId: delivery.deliveryId,
     trackingCode: delivery.trackingCode,
     entries
+  });
+}
+
+export async function listAccessibleDeliveries(
+  principal: AuthPrincipal,
+  input: z.input<typeof deliveryListQuerySchema>,
+  deps: {
+    deliveries: DeliveryListRepository;
+  }
+): Promise<DeliveryListResponse> {
+  const parsedInput = deliveryListQuerySchema.parse(input);
+  const deliveries = await deps.deliveries.listAccessible({
+    principal,
+    ...(parsedInput.status === undefined ? {} : { status: parsedInput.status }),
+    ...(parsedInput.paymentStatus === undefined
+      ? {}
+      : { paymentStatus: parsedInput.paymentStatus }),
+    limit: parsedInput.limit ?? 50
+  });
+
+  return deliveryListResponseSchema.parse({
+    deliveries: deliveries.map((delivery) => ({
+      deliveryId: delivery.deliveryId,
+      trackingCode: delivery.trackingCode,
+      currentStatus: delivery.currentStatus,
+      paymentStatus: delivery.paymentStatus,
+      originStationId: delivery.originStationId,
+      destinationStationId: delivery.destinationStationId,
+      serviceType: delivery.serviceType,
+      receiverName: delivery.receiver.name,
+      latestOccurredAt: delivery.latestEvent.occurredAt,
+      latestTouchpointRole: delivery.latestTouchpoint.role,
+      ...(delivery.latestTouchpoint.stationId === undefined
+        ? {}
+        : { latestTouchpointStationId: delivery.latestTouchpoint.stationId }),
+      doorstepRequested: delivery.doorstepRequested
+    }))
   });
 }

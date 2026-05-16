@@ -11,6 +11,7 @@ import {
   completeDeliveryRequestSchema,
   confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
+  deliveryListResponseSchema,
   deliveryLifecycleResponseSchema,
   dispatchDeliveryRequestSchema,
   mtnMomoWebhookRequestSchema,
@@ -20,6 +21,7 @@ import {
   publicTrackingResponseSchema,
   requestPhoneVerificationChallengeRequestSchema,
   requestPhoneVerificationChallengeResponseSchema,
+  recordFailedAttemptRequestSchema,
   receiveDestinationRequestSchema,
   refundPaymentRequestSchema,
   refundPaymentResponseSchema,
@@ -130,6 +132,36 @@ describe("api contracts", () => {
     ).toMatchObject({
       deliveryId: "DEL-0001",
       status: "received_at_destination"
+    });
+  });
+
+  it("accepts a delivery list response contract", () => {
+    expect(
+      deliveryListResponseSchema.parse({
+        deliveries: [
+          {
+            deliveryId: "DEL-0001",
+            trackingCode: "KRA-0001",
+            currentStatus: "received_at_destination",
+            paymentStatus: "confirmed",
+            originStationId: "ST-ACC-01",
+            destinationStationId: "ST-KMS-01",
+            serviceType: "standard",
+            receiverName: "Kojo Asante",
+            latestOccurredAt: "2026-05-16T14:00:00.000Z",
+            latestTouchpointRole: "station_operator",
+            latestTouchpointStationId: "ST-KMS-01",
+            doorstepRequested: false
+          }
+        ]
+      })
+    ).toMatchObject({
+      deliveries: [
+        {
+          deliveryId: "DEL-0001",
+          trackingCode: "KRA-0001"
+        }
+      ]
     });
   });
 
@@ -271,6 +303,15 @@ describe("api contracts", () => {
       })
     ).toEqual({
       courierUserId: "USR-COR-001"
+    });
+
+    expect(
+      recordFailedAttemptRequestSchema.parse({
+        reasonCode: "receiver_unavailable",
+        note: "Receiver requested a reattempt tomorrow."
+      })
+    ).toMatchObject({
+      reasonCode: "receiver_unavailable"
     });
 
     expect(

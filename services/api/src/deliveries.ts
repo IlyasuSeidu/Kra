@@ -13,6 +13,7 @@ export interface DeliveryRecord extends DeliveryDraft {
   paymentStatus: PaymentStatus;
   assignedDriverId?: string;
   assignedFinalMileCourierId?: string;
+  finalMileAttemptCount?: number;
   finalProof?: {
     type: "otp" | "signature" | "delivery_photo";
     reference: string;

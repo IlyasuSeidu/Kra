@@ -16,6 +16,11 @@ describe("api routes", () => {
       capability: "cancel_eligible_delivery"
     });
 
+    expect(getApiRoute("list_deliveries")).toMatchObject({
+      authScope: "authenticated",
+      path: "/v1/deliveries"
+    });
+
     expect(getApiRoute("get_delivery")).toMatchObject({
       authScope: "authenticated",
       path: "/v1/deliveries/:id"
@@ -101,6 +106,7 @@ describe("api routes", () => {
       "dispatch_delivery",
       "receive_destination",
       "assign_final_mile",
+      "record_failed_attempt",
       "complete_delivery"
     ]);
   });

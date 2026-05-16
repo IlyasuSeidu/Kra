@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  auditEventDocumentPath,
   deliveryDocumentPath,
   deliveryEventDocumentPath,
   firestoreCollections,
@@ -25,7 +26,8 @@ describe("firestore schema helpers", () => {
       publicTrackingPhoneChallenges: "public_tracking_phone_challenges",
       publicTrackingVerificationAttempts: "public_tracking_verification_failed_attempts",
       publicTrackingVerificationGrants: "public_tracking_verification_grants",
-      idempotencyRecords: "idempotency_records"
+      idempotencyRecords: "idempotency_records",
+      auditEvents: "audit_events"
     });
   });
 
@@ -49,5 +51,6 @@ describe("firestore schema helpers", () => {
     expect(publicTrackingVerificationGrantDocumentPath("PVT-1001")).toBe(
       "public_tracking_verification_grants/PVT-1001"
     );
+    expect(auditEventDocumentPath("AUD-1001")).toBe("audit_events/AUD-1001");
   });
 });

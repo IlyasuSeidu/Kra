@@ -7,8 +7,14 @@ import type {
   AdminPaymentMetricsRepository,
   AdminWebhookMetricsRepository
 } from "../admin";
+import type { AuditEventRepository } from "../audit";
+import type { AuthPrincipal } from "../auth";
 import type { DeliveryRecord, DeliveryRepository } from "../deliveries";
-import type { DeliveryEventReadRepository, HandoffEventReadRepository } from "../delivery-queries";
+import type {
+  DeliveryEventReadRepository,
+  DeliveryListRepository,
+  HandoffEventReadRepository
+} from "../delivery-queries";
 import type {
   DeliveryEventRepository,
   DeliveryLifecycleRepository,
@@ -24,6 +30,7 @@ import type {
   WebhookEventRecord,
   WebhookEventRepository
 } from "../payment-webhooks";
+import type { IdempotencyRecord, IdempotencyRepository } from "../idempotency";
 import type {
   PublicTrackingVerificationRepository
 } from "../public-tracking-verification";
@@ -40,7 +47,10 @@ import {
   publicTrackingVerificationGrantConverter,
   supportIssueConverter,
   webhookEventConverter,
+  idempotencyRecordConverter,
+  auditEventConverter,
   type DeliveryDocument,
+  type IdempotencyRecordDocument,
   type PaymentDocument
 } from "./schema";
 
@@ -70,6 +80,10 @@ function fromPaymentDocument(document: PaymentDocument): PaymentRecord {
   return payment;
 }
 
+function fromIdempotencyRecordDocument(document: IdempotencyRecordDocument): IdempotencyRecord {
+  return document;
+}
+
 const activeQueueStatuses: DeliveryRecord["currentStatus"][] = [
   "created",
   "received_at_origin",
@@ -86,10 +100,39 @@ const activeQueueStatuses: DeliveryRecord["currentStatus"][] = [
   "on_hold"
 ];
 
+function sortDeliveriesByLatestOccurredAt(deliveries: DeliveryRecord[]): DeliveryRecord[] {
+  return [...deliveries].sort((left, right) =>
+    right.latestEvent.occurredAt.localeCompare(left.latestEvent.occurredAt)
+  );
+}
+
+function filterDeliveries(
+  deliveries: DeliveryRecord[],
+  input: {
+    status?: DeliveryRecord["currentStatus"];
+    paymentStatus?: DeliveryRecord["paymentStatus"];
+  }
+): DeliveryRecord[] {
+  return deliveries.filter((delivery) => {
+    if (input.status && delivery.currentStatus !== input.status) {
+      return false;
+    }
+
+    if (input.paymentStatus && delivery.paymentStatus !== input.paymentStatus) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 export function createFirestoreDeliveryRepository(
   firestore: Firestore,
   now: () => string
-): DeliveryRepository & DeliveryLifecycleRepository & AdminDeliveryMetricsRepository {
+): DeliveryRepository &
+  DeliveryLifecycleRepository &
+  DeliveryListRepository &
+  AdminDeliveryMetricsRepository {
   const deliveriesCollection = firestore
     .collection(firestoreCollections.deliveries)
     .withConverter(deliveryConverter);
@@ -132,6 +175,92 @@ export function createFirestoreDeliveryRepository(
         toDeliveryDocument(delivery, now()),
         { merge: true }
       );
+    },
+    async listAccessible(input: {
+      principal: AuthPrincipal;
+      status?: DeliveryRecord["currentStatus"];
+      paymentStatus?: DeliveryRecord["paymentStatus"];
+      limit: number;
+    }) {
+      const scanLimit = Math.max(input.limit * 3, 100);
+
+      if (input.principal.role === "sender") {
+        const snapshot = await deliveriesCollection
+          .where("senderId", "==", input.principal.userId)
+          .orderBy("latestEvent.occurredAt", "desc")
+          .limit(scanLimit)
+          .get();
+
+        return filterDeliveries(
+          snapshot.docs.map((document) => fromDeliveryDocument(document.data())),
+          input
+        ).slice(0, input.limit);
+      }
+
+      if (input.principal.role === "driver") {
+        const snapshot = await deliveriesCollection
+          .where("assignedDriverId", "==", input.principal.userId)
+          .orderBy("latestEvent.occurredAt", "desc")
+          .limit(scanLimit)
+          .get();
+
+        return filterDeliveries(
+          snapshot.docs.map((document) => fromDeliveryDocument(document.data())),
+          input
+        ).slice(0, input.limit);
+      }
+
+      if (input.principal.role === "final_mile_courier") {
+        const snapshot = await deliveriesCollection
+          .where("assignedFinalMileCourierId", "==", input.principal.userId)
+          .orderBy("latestEvent.occurredAt", "desc")
+          .limit(scanLimit)
+          .get();
+
+        return filterDeliveries(
+          snapshot.docs.map((document) => fromDeliveryDocument(document.data())),
+          input
+        ).slice(0, input.limit);
+      }
+
+      if (input.principal.role === "station_operator") {
+        const [originSnapshot, destinationSnapshot] = await Promise.all([
+          deliveriesCollection
+            .where("originStationId", "==", input.principal.stationId)
+            .orderBy("latestEvent.occurredAt", "desc")
+            .limit(scanLimit)
+            .get(),
+          deliveriesCollection
+            .where("destinationStationId", "==", input.principal.stationId)
+            .orderBy("latestEvent.occurredAt", "desc")
+            .limit(scanLimit)
+            .get()
+        ]);
+
+        const byId = new Map<string, DeliveryRecord>();
+
+        for (const snapshot of [originSnapshot, destinationSnapshot]) {
+          for (const document of snapshot.docs) {
+            const delivery = fromDeliveryDocument(document.data());
+            byId.set(delivery.deliveryId, delivery);
+          }
+        }
+
+        return filterDeliveries(sortDeliveriesByLatestOccurredAt([...byId.values()]), input).slice(
+          0,
+          input.limit
+        );
+      }
+
+      const snapshot = await deliveriesCollection
+        .orderBy("latestEvent.occurredAt", "desc")
+        .limit(scanLimit)
+        .get();
+
+      return filterDeliveries(
+        snapshot.docs.map((document) => fromDeliveryDocument(document.data())),
+        input
+      ).slice(0, input.limit);
     },
     async listRecent(limit) {
       const snapshot = await deliveriesCollection
@@ -558,6 +687,58 @@ export function createFirestoreSupportIssueRepository(
   };
 }
 
+export function createFirestoreIdempotencyRepository(
+  firestore: Firestore
+): IdempotencyRepository {
+  const idempotencyCollection = firestore
+    .collection(firestoreCollections.idempotencyRecords)
+    .withConverter(idempotencyRecordConverter);
+
+  return {
+    async getByScopeKey(scopeKey) {
+      const snapshot = await idempotencyCollection.where("scopeKey", "==", scopeKey).limit(1).get();
+      const match = snapshot.docs[0];
+
+      if (!match) {
+        return undefined;
+      }
+
+      return fromIdempotencyRecordDocument(match.data());
+    },
+    async createPending(record) {
+      await idempotencyCollection.doc(record.recordId).create(record);
+    },
+    async markCompleted(input) {
+      await idempotencyCollection.doc(input.recordId).set(
+        {
+          status: "completed",
+          completedAt: input.completedAt,
+          responseStatusCode: input.responseStatusCode,
+          responseBody: input.responseBody
+        },
+        { merge: true }
+      );
+    },
+    async delete(recordId) {
+      await idempotencyCollection.doc(recordId).delete();
+    }
+  };
+}
+
+export function createFirestoreAuditEventRepository(
+  firestore: Firestore
+): AuditEventRepository {
+  const auditEventsCollection = firestore
+    .collection(firestoreCollections.auditEvents)
+    .withConverter(auditEventConverter);
+
+  return {
+    async create(event) {
+      await auditEventsCollection.doc(event.eventId).set(event);
+    }
+  };
+}
+
 export function createFirestoreApiRepositories(
   firestore: Firestore,
   now: () => string
@@ -569,6 +750,8 @@ export function createFirestoreApiRepositories(
     verification: createFirestorePublicTrackingVerificationRepository(firestore),
     webhookEvents: createFirestoreWebhookEventRepository(firestore),
     deliveryEvents: createFirestoreDeliveryEventRepository(firestore),
-    handoffEvents: createFirestoreHandoffEventRepository(firestore)
+    handoffEvents: createFirestoreHandoffEventRepository(firestore),
+    idempotency: createFirestoreIdempotencyRepository(firestore),
+    auditEvents: createFirestoreAuditEventRepository(firestore)
   };
 }

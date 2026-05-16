@@ -18,6 +18,7 @@ type HandoffType =
   | "origin_station_to_driver"
   | "driver_to_destination_station"
   | "destination_station_to_final_mile_courier"
+  | "final_mile_courier_to_destination_station"
   | "delivery_completion";
 
 type LifecycleEventType =
@@ -33,7 +34,8 @@ type LifecycleEventType =
   | "final_mile_courier_assigned"
   | "delivery_marked_out_for_delivery"
   | "delivery_completed"
-  | "delivery_cancelled";
+  | "delivery_cancelled"
+  | "delivery_failed_attempt_recorded";
 
 export interface OperationalActor {
   actorId: string;
@@ -183,6 +185,7 @@ async function applyTransition(
     currentCustodyActorId?: string | null;
     assignedDriverId?: string | null;
     assignedFinalMileCourierId?: string | null;
+    finalMileAttemptCount?: number;
     finalProof?: DeliveryRecord["finalProof"];
   },
   deps: DeliveryLifecycleDeps
@@ -228,6 +231,9 @@ async function applyTransition(
         ? {}
         : { assignedFinalMileCourierId: input.assignedFinalMileCourierId }),
     ...(input.finalProof === undefined ? {} : { finalProof: input.finalProof }),
+    ...(input.finalMileAttemptCount === undefined
+      ? {}
+      : { finalMileAttemptCount: input.finalMileAttemptCount }),
     latestEvent: {
       type: input.eventType,
       occurredAt: input.occurredAt
@@ -241,6 +247,14 @@ async function applyTransition(
       ...(input.stationId === undefined ? {} : { stationId: input.stationId })
     }
   };
+
+  if (input.assignedDriverId === null) {
+    delete nextDelivery.assignedDriverId;
+  }
+
+  if (input.assignedFinalMileCourierId === null) {
+    delete nextDelivery.assignedFinalMileCourierId;
+  }
 
   await deps.deliveries.save(nextDelivery);
   await deps.deliveryEvents.create(event);
@@ -682,6 +696,123 @@ export async function assignFinalMileCourier(
       proof: {
         reference: `${delivery.deliveryId}:${input.courierUserId}`,
         type: "package_scan"
+      }
+    },
+    deps
+  );
+
+  return {
+    delivery: updatedDelivery,
+    response: buildLifecycleResponse(event.eventId, updatedDelivery, occurredAt)
+  };
+}
+
+export async function recordFinalMileFailedAttempt(
+  input: {
+    deliveryId: string;
+    reasonCode:
+      | "receiver_unreachable"
+      | "receiver_unavailable"
+      | "address_not_found"
+      | "unsafe_to_complete"
+      | "receiver_refused"
+      | "proof_failed"
+      | "package_issue_detected";
+    note?: string;
+  },
+  actor: OperationalActor,
+  deps: DeliveryLifecycleDeps
+): Promise<{
+  delivery: DeliveryRecord;
+  response: DeliveryLifecycleResponse;
+}> {
+  assertCapability(actor, "record_failed_attempt");
+
+  const delivery = await deps.deliveries.getById(input.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  if (delivery.assignedFinalMileCourierId && delivery.assignedFinalMileCourierId !== actor.actorId) {
+    throw new ApiServiceError("FORBIDDEN", "This delivery is assigned to a different courier.", {
+      deliveryId: delivery.deliveryId,
+      assignedFinalMileCourierId: delivery.assignedFinalMileCourierId,
+      actorId: actor.actorId
+    });
+  }
+
+  let workingDelivery = delivery;
+  const occurredAt = deps.now();
+
+  if (workingDelivery.currentStatus === "assigned_for_final_mile") {
+    workingDelivery = (
+      await applyTransition(
+        {
+          delivery: workingDelivery,
+          nextStatus: "out_for_delivery",
+          eventType: "delivery_marked_out_for_delivery",
+          actor,
+          occurredAt,
+          currentCustodyRole: "final_mile_courier",
+          currentCustodyActorId: actor.actorId
+        },
+        deps
+      )
+    ).delivery;
+  }
+
+  const nextAttemptCount = (workingDelivery.finalMileAttemptCount ?? 0) + 1;
+  const routeToIssue =
+    input.reasonCode === "receiver_refused" || input.reasonCode === "package_issue_detected";
+  const rerouteToPickup = !routeToIssue && nextAttemptCount >= 2;
+
+  const nextStatus: DeliveryStatus = routeToIssue
+    ? "issue_reported"
+    : rerouteToPickup
+      ? "awaiting_receiver_pickup"
+      : "awaiting_final_mile_assignment";
+  const eventType: LifecycleEventType = routeToIssue
+    ? "delivery_routed_to_issue_queue"
+    : rerouteToPickup
+      ? "delivery_routed_to_pickup_queue"
+      : "delivery_routed_to_final_mile_queue";
+
+  const { delivery: updatedDelivery, event } = await applyTransition(
+    {
+      delivery: workingDelivery,
+      nextStatus,
+      eventType,
+      actor,
+      occurredAt,
+      stationId: workingDelivery.destinationStationId,
+      currentCustodyRole: "station_operator",
+      currentCustodyActorId: null,
+      assignedFinalMileCourierId: null,
+      finalMileAttemptCount: nextAttemptCount,
+      metadata: {
+        failedAttemptReason: input.reasonCode,
+        failedAttemptCount: nextAttemptCount,
+        ...(input.note === undefined ? {} : { note: input.note })
+      }
+    },
+    deps
+  );
+
+  await createHandoffEvent(
+    {
+      deliveryId: delivery.deliveryId,
+      handoffType: "final_mile_courier_to_destination_station",
+      fromRole: "final_mile_courier",
+      fromActorId: actor.actorId,
+      toRole: "station_operator",
+      stationId: delivery.destinationStationId,
+      occurredAt,
+      proof: {
+        reference: `${delivery.deliveryId}:${input.reasonCode}:${nextAttemptCount}`,
+        type: "delivery_proof"
       }
     },
     deps

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getDeliveryDetail, getDeliveryTimeline } from "../delivery-queries";
+import {
+  getDeliveryDetail,
+  getDeliveryTimeline,
+  listAccessibleDeliveries
+} from "../delivery-queries";
 import type { DeliveryRecord } from "../deliveries";
 
 function resolve<T>(value: T): Promise<T> {
@@ -169,6 +173,47 @@ describe("delivery query services", () => {
     expect(result.entries[1]).toMatchObject({
       entryType: "delivery_event",
       entryId: "EVT-DEL-9201"
+    });
+  });
+
+  it("returns a delivery list projection for the authenticated principal", async () => {
+    const result = await listAccessibleDeliveries(
+      senderPrincipal,
+      {
+        limit: 10
+      },
+      {
+        deliveries: {
+          listAccessible() {
+            return resolve([
+              makeDelivery(),
+              makeDelivery({
+                deliveryId: "DEL-9202",
+                trackingCode: "KRA-9202",
+                latestEvent: {
+                  type: "delivery_received_at_origin",
+                  occurredAt: "2026-05-15T14:00:00.000Z"
+                }
+              })
+            ]);
+          }
+        }
+      }
+    );
+
+    expect(result).toMatchObject({
+      deliveries: [
+        {
+          deliveryId: "DEL-9201",
+          trackingCode: "KRA-9201",
+          latestTouchpointRole: "station_operator",
+          doorstepRequested: false
+        },
+        {
+          deliveryId: "DEL-9202",
+          trackingCode: "KRA-9202"
+        }
+      ]
     });
   });
 });

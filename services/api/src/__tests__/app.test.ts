@@ -100,6 +100,9 @@ function makeAppDeps(): ApiAppDeps {
       save() {
         return resolveVoid();
       },
+      listAccessible() {
+        return resolve([makeDelivery()]);
+      },
       countByStatus() {
         return resolve([]);
       },
@@ -209,6 +212,25 @@ function makeAppDeps(): ApiAppDeps {
         return resolve([]);
       }
     },
+    idempotency: {
+      getByScopeKey() {
+        return resolve(undefined);
+      },
+      createPending() {
+        return resolveVoid();
+      },
+      markCompleted() {
+        return resolveVoid();
+      },
+      delete() {
+        return resolveVoid();
+      }
+    },
+    auditEvents: {
+      create() {
+        return resolveVoid();
+      }
+    },
     gateway: {
       initializeCharge() {
         return resolve({
@@ -227,6 +249,8 @@ function makeAppDeps(): ApiAppDeps {
       nextRequestId: () => "REQ-9401",
       nextDeliveryId: () => "DEL-9401",
       nextTrackingCode: () => "KRA-9401",
+      nextIdempotencyRecordId: () => "IDM-9401",
+      nextAuditEventId: () => "AUD-9401",
       nextPaymentId: () => "PAY-9401",
       nextWebhookEventId: () => "EVT-WEB-9401",
       nextIssueId: () => "ISS-9401",
@@ -299,6 +323,32 @@ describe("api app", () => {
       deliveryId: "DEL-9401",
       trackingCode: "KRA-9401",
       status: "created"
+    });
+  });
+
+  it("lists accessible deliveries over the authenticated route surface", async () => {
+    const app = createApiApp(makeAppDeps());
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/deliveries",
+      headers: {
+        authorization: "Bearer token-123"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      deliveries: [
+        {
+          deliveryId: "DEL-9401",
+          trackingCode: "KRA-9401",
+          currentStatus: "received_at_destination",
+          receiverName: "Kojo Asante",
+          doorstepRequested: false
+        }
+      ]
     });
   });
 

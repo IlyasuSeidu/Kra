@@ -43,6 +43,12 @@ export function createApiIdentityFactory() {
     nextVerificationId() {
       return buildPrefixedId("VRF");
     },
+    nextIdempotencyRecordId() {
+      return buildPrefixedId("IDM");
+    },
+    nextAuditEventId() {
+      return buildPrefixedId("AUD");
+    },
     nextOtpCode() {
       return `${Math.floor(Math.random() * 900_000) + 100_000}`;
     },

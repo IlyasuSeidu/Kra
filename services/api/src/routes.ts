@@ -13,6 +13,8 @@ import {
   createIssueRequestSchema,
   createDeliveryRequestSchema,
   createDeliveryResponseSchema,
+  deliveryListQuerySchema,
+  deliveryListResponseSchema,
   deliveryDetailResponseSchema,
   deliveryLifecycleResponseSchema,
   deliveryTimelineResponseSchema,
@@ -32,6 +34,7 @@ import {
   publicTrackingResponseSchema,
   requestPhoneVerificationChallengeRequestSchema,
   requestPhoneVerificationChallengeResponseSchema,
+  recordFailedAttemptRequestSchema,
   receiveDestinationRequestSchema,
   verifyPhoneResponseSchema,
   verifyPhoneRequestSchema,
@@ -64,6 +67,17 @@ export interface ApiRouteDefinition {
 }
 
 export const apiRoutes = [
+  {
+    operationId: "list_deliveries",
+    method: "GET",
+    path: "/v1/deliveries",
+    module: "deliveries",
+    authScope: "authenticated",
+    idempotent: true,
+    requestSchema: deliveryListQuerySchema,
+    responseSchema: deliveryListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
   {
     operationId: "create_delivery",
     method: "POST",
@@ -258,6 +272,18 @@ export const apiRoutes = [
     capability: "assign_final_mile",
     idempotent: true,
     requestSchema: assignFinalMileRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "record_failed_attempt",
+    method: "POST",
+    path: "/v1/deliveries/:id/final-mile-failed-attempt",
+    module: "handoffs",
+    authScope: "staff",
+    capability: "record_failed_attempt",
+    idempotent: false,
+    requestSchema: recordFailedAttemptRequestSchema,
     responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },

@@ -7,6 +7,7 @@ import {
   completeDelivery,
   confirmOriginIntake,
   dispatchDelivery,
+  recordFinalMileFailedAttempt,
   receiveDestination,
   type DeliveryEventRecord,
   type HandoffEventRecord
@@ -498,5 +499,94 @@ describe("delivery lifecycle services", () => {
     );
 
     expect(pickupCompletion.response.status).toBe("delivered");
+  });
+
+  it("returns a failed doorstep attempt to the final-mile queue, then pickup flow on the second attempt", async () => {
+    let currentDelivery = makeDelivery({
+      currentStatus: "assigned_for_final_mile",
+      assignedFinalMileCourierId: "USR-COR-001",
+      currentCustodyRole: "final_mile_courier",
+      currentCustodyActorId: "USR-COR-001"
+    });
+    const handoffEvents: string[] = [];
+
+    const deps = {
+      deliveries: {
+        getById() {
+          return resolve(currentDelivery);
+        },
+        save(delivery: DeliveryRecord) {
+          currentDelivery = delivery;
+          return resolveVoid();
+        }
+      },
+      deliveryEvents: {
+        create() {
+          return resolveVoid();
+        }
+      },
+      handoffEvents: {
+        create(event: HandoffEventRecord) {
+          handoffEvents.push(event.handoffType);
+          return resolveVoid();
+        }
+      },
+      identityFactory: {
+        nextDeliveryEventId: (() => {
+          const ids = ["EVT-DEL-6011", "EVT-DEL-6012", "EVT-DEL-6013", "EVT-DEL-6014"];
+          return () => ids.shift() ?? "EVT-DEL-EXTRA";
+        })(),
+        nextHandoffEventId: (() => {
+          const ids = ["EVT-HO-6011", "EVT-HO-6012"];
+          return () => ids.shift() ?? "EVT-HO-EXTRA";
+        })()
+      },
+      now: () => "2026-05-16T15:00:00.000Z"
+    };
+
+    const firstAttempt = await recordFinalMileFailedAttempt(
+      {
+        deliveryId: "DEL-6001",
+        reasonCode: "receiver_unavailable",
+        note: "Receiver requested a later attempt"
+      },
+      {
+        actorId: "USR-COR-001",
+        role: "final_mile_courier"
+      },
+      deps
+    );
+
+    expect(firstAttempt.response.status).toBe("awaiting_final_mile_assignment");
+    expect(currentDelivery.finalMileAttemptCount).toBe(1);
+    expect(currentDelivery.assignedFinalMileCourierId).toBeUndefined();
+
+    currentDelivery = {
+      ...currentDelivery,
+      currentStatus: "out_for_delivery",
+      assignedFinalMileCourierId: "USR-COR-001",
+      currentCustodyRole: "final_mile_courier",
+      currentCustodyActorId: "USR-COR-001"
+    };
+
+    const secondAttempt = await recordFinalMileFailedAttempt(
+      {
+        deliveryId: "DEL-6001",
+        reasonCode: "address_not_found",
+        note: "Address landmark could not be verified"
+      },
+      {
+        actorId: "USR-COR-001",
+        role: "final_mile_courier"
+      },
+      deps
+    );
+
+    expect(secondAttempt.response.status).toBe("awaiting_receiver_pickup");
+    expect(currentDelivery.finalMileAttemptCount).toBe(2);
+    expect(handoffEvents).toEqual([
+      "final_mile_courier_to_destination_station",
+      "final_mile_courier_to_destination_station"
+    ]);
   });
 });

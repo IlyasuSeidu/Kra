@@ -2,9 +2,11 @@ import type { DocumentData, FirestoreDataConverter, QueryDocumentSnapshot } from
 
 import type { DeliveryRecord } from "../deliveries";
 import type { DeliveryEventRecord, HandoffEventRecord } from "../handoffs";
+import type { IdempotencyRecord } from "../idempotency";
 import type { SupportIssueRecord } from "../issues";
 import type { WebhookEventRecord } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
+import type { AuditEventRecord } from "../audit";
 import type {
   PublicTrackingPhoneChallengeRecord,
   PublicTrackingVerificationFailedAttemptRecord,
@@ -21,7 +23,8 @@ export const firestoreCollections = {
   publicTrackingPhoneChallenges: "public_tracking_phone_challenges",
   publicTrackingVerificationAttempts: "public_tracking_verification_failed_attempts",
   publicTrackingVerificationGrants: "public_tracking_verification_grants",
-  idempotencyRecords: "idempotency_records"
+  idempotencyRecords: "idempotency_records",
+  auditEvents: "audit_events"
 } as const;
 
 export interface DeliveryDocument extends DeliveryRecord {
@@ -43,6 +46,8 @@ export type PublicTrackingPhoneChallengeDocument = PublicTrackingPhoneChallengeR
 export type PublicTrackingVerificationAttemptDocument =
   PublicTrackingVerificationFailedAttemptRecord;
 export type PublicTrackingVerificationGrantDocument = PublicTrackingVerificationGrantRecord;
+export type IdempotencyRecordDocument = IdempotencyRecord;
+export type AuditEventDocument = AuditEventRecord;
 
 function createPassThroughConverter<T extends DocumentData>(): FirestoreDataConverter<T> {
   return {
@@ -67,6 +72,8 @@ export const publicTrackingVerificationAttemptConverter =
   createPassThroughConverter<PublicTrackingVerificationAttemptDocument>();
 export const publicTrackingVerificationGrantConverter =
   createPassThroughConverter<PublicTrackingVerificationGrantDocument>();
+export const idempotencyRecordConverter = createPassThroughConverter<IdempotencyRecordDocument>();
+export const auditEventConverter = createPassThroughConverter<AuditEventDocument>();
 
 export function deliveryDocumentPath(deliveryId: string): string {
   return `${firestoreCollections.deliveries}/${deliveryId}`;
@@ -102,4 +109,12 @@ export function publicTrackingVerificationAttemptDocumentPath(attemptId: string)
 
 export function publicTrackingVerificationGrantDocumentPath(verificationId: string): string {
   return `${firestoreCollections.publicTrackingVerificationGrants}/${verificationId}`;
+}
+
+export function idempotencyRecordDocumentPath(recordId: string): string {
+  return `${firestoreCollections.idempotencyRecords}/${recordId}`;
+}
+
+export function auditEventDocumentPath(eventId: string): string {
+  return `${firestoreCollections.auditEvents}/${eventId}`;
 }

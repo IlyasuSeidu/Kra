@@ -16,6 +16,7 @@ import {
   mtnMomoWebhookRequestSchema,
   paymentInitializeRequestSchema,
   paymentVerifyRequestSchema,
+  recordFailedAttemptRequestSchema,
   receiveDestinationRequestSchema,
   refundPaymentRequestSchema,
   requestPhoneVerificationChallengeRequestSchema,
@@ -44,13 +45,20 @@ import {
   type AdminPaymentMetricsRepository,
   type AdminWebhookMetricsRepository
 } from "./admin";
+import {
+  type AuditEventRecord,
+  type AuditEventRepository,
+  type AuditIdentityFactory
+} from "./audit";
 import { cancelDelivery } from "./cancellations";
 import { loadApiRuntimeConfig, type ApiRuntimeConfig } from "./config";
 import { createDeliveryBooking, type DeliveryRepository } from "./deliveries";
 import {
   getDeliveryDetail,
+  listAccessibleDeliveries,
   getDeliveryTimeline,
   type DeliveryEventReadRepository,
+  type DeliveryListRepository,
   type DeliveryIssueReadRepository,
   type HandoffEventReadRepository
 } from "./delivery-queries";
@@ -65,6 +73,7 @@ import {
   completeDelivery,
   confirmOriginIntake,
   dispatchDelivery,
+  recordFinalMileFailedAttempt,
   receiveDestination,
   type DeliveryEventRepository,
   type DeliveryLifecycleIdentityFactory,
@@ -72,6 +81,10 @@ import {
   type HandoffEventRepository,
   type OperationalActor
 } from "./handoffs";
+import {
+  executeIdempotentOperation,
+  type IdempotencyRepository
+} from "./idempotency";
 import { createApiIdentityFactory } from "./ids";
 import {
   createSupportIssue,
@@ -122,10 +135,12 @@ type SharedIdentityFactory = PaymentIdentityFactory &
   PaymentWebhookIdentityFactory &
   DeliveryLifecycleIdentityFactory &
   PublicTrackingVerificationIdentityFactory &
+  AuditIdentityFactory &
   SupportIssueIdentityFactory & {
     nextRequestId(): string;
     nextDeliveryId(): string;
     nextTrackingCode(): string;
+    nextIdempotencyRecordId(): string;
   };
 
 export interface ApiAppDeps {
@@ -133,6 +148,7 @@ export interface ApiAppDeps {
   authVerifier: AuthVerifier;
   deliveries: DeliveryRepository &
     DeliveryLifecycleRepository &
+    DeliveryListRepository &
     AdminDeliveryMetricsRepository;
   deliveryEvents: DeliveryEventRepository & DeliveryEventReadRepository;
   handoffEvents: HandoffEventRepository & HandoffEventReadRepository;
@@ -143,6 +159,8 @@ export interface ApiAppDeps {
   issues: SupportIssueRepository & AdminIssueMetricsRepository & DeliveryIssueReadRepository;
   verification: PublicTrackingVerificationRepository;
   webhookEvents: WebhookEventRepository & AdminWebhookMetricsRepository;
+  idempotency: IdempotencyRepository;
+  auditEvents: AuditEventRepository;
   gateway: MtnMomoGateway;
   notifications?: PublicTrackingOtpNotificationGateway;
   identityFactory: SharedIdentityFactory;
@@ -275,6 +293,124 @@ function withOptionalValue<K extends string, V>(key: K, value: V | undefined): P
   } as Partial<Record<K, V>>;
 }
 
+function getIdempotencyKey(request: FastifyRequest): string | undefined {
+  const header = request.headers["idempotency-key"];
+
+  return typeof header === "string" && header.trim().length > 0 ? header.trim() : undefined;
+}
+
+function getActorKey(request: FastifyRequest): string {
+  if (request.principal) {
+    return request.principal.userId;
+  }
+
+  return "public";
+}
+
+function inferAuditTarget(
+  fingerprint: Record<string, unknown>
+): Pick<AuditEventRecord, "targetType" | "targetId"> {
+  const targetIdFromTopLevel =
+    typeof fingerprint.deliveryId === "string"
+      ? { targetType: "delivery" as const, targetId: fingerprint.deliveryId }
+      : typeof fingerprint.paymentId === "string"
+        ? { targetType: "payment" as const, targetId: fingerprint.paymentId }
+        : typeof fingerprint.issueId === "string"
+          ? { targetType: "issue" as const, targetId: fingerprint.issueId }
+          : typeof fingerprint.trackingCode === "string"
+            ? { targetType: "tracking" as const, targetId: fingerprint.trackingCode }
+            : undefined;
+
+  if (targetIdFromTopLevel) {
+    return targetIdFromTopLevel;
+  }
+
+  const body = typeof fingerprint.body === "object" && fingerprint.body !== null
+    ? (fingerprint.body as Record<string, unknown>)
+    : undefined;
+
+  if (!body) {
+    return {};
+  }
+
+  if (typeof body.deliveryId === "string") {
+    return {
+      targetType: "delivery",
+      targetId: body.deliveryId
+    };
+  }
+
+  if (typeof body.paymentId === "string") {
+    return {
+      targetType: "payment",
+      targetId: body.paymentId
+    };
+  }
+
+  return {};
+}
+
+async function runIdempotentMutation<TResponse extends object>(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: ApiAppDeps,
+  input: {
+    routeKey: string;
+    fingerprint: Record<string, unknown>;
+  },
+  operation: () => Promise<{
+    statusCode: number;
+    responseBody: TResponse;
+  }>
+): Promise<TResponse> {
+  const result = await executeIdempotentOperation(
+    {
+      routeKey: input.routeKey,
+      actorKey: getActorKey(request),
+      idempotencyKey: getIdempotencyKey(request),
+      requestId: request.id,
+      fingerprint: input.fingerprint
+    },
+    {
+      repository: deps.idempotency,
+      identityFactory: deps.identityFactory,
+      now: deps.now
+    },
+    async () => {
+      const mutationResult = await operation();
+
+      if (request.principal) {
+        await deps.auditEvents.create({
+          eventId: deps.identityFactory.nextAuditEventId(),
+          requestId: request.id,
+          action: input.routeKey,
+          actorId: request.principal.userId,
+          actorRole: request.principal.role,
+          occurredAt: deps.now(),
+          ...(request.principal.stationId === undefined
+            ? {}
+            : { stationId: request.principal.stationId }),
+          ...inferAuditTarget(input.fingerprint),
+          metadata: {
+            fingerprint: input.fingerprint,
+            responseStatusCode: mutationResult.statusCode
+          }
+        });
+      }
+
+      return mutationResult;
+    }
+  );
+
+  if (result.replayed) {
+    reply.header("Idempotent-Replayed", "true");
+  }
+
+  reply.status(result.statusCode);
+
+  return result.responseBody;
+}
+
 function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
   const firestore = getKraFirestore(config);
   const repositories = createFirestoreApiRepositories(firestore, () => new Date().toISOString());
@@ -290,6 +426,8 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
     issues: repositories.issues,
     verification: repositories.verification,
     webhookEvents: repositories.webhookEvents,
+    idempotency: repositories.idempotency,
+    auditEvents: repositories.auditEvents,
     gateway: createMtnMomoGateway(config),
     ...(config.hubtelSms === undefined
       ? {}
@@ -487,57 +625,84 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       assertCanAccessDelivery(principal, delivery);
     };
 
+    rateLimitedApp.get("/v1/deliveries", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      setNoStore(reply);
+      return listAccessibleDeliveries(principal, (request.query as Record<string, unknown>) ?? {}, {
+        deliveries: deps.deliveries
+      });
+    });
+
     rateLimitedApp.post("/v1/deliveries", { preHandler: [createDeliveryPreHandler, requireCapability("create_delivery")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = createDeliveryRequestSchema.parse(request.body);
-      const result = await createDeliveryBooking(
-        principal.userId,
-        {
-          senderId: principal.userId,
-          originStationId: input.originStationId,
-          destinationStationId: input.destinationStationId,
-          receiver: {
-            name: input.receiver.name,
-            phone: input.receiver.phone,
-            ...withOptionalValue("addressText", input.receiver.addressText)
-          },
-          package: input.package,
-          serviceType: input.serviceType,
-          doorstepRequested: input.doorstepRequested,
-          ...withOptionalValue("doorstepDistanceKm", input.doorstepDistanceKm)
-        },
-        {
-          deliveries: deps.deliveries,
-          identityFactory: deps.identityFactory,
-          now: deps.now
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "create_delivery",
+        fingerprint: {
+          body: input
         }
-      );
-
-      reply.status(201);
-      return result.response;
-    });
-
-    rateLimitedApp.post("/v1/deliveries/:id/cancel", { preHandler: [authenticatedMutationPreHandler, requireCapability("cancel_eligible_delivery")] }, async (request: FastifyRequest) => {
-      const principal = getAuthenticatedPrincipal(request);
-      const input = cancelDeliveryRequestSchema.parse(request.body);
-
-      return (
-        await cancelDelivery(
-          principal,
+      }, async () => {
+        const result = await createDeliveryBooking(
+          principal.userId,
           {
-            deliveryId: (request.params as { id: string }).id,
-            reasonCode: input.reasonCode,
-            ...(input.note === undefined ? {} : { note: input.note })
+            senderId: principal.userId,
+            originStationId: input.originStationId,
+            destinationStationId: input.destinationStationId,
+            receiver: {
+              name: input.receiver.name,
+              phone: input.receiver.phone,
+              ...withOptionalValue("addressText", input.receiver.addressText)
+            },
+            package: input.package,
+            serviceType: input.serviceType,
+            doorstepRequested: input.doorstepRequested,
+            ...withOptionalValue("doorstepDistanceKm", input.doorstepDistanceKm)
           },
           {
             deliveries: deps.deliveries,
-            deliveryEvents: deps.deliveryEvents,
-            payments: deps.payments,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
-        )
-      ).response;
+        );
+
+        return {
+          statusCode: 201,
+          responseBody: result.response
+        };
+      });
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/cancel", { preHandler: [authenticatedMutationPreHandler, requireCapability("cancel_eligible_delivery")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = cancelDeliveryRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "cancel_delivery",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await cancelDelivery(
+            principal,
+            {
+              deliveryId,
+              reasonCode: input.reasonCode,
+              ...(input.note === undefined ? {} : { note: input.note })
+            },
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              payments: deps.payments,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
     rateLimitedApp.get("/v1/deliveries/:id", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -566,123 +731,171 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
-    rateLimitedApp.post("/v1/public/track/:trackingCode/request-verification", { preHandler: publicMutationPreHandler }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/public/track/:trackingCode/request-verification", { preHandler: publicMutationPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
       const input = requestPhoneVerificationChallengeRequestSchema.parse(request.body);
+      const trackingCode = (request.params as { trackingCode: string }).trackingCode;
 
-      return (
-        await requestPublicTrackingPhoneChallenge(
-          {
-            trackingCode: (request.params as { trackingCode: string }).trackingCode,
-            phone: input.phone
-          },
-          {
-            deliveries: deps.deliveries,
-            verification: deps.verification,
-            identityFactory: deps.identityFactory,
-            now: deps.now,
-            ...(deps.notifications === undefined
-              ? {}
-              : { notifications: deps.notifications })
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "request_public_tracking_phone_challenge",
+        fingerprint: {
+          trackingCode,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await requestPublicTrackingPhoneChallenge(
+            {
+              trackingCode,
+              phone: input.phone
+            },
+            {
+              deliveries: deps.deliveries,
+              verification: deps.verification,
+              identityFactory: deps.identityFactory,
+              now: deps.now,
+              ...(deps.notifications === undefined
+                ? {}
+                : { notifications: deps.notifications })
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/public/track/:trackingCode/verify-phone", { preHandler: publicMutationPreHandler }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/public/track/:trackingCode/verify-phone", { preHandler: publicMutationPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
       const input = verifyPhoneRequestSchema.parse(request.body);
+      const trackingCode = (request.params as { trackingCode: string }).trackingCode;
 
-      return (
-        await verifyPublicTrackingPhone(
-          {
-            trackingCode: (request.params as { trackingCode: string }).trackingCode,
-            phone: input.phone,
-            otp: input.otp
-          },
-          {
-            deliveries: deps.deliveries,
-            verification: deps.verification,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "verify_public_tracking_phone",
+        fingerprint: {
+          trackingCode,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await verifyPublicTrackingPhone(
+            {
+              trackingCode,
+              phone: input.phone,
+              otp: input.otp
+            },
+            {
+              deliveries: deps.deliveries,
+              verification: deps.verification,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/payments/initialize", { preHandler: [paymentInitializePreHandler, requirePaymentInitializationAccess] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/payments/initialize", { preHandler: [paymentInitializePreHandler, requirePaymentInitializationAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const input = paymentInitializeRequestSchema.parse(request.body);
-
-      return (
-        await initializeMtnMomoPayment(input, {
-          deliveries: deps.deliveries,
-          payments: deps.payments,
-          gateway: deps.gateway,
-          identityFactory: deps.identityFactory,
-          now: deps.now
-        })
-      ).response;
-    });
-
-    rateLimitedApp.post("/v1/payments/verify", { preHandler: [authenticatedMutationPreHandler, requirePaymentVerificationAccess] }, async (request: FastifyRequest) => {
-      const input = paymentVerifyRequestSchema.parse(request.body);
-
-      return (
-        await verifyMtnMomoPayment(
-          {
-            deliveryId: input.deliveryId
-          },
-          {
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "initialize_payment",
+        fingerprint: {
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await initializeMtnMomoPayment(input, {
             deliveries: deps.deliveries,
             payments: deps.payments,
             gateway: deps.gateway,
             identityFactory: deps.identityFactory,
             now: deps.now
-          }
-        )
-      ).response;
+          })
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/payments/refund", { preHandler: [adminMutationPreHandler, requireAdminCapability("execute_refund")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/payments/verify", { preHandler: [authenticatedMutationPreHandler, requirePaymentVerificationAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const input = paymentVerifyRequestSchema.parse(request.body);
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "verify_payment",
+        fingerprint: {
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await verifyMtnMomoPayment(
+            {
+              deliveryId: input.deliveryId
+            },
+            {
+              deliveries: deps.deliveries,
+              payments: deps.payments,
+              gateway: deps.gateway,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
+    });
+
+    rateLimitedApp.post("/v1/payments/refund", { preHandler: [adminMutationPreHandler, requireAdminCapability("execute_refund")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const input = refundPaymentRequestSchema.parse(request.body);
-
-      return (
-        await requestPaymentRefund(
-          {
-            paymentId: input.paymentId,
-            ...withOptionalValue("duplicateCharge", input.duplicateCharge),
-            ...withOptionalValue("platformPaymentError", input.platformPaymentError),
-            ...withOptionalValue(
-              "packageNeverReceivedAtOrigin",
-              input.packageNeverReceivedAtOrigin
-            ),
-            ...withOptionalValue("doorstepAttemptOccurred", input.doorstepAttemptOccurred),
-            ...withOptionalValue("expressHandlingPerformed", input.expressHandlingPerformed)
-          },
-          {
-            deliveries: deps.deliveries,
-            payments: deps.payments,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "refund_payment",
+        fingerprint: {
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await requestPaymentRefund(
+            {
+              paymentId: input.paymentId,
+              ...withOptionalValue("duplicateCharge", input.duplicateCharge),
+              ...withOptionalValue("platformPaymentError", input.platformPaymentError),
+              ...withOptionalValue(
+                "packageNeverReceivedAtOrigin",
+                input.packageNeverReceivedAtOrigin
+              ),
+              ...withOptionalValue("doorstepAttemptOccurred", input.doorstepAttemptOccurred),
+              ...withOptionalValue("expressHandlingPerformed", input.expressHandlingPerformed)
+            },
+            {
+              deliveries: deps.deliveries,
+              payments: deps.payments,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/payments/refund/settle", { preHandler: [adminMutationPreHandler, requireAdminCapability("execute_refund")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/payments/refund/settle", { preHandler: [adminMutationPreHandler, requireAdminCapability("execute_refund")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const input = settleRefundRequestSchema.parse(request.body);
-
-      return (
-        await settlePaymentRefund(
-          {
-            paymentId: input.paymentId,
-            refundReference: input.refundReference,
-            ...(input.settledAt === undefined ? {} : { settledAt: input.settledAt })
-          },
-          {
-            deliveries: deps.deliveries,
-            payments: deps.payments,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "settle_refund_payment",
+        fingerprint: {
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await settlePaymentRefund(
+            {
+              paymentId: input.paymentId,
+              refundReference: input.refundReference,
+              ...(input.settledAt === undefined ? {} : { settledAt: input.settledAt })
+            },
+            {
+              deliveries: deps.deliveries,
+              payments: deps.payments,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
     rateLimitedApp.post("/v1/webhooks/payments/mtn-momo", { preHandler: webhookPreHandler }, async (request: FastifyRequest) => {
@@ -718,163 +931,265 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/intake", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_intake")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/deliveries/:id/intake", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_intake")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = confirmIntakeRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
 
-      return (
-        await confirmOriginIntake(
-          {
-            deliveryId: (request.params as { id: string }).id,
-            measuredWeightKg: input.measuredWeightKg,
-            sizeTier: input.sizeTier,
-            condition: input.condition,
-            labelScanCode: input.labelScanCode,
-            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-          },
-          mapPrincipalToOperationalActor(principal),
-          {
-            deliveries: deps.deliveries,
-            deliveryEvents: deps.deliveryEvents,
-            handoffEvents: deps.handoffEvents,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "confirm_intake",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await confirmOriginIntake(
+            {
+              deliveryId,
+              measuredWeightKg: input.measuredWeightKg,
+              sizeTier: input.sizeTier,
+              condition: input.condition,
+              labelScanCode: input.labelScanCode,
+              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/assign-driver", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_driver")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/deliveries/:id/assign-driver", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_driver")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = assignDriverRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
 
-      return (
-        await assignDriver(
-          {
-            deliveryId: (request.params as { id: string }).id,
-            driverUserId: input.driverUserId
-          },
-          mapPrincipalToOperationalActor(principal),
-          {
-            deliveries: deps.deliveries,
-            deliveryEvents: deps.deliveryEvents,
-            handoffEvents: deps.handoffEvents,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "assign_driver",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await assignDriver(
+            {
+              deliveryId,
+              driverUserId: input.driverUserId
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/dispatch", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_dispatch")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/deliveries/:id/dispatch", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_dispatch")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = dispatchDeliveryRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
 
-      return (
-        await dispatchDelivery(
-          {
-            deliveryId: (request.params as { id: string }).id,
-            packageScanCode: input.packageScanCode,
-            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-          },
-          mapPrincipalToOperationalActor(principal),
-          {
-            deliveries: deps.deliveries,
-            deliveryEvents: deps.deliveryEvents,
-            handoffEvents: deps.handoffEvents,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "dispatch_delivery",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await dispatchDelivery(
+            {
+              deliveryId,
+              packageScanCode: input.packageScanCode,
+              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/receive-destination", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_destination_receipt")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/deliveries/:id/receive-destination", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_destination_receipt")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = receiveDestinationRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
 
-      return (
-        await receiveDestination(
-          {
-            deliveryId: (request.params as { id: string }).id,
-            packageScanCode: input.packageScanCode,
-            condition: input.condition,
-            nextStep: input.nextStep,
-            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-          },
-          mapPrincipalToOperationalActor(principal),
-          {
-            deliveries: deps.deliveries,
-            deliveryEvents: deps.deliveryEvents,
-            handoffEvents: deps.handoffEvents,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "receive_destination",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await receiveDestination(
+            {
+              deliveryId,
+              packageScanCode: input.packageScanCode,
+              condition: input.condition,
+              nextStep: input.nextStep,
+              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/assign-final-mile", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_final_mile")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/deliveries/:id/assign-final-mile", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_final_mile")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = assignFinalMileRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
 
-      return (
-        await assignFinalMileCourier(
-          {
-            deliveryId: (request.params as { id: string }).id,
-            courierUserId: input.courierUserId
-          },
-          mapPrincipalToOperationalActor(principal),
-          {
-            deliveries: deps.deliveries,
-            deliveryEvents: deps.deliveryEvents,
-            handoffEvents: deps.handoffEvents,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "assign_final_mile",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await assignFinalMileCourier(
+            {
+              deliveryId,
+              courierUserId: input.courierUserId
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: [authenticatedMutationPreHandler, requireCapability("complete_delivery_with_proof")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/deliveries/:id/final-mile-failed-attempt", { preHandler: [authenticatedMutationPreHandler, requireCapability("record_failed_attempt")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = recordFailedAttemptRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "record_failed_attempt",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await recordFinalMileFailedAttempt(
+            {
+              deliveryId,
+              reasonCode: input.reasonCode,
+              ...(input.note === undefined ? {} : { note: input.note })
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: [authenticatedMutationPreHandler, requireCapability("complete_delivery_with_proof")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = completeDeliveryRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
 
-      return (
-        await completeDelivery(
-          {
-            deliveryId: (request.params as { id: string }).id,
-            proofType: input.proofType,
-            proofReference: input.proofReference,
-            receivedByName: input.receivedByName
-          },
-          mapPrincipalToOperationalActor(principal),
-          {
-            deliveries: deps.deliveries,
-            deliveryEvents: deps.deliveryEvents,
-            handoffEvents: deps.handoffEvents,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "complete_delivery",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await completeDelivery(
+            {
+              deliveryId,
+              proofType: input.proofType,
+              proofReference: input.proofReference,
+              receivedByName: input.receivedByName
+            },
+            mapPrincipalToOperationalActor(principal),
+            {
+              deliveries: deps.deliveries,
+              deliveryEvents: deps.deliveryEvents,
+              handoffEvents: deps.handoffEvents,
+              identityFactory: deps.identityFactory,
+              now: deps.now
+            }
+          )
+        ).response
+      }));
     });
 
     rateLimitedApp.post("/v1/issues", { preHandler: [authenticatedMutationPreHandler, requireCapability("open_issue")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = createIssueRequestSchema.parse(request.body);
-      const result = await createSupportIssue(principal, input, {
-        deliveries: deps.deliveries,
-        issues: deps.issues,
-        identityFactory: deps.identityFactory,
-        now: deps.now
-      });
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "create_issue",
+        fingerprint: {
+          body: input
+        }
+      }, async () => {
+        const result = await createSupportIssue(principal, input, {
+          deliveries: deps.deliveries,
+          issues: deps.issues,
+          identityFactory: deps.identityFactory,
+          now: deps.now
+        });
 
-      reply.status(201);
-      return result.response;
+        return {
+          statusCode: 201,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.get("/v1/issues/:id", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -886,17 +1201,27 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
-    rateLimitedApp.post("/v1/issues/:id/escalate", { preHandler: [adminMutationPreHandler, requireAdminCapability("escalate_case")] }, async (request: FastifyRequest) => {
+    rateLimitedApp.post("/v1/issues/:id/escalate", { preHandler: [adminMutationPreHandler, requireAdminCapability("escalate_case")] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = escalateIssueRequestSchema.parse(request.body);
+      const issueId = (request.params as { id: string }).id;
 
-      return (
-        await escalateSupportIssue(principal, (request.params as { id: string }).id, input, {
-          deliveries: deps.deliveries,
-          issues: deps.issues,
-          now: deps.now
-        })
-      ).response;
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "escalate_issue",
+        fingerprint: {
+          issueId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await escalateSupportIssue(principal, issueId, input, {
+            deliveries: deps.deliveries,
+            issues: deps.issues,
+            now: deps.now
+          })
+        ).response
+      }));
     });
 
     rateLimitedApp.get("/v1/admin/overview", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
