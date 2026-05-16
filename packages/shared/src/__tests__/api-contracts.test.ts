@@ -30,6 +30,7 @@ import {
   markOutForDeliveryRequestSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
+  notificationListResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
   publicTrackingResponseSchema,
@@ -275,6 +276,31 @@ describe("api contracts", () => {
         {
           eventId: "EVT-WEB-0001",
           processingStatus: "processed"
+        }
+      ]
+    });
+  });
+
+  it("accepts notification feed response contracts", () => {
+    expect(
+      notificationListResponseSchema.parse({
+        notifications: [
+          {
+            notificationId: "NTF-0001",
+            type: "ready_for_pickup",
+            status: "unread",
+            title: "Ready for pickup",
+            body: "Your package is ready for receiver pickup at the destination station.",
+            deliveryId: "DEL-0001",
+            createdAt: "2026-05-16T14:15:00.000Z"
+          }
+        ]
+      })
+    ).toMatchObject({
+      notifications: [
+        {
+          notificationId: "NTF-0001",
+          type: "ready_for_pickup"
         }
       ]
     });

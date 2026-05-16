@@ -41,6 +41,8 @@ import {
   issueResponseSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
+  notificationListQuerySchema,
+  notificationListResponseSchema,
   paymentInitializeRequestSchema,
   paymentInitializeResponseSchema,
   refundPaymentRequestSchema,
@@ -208,6 +210,17 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: paymentVerifyRequestSchema,
     responseSchema: paymentVerifyResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "list_notifications",
+    method: "GET",
+    path: "/v1/notifications",
+    module: "notifications",
+    authScope: "authenticated",
+    idempotent: true,
+    requestSchema: notificationListQuerySchema,
+    responseSchema: notificationListResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

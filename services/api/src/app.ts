@@ -62,7 +62,7 @@ import {
 } from "./audit";
 import { cancelDelivery } from "./cancellations";
 import { loadApiRuntimeConfig, type ApiRuntimeConfig } from "./config";
-import { createDeliveryBooking, type DeliveryRepository } from "./deliveries";
+import { createDeliveryBooking, type DeliveryRecord, type DeliveryRepository } from "./deliveries";
 import {
   getDeliveryDetail,
   listAccessibleDeliveries,
@@ -116,6 +116,13 @@ import {
   type PublicTrackingOtpNotificationGateway
 } from "./notifications";
 import {
+  listNotifications,
+  queueNotificationIfMissing,
+  type NotificationIdentityFactory,
+  type NotificationRepository,
+  type QueueNotificationInput
+} from "./notification-feed";
+import {
   listAdminWebhookEvents,
   processMtnMomoWebhook,
   type PaymentLookupRepository,
@@ -159,6 +166,7 @@ declare module "fastify" {
 type SharedIdentityFactory = PaymentIdentityFactory &
   PaymentWebhookIdentityFactory &
   DeliveryLifecycleIdentityFactory &
+  NotificationIdentityFactory &
   PublicTrackingVerificationIdentityFactory &
   AuditIdentityFactory &
   SupportIssueIdentityFactory & {
@@ -173,6 +181,7 @@ export interface ApiAppDeps {
   authVerifier: AuthVerifier;
   users: UserRepository;
   stations: StationRepository;
+  notificationFeed: NotificationRepository;
   deliveries: DeliveryRepository &
     DeliveryLifecycleRepository &
     DeliveryListRepository &
@@ -320,6 +329,182 @@ function withOptionalValue<K extends string, V>(key: K, value: V | undefined): P
   } as Partial<Record<K, V>>;
 }
 
+type SenderNotificationCopy = Pick<QueueNotificationInput, "type" | "title" | "body">;
+
+const deliveryStatusNotificationCopy: Partial<
+  Record<DeliveryRecord["currentStatus"], SenderNotificationCopy>
+> = {
+  received_at_origin: {
+    type: "received_at_origin",
+    title: "Package received at origin",
+    body: "Your package has been received and scanned at the origin station."
+  },
+  dispatched_from_origin: {
+    type: "dispatched",
+    title: "Package dispatched",
+    body: "Your package has left the origin station and is moving through the Kra network."
+  },
+  received_at_destination: {
+    type: "received_at_destination",
+    title: "Arrived at destination station",
+    body: "Your package has arrived at the destination station."
+  },
+  awaiting_receiver_pickup: {
+    type: "ready_for_pickup",
+    title: "Ready for pickup",
+    body: "Your package is ready for receiver pickup at the destination station."
+  },
+  awaiting_final_mile_assignment: {
+    type: "received_at_destination",
+    title: "Preparing doorstep delivery",
+    body: "Your package has arrived at the destination station and is being prepared for doorstep delivery."
+  },
+  out_for_delivery: {
+    type: "out_for_delivery",
+    title: "Out for delivery",
+    body: "Your package is with the final-mile courier and is on its way to the receiver."
+  },
+  delivered: {
+    type: "delivered",
+    title: "Delivery completed",
+    body: "Your package has been delivered and the proof of delivery has been captured."
+  },
+  issue_reported: {
+    type: "issue_updated",
+    title: "Delivery issue reported",
+    body: "A delivery issue has been opened and the operations team is reviewing it."
+  }
+};
+
+function getPaymentNotificationCopy(
+  paymentStatus: "confirmed" | "failed"
+): SenderNotificationCopy {
+  if (paymentStatus === "confirmed") {
+    return {
+      type: "payment_confirmed",
+      title: "Payment confirmed",
+      body: "Your payment is confirmed. Kra can now move your package through the delivery network."
+    };
+  }
+
+  return {
+    type: "payment_failed",
+    title: "Payment failed",
+    body: "Your payment could not be confirmed. Please retry payment before the package moves into transport."
+  };
+}
+
+function getIssueNotificationCopy(
+  status: "open" | "in_review" | "escalated" | "resolved" | "closed"
+): SenderNotificationCopy {
+  if (status === "open") {
+    return {
+      type: "issue_updated",
+      title: "Issue opened",
+      body: "A support issue has been opened for your delivery."
+    };
+  }
+
+  if (status === "resolved" || status === "closed") {
+    return {
+      type: "issue_updated",
+      title: "Issue resolved",
+      body: "The support issue on your delivery has been resolved or closed."
+    };
+  }
+
+  return {
+    type: "issue_updated",
+    title: "Issue updated",
+    body: "The support issue on your delivery has a new status."
+  };
+}
+
+async function queueSenderNotificationForDelivery(
+  deps: ApiAppDeps,
+  delivery: Pick<DeliveryRecord, "deliveryId" | "senderId">,
+  copy: SenderNotificationCopy,
+  dedupeKey: string
+): Promise<void> {
+  await queueNotificationIfMissing(
+    {
+      recipientUserId: delivery.senderId,
+      type: copy.type,
+      title: copy.title,
+      body: copy.body,
+      deliveryId: delivery.deliveryId,
+      dedupeKey
+    },
+    {
+      notificationFeed: deps.notificationFeed,
+      identityFactory: deps.identityFactory,
+      now: deps.now
+    }
+  );
+}
+
+async function queueDeliveryStatusNotification(
+  deps: ApiAppDeps,
+  delivery: DeliveryRecord
+): Promise<void> {
+  const copy = deliveryStatusNotificationCopy[delivery.currentStatus];
+
+  if (!copy) {
+    return;
+  }
+
+  await queueSenderNotificationForDelivery(
+    deps,
+    delivery,
+    copy,
+    `delivery:${delivery.deliveryId}:${copy.type}`
+  );
+}
+
+async function queuePaymentStatusNotification(
+  deps: ApiAppDeps,
+  deliveryId: string,
+  paymentStatus: "pending" | "confirmed" | "failed"
+): Promise<void> {
+  if (paymentStatus !== "confirmed" && paymentStatus !== "failed") {
+    return;
+  }
+
+  const delivery = await deps.deliveries.getById(deliveryId);
+
+  if (!delivery) {
+    return;
+  }
+
+  const copy = getPaymentNotificationCopy(paymentStatus);
+  await queueSenderNotificationForDelivery(
+    deps,
+    delivery,
+    copy,
+    `delivery:${delivery.deliveryId}:${copy.type}`
+  );
+}
+
+async function queueIssueNotification(
+  deps: ApiAppDeps,
+  deliveryId: string,
+  issueId: string,
+  status: "open" | "in_review" | "escalated" | "resolved" | "closed"
+): Promise<void> {
+  const delivery = await deps.deliveries.getById(deliveryId);
+
+  if (!delivery) {
+    return;
+  }
+
+  await queueSenderNotificationForDelivery(
+    deps,
+    delivery,
+    getIssueNotificationCopy(status),
+    `issue:${issueId}:${status}`
+  );
+}
+
 function getIdempotencyKey(request: FastifyRequest): string | undefined {
   const header = request.headers["idempotency-key"];
 
@@ -448,6 +633,7 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
     authVerifier: createFirebaseAuthVerifier(getFirebaseAdminApp(config)),
     users: repositories.users,
     stations: repositories.stations,
+    notificationFeed: repositories.notificationFeed,
     deliveries: repositories.deliveries,
     deliveryEvents: repositories.deliveryEvents,
     handoffEvents: repositories.handoffEvents,
@@ -732,6 +918,14 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       );
     };
 
+    rateLimitedApp.get("/v1/notifications", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      setNoStore(reply);
+      return listNotifications(principal, (request.query as Record<string, unknown>) ?? {}, {
+        notificationFeed: deps.notificationFeed
+      });
+    });
+
     rateLimitedApp.get("/v1/deliveries", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       setNoStore(reply);
@@ -770,6 +964,16 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             identityFactory: deps.identityFactory,
             now: deps.now
           }
+        );
+        await queueSenderNotificationForDelivery(
+          deps,
+          result.delivery,
+          {
+            type: "delivery_created",
+            title: "Delivery created",
+            body: "Your delivery has been created. Complete payment so Kra can move it into transport."
+          },
+          `delivery:${result.delivery.deliveryId}:delivery_created`
         );
 
         return {
@@ -928,23 +1132,26 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         fingerprint: {
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await verifyMtnMomoPayment(
-            {
-              deliveryId: input.deliveryId
-            },
-            {
-              deliveries: deps.deliveries,
-              payments: deps.payments,
-              gateway: deps.gateway,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await verifyMtnMomoPayment(
+          {
+            deliveryId: input.deliveryId
+          },
+          {
+            deliveries: deps.deliveries,
+            payments: deps.payments,
+            gateway: deps.gateway,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await queuePaymentStatusNotification(deps, input.deliveryId, result.response.paymentStatus);
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/payments/refund", { preHandler: [adminMutationPreHandler, requireAdminCapability("approve_refund")] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -986,48 +1193,72 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         fingerprint: {
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await settlePaymentRefund(
+      }, async () => {
+        const result = await settlePaymentRefund(
+          {
+            paymentId: input.paymentId,
+            refundReference: input.refundReference,
+            ...(input.settledAt === undefined ? {} : { settledAt: input.settledAt })
+          },
+          {
+            deliveries: deps.deliveries,
+            payments: deps.payments,
+            now: deps.now
+          }
+        );
+        const delivery = await deps.deliveries.getById(result.response.deliveryId);
+
+        if (delivery) {
+          await queueSenderNotificationForDelivery(
+            deps,
+            delivery,
             {
-              paymentId: input.paymentId,
-              refundReference: input.refundReference,
-              ...(input.settledAt === undefined ? {} : { settledAt: input.settledAt })
+              type: "refund_completed",
+              title: "Refund completed",
+              body: "Your refund has been completed and marked as settled."
             },
-            {
-              deliveries: deps.deliveries,
-              payments: deps.payments,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+            `payment:${result.response.paymentId}:refund_completed`
+          );
+        }
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/webhooks/payments/mtn-momo", { preHandler: [webhookPreHandler, requireMtnMomoWebhookSignature] }, async (request: FastifyRequest) => {
       const payload = mtnMomoWebhookRequestSchema.parse(request.body);
 
-      return (
-        await processMtnMomoWebhook(
-          {
-            providerReference: payload.providerReference,
-            eventType: payload.eventType,
-            amountGhs: payload.amountGhs,
-            currency: payload.currency,
-            occurredAt: payload.occurredAt,
-            rawPayload: payload.rawPayload ?? {},
-            ...withOptionalValue("providerEventId", payload.providerEventId)
-          },
-          {
-            deliveries: deps.deliveries,
-            payments: deps.payments,
-            webhookEvents: deps.webhookEvents,
-            identityFactory: deps.identityFactory,
-            now: deps.now
-          }
-        )
-      ).response;
+      const result = await processMtnMomoWebhook(
+        {
+          providerReference: payload.providerReference,
+          eventType: payload.eventType,
+          amountGhs: payload.amountGhs,
+          currency: payload.currency,
+          occurredAt: payload.occurredAt,
+          rawPayload: payload.rawPayload ?? {},
+          ...withOptionalValue("providerEventId", payload.providerEventId)
+        },
+        {
+          deliveries: deps.deliveries,
+          payments: deps.payments,
+          webhookEvents: deps.webhookEvents,
+          identityFactory: deps.identityFactory,
+          now: deps.now
+        }
+      );
+
+      if (payload.eventType === "payment.confirmed" && result.response.matchedDeliveryId) {
+        await queuePaymentStatusNotification(deps, result.response.matchedDeliveryId, "confirmed");
+      }
+
+      if (payload.eventType === "payment.failed" && result.response.matchedDeliveryId) {
+        await queuePaymentStatusNotification(deps, result.response.matchedDeliveryId, "failed");
+      }
+
+      return result.response;
     });
 
     rateLimitedApp.post("/v1/deliveries/:id/intake", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_intake")] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1041,30 +1272,33 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           deliveryId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await confirmOriginIntake(
-            {
-              deliveryId,
-              measuredWeightKg: input.measuredWeightKg,
-              sizeTier: input.sizeTier,
-              condition: input.condition,
-              labelScanCode: input.labelScanCode,
-              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-            },
-            mapPrincipalToOperationalActor(principal),
-            {
-              deliveries: deps.deliveries,
-              deliveryEvents: deps.deliveryEvents,
-              handoffEvents: deps.handoffEvents,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await confirmOriginIntake(
+          {
+            deliveryId,
+            measuredWeightKg: input.measuredWeightKg,
+            sizeTier: input.sizeTier,
+            condition: input.condition,
+            labelScanCode: input.labelScanCode,
+            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await queueDeliveryStatusNotification(deps, result.delivery);
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/deliveries/:id/assign-driver", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_driver")] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1142,27 +1376,30 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           deliveryId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await dispatchDelivery(
-            {
-              deliveryId,
-              packageScanCode: input.packageScanCode,
-              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-            },
-            mapPrincipalToOperationalActor(principal),
-            {
-              deliveries: deps.deliveries,
-              deliveryEvents: deps.deliveryEvents,
-              handoffEvents: deps.handoffEvents,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await dispatchDelivery(
+          {
+            deliveryId,
+            packageScanCode: input.packageScanCode,
+            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await queueDeliveryStatusNotification(deps, result.delivery);
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/deliveries/:id/confirm-pickup", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_pickup")] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1242,29 +1479,32 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           deliveryId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await receiveDestination(
-            {
-              deliveryId,
-              packageScanCode: input.packageScanCode,
-              condition: input.condition,
-              nextStep: input.nextStep,
-              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
-              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
-            },
-            mapPrincipalToOperationalActor(principal),
-            {
-              deliveries: deps.deliveries,
-              deliveryEvents: deps.deliveryEvents,
-              handoffEvents: deps.handoffEvents,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await receiveDestination(
+          {
+            deliveryId,
+            packageScanCode: input.packageScanCode,
+            condition: input.condition,
+            nextStep: input.nextStep,
+            ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+            ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId)
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await queueDeliveryStatusNotification(deps, result.delivery);
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/deliveries/:id/assign-final-mile", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_final_mile")] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1342,25 +1582,28 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           deliveryId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await markDeliveryOutForDelivery(
-            {
-              deliveryId,
-              ...withOptionalValue("note", input.note)
-            },
-            mapPrincipalToOperationalActor(principal),
-            {
-              deliveries: deps.deliveries,
-              deliveryEvents: deps.deliveryEvents,
-              handoffEvents: deps.handoffEvents,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await markDeliveryOutForDelivery(
+          {
+            deliveryId,
+            ...withOptionalValue("note", input.note)
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await queueDeliveryStatusNotification(deps, result.delivery);
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/deliveries/:id/final-mile-failed-attempt", { preHandler: [authenticatedMutationPreHandler, requireCapability("record_failed_attempt")] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1374,26 +1617,29 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           deliveryId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await recordFinalMileFailedAttempt(
-            {
-              deliveryId,
-              reasonCode: input.reasonCode,
-              ...(input.note === undefined ? {} : { note: input.note })
-            },
-            mapPrincipalToOperationalActor(principal),
-            {
-              deliveries: deps.deliveries,
-              deliveryEvents: deps.deliveryEvents,
-              handoffEvents: deps.handoffEvents,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await recordFinalMileFailedAttempt(
+          {
+            deliveryId,
+            reasonCode: input.reasonCode,
+            ...(input.note === undefined ? {} : { note: input.note })
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await queueDeliveryStatusNotification(deps, result.delivery);
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: [authenticatedMutationPreHandler, requireDeliveryCompletionAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1407,27 +1653,30 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           deliveryId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await completeDelivery(
-            {
-              deliveryId,
-              proofType: input.proofType,
-              proofReference: input.proofReference,
-              receivedByName: input.receivedByName
-            },
-            mapPrincipalToOperationalActor(principal),
-            {
-              deliveries: deps.deliveries,
-              deliveryEvents: deps.deliveryEvents,
-              handoffEvents: deps.handoffEvents,
-              identityFactory: deps.identityFactory,
-              now: deps.now
-            }
-          )
-        ).response
-      }));
+      }, async () => {
+        const result = await completeDelivery(
+          {
+            deliveryId,
+            proofType: input.proofType,
+            proofReference: input.proofReference,
+            receivedByName: input.receivedByName
+          },
+          mapPrincipalToOperationalActor(principal),
+          {
+            deliveries: deps.deliveries,
+            deliveryEvents: deps.deliveryEvents,
+            handoffEvents: deps.handoffEvents,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+        await queueDeliveryStatusNotification(deps, result.delivery);
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.get("/v1/issues", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1454,6 +1703,12 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           identityFactory: deps.identityFactory,
           now: deps.now
         });
+        await queueIssueNotification(
+          deps,
+          result.issue.deliveryId,
+          result.issue.issueId,
+          result.issue.status
+        );
 
         return {
           statusCode: 201,
@@ -1482,16 +1737,24 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           issueId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await escalateSupportIssue(principal, issueId, input, {
-            deliveries: deps.deliveries,
-            issues: deps.issues,
-            now: deps.now
-          })
-        ).response
-      }));
+      }, async () => {
+        const result = await escalateSupportIssue(principal, issueId, input, {
+          deliveries: deps.deliveries,
+          issues: deps.issues,
+          now: deps.now
+        });
+        await queueIssueNotification(
+          deps,
+          result.issue.deliveryId,
+          result.issue.issueId,
+          result.issue.status
+        );
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.post("/v1/issues/:id/resolve", { preHandler: [adminMutationPreHandler, requireIssueManagement] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1505,16 +1768,24 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           issueId,
           body: input
         }
-      }, async () => ({
-        statusCode: 200,
-        responseBody: (
-          await resolveSupportIssue(principal, issueId, input, {
-            deliveries: deps.deliveries,
-            issues: deps.issues,
-            now: deps.now
-          })
-        ).response
-      }));
+      }, async () => {
+        const result = await resolveSupportIssue(principal, issueId, input, {
+          deliveries: deps.deliveries,
+          issues: deps.issues,
+          now: deps.now
+        });
+        await queueIssueNotification(
+          deps,
+          result.issue.deliveryId,
+          result.issue.issueId,
+          result.issue.status
+        );
+
+        return {
+          statusCode: 200,
+          responseBody: result.response
+        };
+      });
     });
 
     rateLimitedApp.get("/v1/admin/overview", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
