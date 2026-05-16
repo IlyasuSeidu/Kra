@@ -59,6 +59,7 @@
 - `POST /v1/admin/users`
 - `POST /v1/admin/users/:id/access`
 - `GET /v1/admin/audit-events`
+- `GET /v1/admin/outbound-notifications`
 - `GET /v1/admin/webhook-events`
 
 ## Request And Response Baselines
@@ -157,6 +158,36 @@ Response:
       "outboundNotificationId": "ONF-0001",
       "status": "sent",
       "attemptCount": 1
+    }
+  ]
+}
+```
+
+### `GET /v1/admin/outbound-notifications`
+Query:
+```json
+{
+  "status": "dead_letter",
+  "limit": 20
+}
+```
+
+Response:
+```json
+{
+  "generatedAt": "2026-05-16T15:00:00.000Z",
+  "notifications": [
+    {
+      "outboundNotificationId": "ONF-0001",
+      "channel": "sms",
+      "provider": "hubtel",
+      "kind": "receiver_delivery_sms",
+      "status": "dead_letter",
+      "deliveryId": "DEL-0001",
+      "trackingCode": "KRA-0001",
+      "eventType": "out_for_delivery",
+      "attemptCount": 2,
+      "maxAttempts": 2
     }
   ]
 }

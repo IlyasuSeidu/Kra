@@ -149,6 +149,12 @@ describe("api routes", () => {
       authScope: "admin",
       path: "/v1/admin/audit-events"
     });
+    expect(getApiRoute("admin_outbound_notifications")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/outbound-notifications"
+    });
+    expect(getApiRoute("admin_outbound_notifications")?.requestSchema).toBeDefined();
+    expect(getApiRoute("admin_outbound_notifications")?.responseSchema).toBeDefined();
     expect(getApiRoute("admin_webhook_events")).toMatchObject({
       authScope: "admin",
       path: "/v1/admin/webhook-events"

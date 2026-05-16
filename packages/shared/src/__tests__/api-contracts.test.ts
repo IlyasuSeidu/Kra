@@ -4,6 +4,8 @@ import {
   acceptFinalMileAssignmentRequestSchema,
   acceptRunRequestSchema,
   adminStationListResponseSchema,
+  adminOutboundNotificationListQuerySchema,
+  adminOutboundNotificationListResponseSchema,
   adminUpdateStationStatusRequestSchema,
   adminUpdateStationStatusResponseSchema,
   adminUpdateStationValidationRequestSchema,
@@ -343,6 +345,56 @@ describe("api contracts", () => {
       processed: 2,
       sent: 1,
       failed: 1
+    });
+  });
+
+  it("accepts admin outbound notification review contracts", () => {
+    expect(
+      adminOutboundNotificationListQuerySchema.parse({
+        status: "dead_letter",
+        limit: "20"
+      })
+    ).toEqual({
+      status: "dead_letter",
+      limit: 20
+    });
+
+    expect(
+      adminOutboundNotificationListResponseSchema.parse({
+        generatedAt: "2026-05-16T15:00:00.000Z",
+        notifications: [
+          {
+            outboundNotificationId: "ONF-0001",
+            channel: "sms",
+            provider: "hubtel",
+            kind: "receiver_delivery_sms",
+            status: "dead_letter",
+            dedupeKey: "receiver-sms:DEL-0001:out_for_delivery",
+            deliveryId: "DEL-0001",
+            recipientPhone: "+233240000000",
+            trackingCode: "KRA-0001",
+            eventType: "out_for_delivery",
+            stationName: "Kumasi Adum",
+            attemptCount: 2,
+            maxAttempts: 2,
+            nextAttemptAt: "2026-05-16T15:00:00.000Z",
+            createdAt: "2026-05-16T14:00:00.000Z",
+            updatedAt: "2026-05-16T15:00:00.000Z",
+            lastAttemptAt: "2026-05-16T15:00:00.000Z",
+            lastError: {
+              name: "Error",
+              message: "Hubtel rejected message"
+            }
+          }
+        ]
+      })
+    ).toMatchObject({
+      notifications: [
+        {
+          outboundNotificationId: "ONF-0001",
+          status: "dead_letter"
+        }
+      ]
     });
   });
 

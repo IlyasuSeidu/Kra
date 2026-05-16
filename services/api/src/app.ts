@@ -52,6 +52,7 @@ import {
   getAdminOverview,
   listAdminDeliveries,
   listAdminFinance,
+  listAdminOutboundNotifications,
   listAdminStations,
   type AdminDeliveryMetricsRepository,
   type AdminIssueMetricsRepository,
@@ -2050,6 +2051,14 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       setNoStore(reply);
       return listAdminAuditEvents(principal, (request.query as Record<string, unknown>) ?? {}, {
         auditEvents: deps.auditEvents
+      });
+    });
+
+    rateLimitedApp.get("/v1/admin/outbound-notifications", { preHandler: [authenticatedReadPreHandler, requireIssueManagement] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      setNoStore(reply);
+      return listAdminOutboundNotifications((request.query as Record<string, unknown>) ?? {}, {
+        outboundNotifications: deps.outboundNotifications,
+        now: deps.now
       });
     });
 

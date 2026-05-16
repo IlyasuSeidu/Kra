@@ -80,6 +80,9 @@ function makeRepository(records: OutboundNotificationRecord[] = []): OutboundNot
     },
     listDue() {
       return resolve(records);
+    },
+    listRecent() {
+      return resolve(records);
     }
   };
 }

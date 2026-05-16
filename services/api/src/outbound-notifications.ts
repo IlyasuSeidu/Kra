@@ -51,6 +51,10 @@ export interface OutboundNotificationRepository {
     lastError: NonNullable<OutboundNotificationRecord["lastError"]>;
   }): Promise<void>;
   listDue(input: { now: string; limit: number }): Promise<OutboundNotificationRecord[]>;
+  listRecent(input: {
+    status?: OutboundNotificationStatus;
+    limit: number;
+  }): Promise<OutboundNotificationRecord[]>;
 }
 
 export interface OutboundNotificationIdentityFactory {
