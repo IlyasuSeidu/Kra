@@ -26,6 +26,8 @@ import {
   escalateIssueRequestSchema,
   issueListQuerySchema,
   issueListResponseSchema,
+  markInTransitRequestSchema,
+  markOutForDeliveryRequestSchema,
   issueResponseSchema,
   mtnMomoWebhookRequestSchema,
   mtnMomoWebhookResponseSchema,
@@ -259,6 +261,18 @@ export const apiRoutes = [
     errorSchema: apiErrorResponseSchema
   },
   {
+    operationId: "mark_in_transit",
+    method: "POST",
+    path: "/v1/deliveries/:id/mark-in-transit",
+    module: "handoffs",
+    authScope: "staff",
+    capability: "update_transit_status",
+    idempotent: true,
+    requestSchema: markInTransitRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
     operationId: "receive_destination",
     method: "POST",
     path: "/v1/deliveries/:id/receive-destination",
@@ -279,6 +293,18 @@ export const apiRoutes = [
     capability: "assign_final_mile",
     idempotent: true,
     requestSchema: assignFinalMileRequestSchema,
+    responseSchema: deliveryLifecycleResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "mark_out_for_delivery",
+    method: "POST",
+    path: "/v1/deliveries/:id/out-for-delivery",
+    module: "handoffs",
+    authScope: "staff",
+    capability: "mark_out_for_delivery",
+    idempotent: true,
+    requestSchema: markOutForDeliveryRequestSchema,
     responseSchema: deliveryLifecycleResponseSchema,
     errorSchema: apiErrorResponseSchema
   },

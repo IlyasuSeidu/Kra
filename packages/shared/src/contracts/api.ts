@@ -321,6 +321,10 @@ export const dispatchDeliveryRequestSchema = z.object({
   supervisorOverrideActorId: userIdSchema.optional()
 });
 
+export const markInTransitRequestSchema = z.object({
+  note: z.string().trim().min(3).max(240).optional()
+});
+
 export const receiveDestinationRequestSchema = z.object({
   packageScanCode: z.string().trim().min(4).max(80),
   condition: packageConditionSchema,
@@ -331,6 +335,10 @@ export const receiveDestinationRequestSchema = z.object({
 
 export const assignFinalMileRequestSchema = z.object({
   courierUserId: userIdSchema
+});
+
+export const markOutForDeliveryRequestSchema = z.object({
+  note: z.string().trim().min(3).max(240).optional()
 });
 
 export const completeDeliveryRequestSchema = z.object({
