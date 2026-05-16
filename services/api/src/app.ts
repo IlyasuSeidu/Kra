@@ -251,6 +251,27 @@ function withOptionalValue<K extends string, V>(key: K, value: V | undefined): P
   } as Partial<Record<K, V>>;
 }
 
+function routeRateLimit(max: number, timeWindow = "1 minute") {
+  return {
+    config: {
+      rateLimit: {
+        max,
+        timeWindow,
+        skipOnError: false
+      }
+    }
+  };
+}
+
+const publicReadRoute = routeRateLimit(120);
+const publicMutationRoute = routeRateLimit(20);
+const authenticatedReadRoute = routeRateLimit(120);
+const authenticatedMutationRoute = routeRateLimit(60);
+const createDeliveryRoute = routeRateLimit(20);
+const paymentInitializeRoute = routeRateLimit(10);
+const adminMutationRoute = routeRateLimit(5);
+const webhookRoute = routeRateLimit(300);
+
 function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
   const firestore = getKraFirestore(config);
   const repositories = createFirestoreApiRepositories(firestore, () => new Date().toISOString());
@@ -352,7 +373,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     };
   });
 
-  app.post("/v1/deliveries", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/v1/deliveries", createDeliveryRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertCapabilityForPrincipal(principal, "create_delivery");
     const input = createDeliveryRequestSchema.parse(request.body);
@@ -383,7 +404,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     return result.response;
   });
 
-  app.get("/v1/deliveries/:id", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/deliveries/:id", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAuthenticatedPrincipal(principal);
     setNoStore(reply);
@@ -392,7 +413,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     });
   });
 
-  app.get("/v1/deliveries/:id/timeline", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/deliveries/:id/timeline", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAuthenticatedPrincipal(principal);
     setNoStore(reply);
@@ -404,14 +425,14 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     });
   });
 
-  app.get("/v1/public/track/:trackingCode", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/public/track/:trackingCode", publicReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     setNoStore(reply);
     return getPublicTracking((request.params as { trackingCode: string }).trackingCode, {
       deliveries: deps.deliveries
     });
   });
 
-  app.post("/v1/public/track/:trackingCode/verify-phone", async (request: FastifyRequest) => {
+  app.post("/v1/public/track/:trackingCode/verify-phone", publicMutationRoute, async (request: FastifyRequest) => {
     const input = verifyPhoneRequestSchema.parse(request.body);
 
     return (
@@ -431,7 +452,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/payments/initialize", async (request: FastifyRequest) => {
+  app.post("/v1/payments/initialize", paymentInitializeRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertCapabilityForPrincipal(principal, "create_delivery");
     const input = paymentInitializeRequestSchema.parse(request.body);
@@ -447,7 +468,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/payments/verify", async (request: FastifyRequest) => {
+  app.post("/v1/payments/verify", authenticatedMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAuthenticatedPrincipal(principal);
     const input = paymentVerifyRequestSchema.parse(request.body);
@@ -468,7 +489,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/payments/refund", async (request: FastifyRequest) => {
+  app.post("/v1/payments/refund", adminMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAdminPrincipal(principal);
     assertCapabilityForPrincipal(principal, "execute_refund");
@@ -496,7 +517,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/webhooks/payments/mtn-momo", async (request: FastifyRequest) => {
+  app.post("/v1/webhooks/payments/mtn-momo", webhookRoute, async (request: FastifyRequest) => {
     const payload = mtnMomoWebhookRequestSchema.parse(request.body);
 
     verifyWebhookSignature(
@@ -529,7 +550,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/deliveries/:id/intake", async (request: FastifyRequest) => {
+  app.post("/v1/deliveries/:id/intake", authenticatedMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = confirmIntakeRequestSchema.parse(request.body);
 
@@ -556,7 +577,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/deliveries/:id/assign-driver", async (request: FastifyRequest) => {
+  app.post("/v1/deliveries/:id/assign-driver", authenticatedMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = assignDriverRequestSchema.parse(request.body);
 
@@ -578,7 +599,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/deliveries/:id/dispatch", async (request: FastifyRequest) => {
+  app.post("/v1/deliveries/:id/dispatch", authenticatedMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = dispatchDeliveryRequestSchema.parse(request.body);
 
@@ -602,7 +623,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/deliveries/:id/receive-destination", async (request: FastifyRequest) => {
+  app.post("/v1/deliveries/:id/receive-destination", authenticatedMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = receiveDestinationRequestSchema.parse(request.body);
 
@@ -628,7 +649,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/deliveries/:id/assign-final-mile", async (request: FastifyRequest) => {
+  app.post("/v1/deliveries/:id/assign-final-mile", authenticatedMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = assignFinalMileRequestSchema.parse(request.body);
 
@@ -650,7 +671,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/deliveries/:id/complete", async (request: FastifyRequest) => {
+  app.post("/v1/deliveries/:id/complete", authenticatedMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = completeDeliveryRequestSchema.parse(request.body);
 
@@ -674,7 +695,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.post("/v1/issues", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/v1/issues", authenticatedMutationRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = createIssueRequestSchema.parse(request.body);
     const result = await createSupportIssue(principal, input, {
@@ -688,7 +709,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     return result.response;
   });
 
-  app.get("/v1/issues/:id", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/issues/:id", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     setNoStore(reply);
     return getSupportIssue(principal, (request.params as { id: string }).id, {
@@ -697,7 +718,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     });
   });
 
-  app.post("/v1/issues/:id/escalate", async (request: FastifyRequest) => {
+  app.post("/v1/issues/:id/escalate", adminMutationRoute, async (request: FastifyRequest) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     const input = escalateIssueRequestSchema.parse(request.body);
 
@@ -710,7 +731,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     ).response;
   });
 
-  app.get("/v1/admin/overview", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/admin/overview", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAdminPrincipal(principal);
     setNoStore(reply);
@@ -722,7 +743,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     });
   });
 
-  app.get("/v1/admin/deliveries", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/admin/deliveries", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAdminPrincipal(principal);
     setNoStore(reply);
@@ -732,7 +753,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     });
   });
 
-  app.get("/v1/admin/stations", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/admin/stations", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAdminPrincipal(principal);
     setNoStore(reply);
@@ -743,7 +764,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     });
   });
 
-  app.get("/v1/admin/finance", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/v1/admin/finance", authenticatedReadRoute, async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = await authenticateRequest(request, deps.authVerifier);
     assertAdminPrincipal(principal);
 
