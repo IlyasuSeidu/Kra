@@ -12,7 +12,8 @@ describe("api routes", () => {
   it("exposes public tracking routes without authenticated scope", () => {
     expect(getApiRoute("get_public_tracking")).toMatchObject({
       authScope: "public",
-      path: "/v1/public/track/:trackingCode"
+      path: "/v1/public/track/:trackingCode",
+      idempotent: true
     });
 
     expect(getApiRoute("verify_public_tracking_phone")).toMatchObject({

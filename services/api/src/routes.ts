@@ -61,7 +61,7 @@ export const apiRoutes = [
     path: "/v1/public/track/:trackingCode",
     module: "deliveries",
     authScope: "public",
-    idempotent: false,
+    idempotent: true,
     responseSchema: publicTrackingResponseSchema,
     errorSchema: apiErrorResponseSchema
   },

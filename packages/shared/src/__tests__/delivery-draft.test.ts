@@ -180,4 +180,31 @@ describe("delivery draft", () => {
       )
     ).toThrow("Doorstep deliveries require a distance estimate.");
   });
+
+  it("rejects doorstep distance when doorstep is not requested", () => {
+    expect(() =>
+      createDeliveryDraft(
+        {
+          senderId: "USR-SND-001",
+          originStationId: "ST-ACC-01",
+          destinationStationId: "ST-KMS-01",
+          receiver: {
+            name: "Kojo Asante",
+            phone: "+233240000000"
+          },
+          package: {
+            description: "Phone accessories",
+            weightKg: 1.8,
+            sizeTier: "standard",
+            isFragile: false,
+            declaredValueGhs: 300
+          },
+          serviceType: "standard",
+          doorstepRequested: false,
+          doorstepDistanceKm: 4
+        },
+        refs
+      )
+    ).toThrow("Doorstep distance should be omitted when doorstep is not requested.");
+  });
 });

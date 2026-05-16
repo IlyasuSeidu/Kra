@@ -89,6 +89,10 @@ function assertDraftInputs(input: CreateDeliveryDraftInput): void {
     throw new Error("Origin and destination stations must be different.");
   }
 
+  if (!input.doorstepRequested && input.doorstepDistanceKm !== undefined) {
+    throw new Error("Doorstep distance should be omitted when doorstep is not requested.");
+  }
+
   if (input.doorstepRequested && !input.receiver.addressText) {
     throw new Error("Doorstep deliveries require a receiver address.");
   }
