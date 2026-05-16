@@ -4,6 +4,8 @@ import {
   createDeliveryResponseSchema,
   paymentInitializeRequestSchema,
   paymentInitializeResponseSchema,
+  paymentVerifyRequestSchema,
+  paymentVerifyResponseSchema,
   publicTrackingResponseSchema,
   verifyPhoneRequestSchema,
   type Capability
@@ -92,7 +94,8 @@ export const apiRoutes = [
     authScope: "authenticated",
     capability: "view_own_delivery",
     idempotent: true,
-    responseSchema: emptySuccessSchema,
+    requestSchema: paymentVerifyRequestSchema,
+    responseSchema: paymentVerifyResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

@@ -115,6 +115,19 @@ export const paymentInitializeResponseSchema = z.object({
   checkoutMode: z.literal("ussd_push")
 });
 
+export const paymentVerifyRequestSchema = z.object({
+  deliveryId: deliveryIdSchema
+});
+
+export const paymentVerifyResponseSchema = z.object({
+  paymentId: z.string().regex(/^PAY-[A-Z0-9-]+$/),
+  deliveryId: deliveryIdSchema,
+  provider: z.literal("mtn_momo"),
+  paymentStatus: z.enum(["pending", "confirmed", "failed"]),
+  providerReference: z.string().min(6),
+  verificationCheckedAt: z.string().datetime()
+});
+
 export const publicTrackingResponseSchema = z.object({
   deliveryId: deliveryIdSchema,
   trackingCode: trackingCodeSchema,

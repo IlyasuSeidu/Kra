@@ -4,6 +4,8 @@ import {
   apiErrorResponseSchema,
   buildApiErrorResponse,
   createDeliveryRequestSchema,
+  paymentVerifyRequestSchema,
+  paymentVerifyResponseSchema,
   publicTrackingResponseSchema
 } from "../contracts/api";
 
@@ -109,6 +111,30 @@ describe("api contracts", () => {
     ).toMatchObject({
       deliveryId: "DEL-0001",
       status: "received_at_destination"
+    });
+  });
+
+  it("accepts verify-payment request and response contracts", () => {
+    expect(
+      paymentVerifyRequestSchema.parse({
+        deliveryId: "DEL-0001"
+      })
+    ).toEqual({
+      deliveryId: "DEL-0001"
+    });
+
+    expect(
+      paymentVerifyResponseSchema.parse({
+        paymentId: "PAY-0001",
+        deliveryId: "DEL-0001",
+        provider: "mtn_momo",
+        paymentStatus: "confirmed",
+        providerReference: "MTN-REF-0001",
+        verificationCheckedAt: "2026-05-15T13:30:00.000Z"
+      })
+    ).toMatchObject({
+      paymentId: "PAY-0001",
+      paymentStatus: "confirmed"
     });
   });
 });

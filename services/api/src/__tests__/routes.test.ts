@@ -22,6 +22,14 @@ describe("api routes", () => {
   });
 
   it("requires admin scope for refund and admin overview endpoints", () => {
+    expect(getApiRoute("verify_payment")).toMatchObject({
+      authScope: "authenticated",
+      capability: "view_own_delivery"
+    });
+
+    expect(getApiRoute("verify_payment")?.requestSchema).toBeDefined();
+    expect(getApiRoute("verify_payment")?.responseSchema).toBeDefined();
+
     expect(getApiRoute("refund_payment")).toMatchObject({
       authScope: "admin",
       capability: "execute_refund"

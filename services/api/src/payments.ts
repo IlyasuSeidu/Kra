@@ -16,12 +16,27 @@ export interface PaymentRecord {
   amountGhs: number;
   status: Extract<PaymentStatus, "pending" | "confirmed" | "failed" | "refund_pending" | "refunded">;
   initiatedAt: string;
+  verifiedAt?: string;
+  failureReason?: string;
   checkoutMode: "ussd_push";
 }
+
+type ChargePaymentStatus = Extract<PaymentStatus, "pending" | "confirmed" | "failed">;
+type ChargePaymentRecord = PaymentRecord & {
+  status: ChargePaymentStatus;
+};
 
 export interface PaymentRepository {
   create(payment: PaymentRecord): Promise<void>;
   listByDeliveryId(deliveryId: string): Promise<PaymentRecord[]>;
+  updateStatus(
+    paymentId: string,
+    status: ChargePaymentStatus,
+    metadata: {
+      verifiedAt: string;
+      failureReason?: string;
+    }
+  ): Promise<void>;
 }
 
 export interface PaymentIdentityFactory {
@@ -37,6 +52,15 @@ export interface MtnMomoGateway {
     providerReference: string;
     checkoutMode: "ussd_push";
   }>;
+  verifyCharge(input: {
+    paymentId: string;
+    deliveryId: string;
+    providerReference: string;
+  }): Promise<{
+    status: ChargePaymentStatus;
+    verifiedAt: string;
+    failureReason?: string;
+  }>;
 }
 
 export interface InitializePaymentDeps {
@@ -48,6 +72,14 @@ export interface InitializePaymentDeps {
 }
 
 export type InitializePaymentResponse = z.infer<typeof paymentInitializeResponseSchema>;
+export interface VerifyPaymentResponse {
+  paymentId: string;
+  deliveryId: string;
+  provider: "mtn_momo";
+  paymentStatus: "pending" | "confirmed" | "failed";
+  providerReference: string;
+  verificationCheckedAt: string;
+}
 
 const transportStartedStatuses = new Set<DeliveryRecord["currentStatus"]>([
   "dispatched_from_origin",
@@ -64,6 +96,16 @@ const transportStartedStatuses = new Set<DeliveryRecord["currentStatus"]>([
   "cancelled",
   "closed"
 ]);
+
+function isChargePayment(payment: PaymentRecord): payment is ChargePaymentRecord {
+  return payment.status === "pending" || payment.status === "confirmed" || payment.status === "failed";
+}
+
+function getLatestChargePayment(payments: PaymentRecord[]): ChargePaymentRecord | undefined {
+  return payments
+    .filter(isChargePayment)
+    .sort((left, right) => right.initiatedAt.localeCompare(left.initiatedAt))[0];
+}
 
 export async function initializeMtnMomoPayment(
   input: {
@@ -157,5 +199,96 @@ export async function initializeMtnMomoPayment(
       providerReference: payment.providerReference,
       checkoutMode: payment.checkoutMode
     })
+  };
+}
+
+export async function verifyMtnMomoPayment(
+  input: {
+    deliveryId: string;
+  },
+  deps: InitializePaymentDeps
+): Promise<{
+  payment: PaymentRecord;
+  response: VerifyPaymentResponse;
+}> {
+  const delivery = await deps.deliveries.getById(input.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  const existingPayments = await deps.payments.listByDeliveryId(input.deliveryId);
+  const latestChargePayment = getLatestChargePayment(existingPayments);
+
+  if (!latestChargePayment) {
+    throw new ApiServiceError("VALIDATION_ERROR", "No payment exists for this delivery.", {
+      deliveryId: input.deliveryId
+    });
+  }
+
+  if (latestChargePayment.status !== "pending") {
+    return {
+      payment: latestChargePayment,
+      response: {
+        paymentId: latestChargePayment.paymentId,
+        deliveryId: latestChargePayment.deliveryId,
+        provider: latestChargePayment.provider,
+        paymentStatus: latestChargePayment.status,
+        providerReference: latestChargePayment.providerReference,
+        verificationCheckedAt:
+          latestChargePayment.verifiedAt ?? latestChargePayment.initiatedAt
+      }
+    };
+  }
+
+  const verification = await deps.gateway.verifyCharge({
+    paymentId: latestChargePayment.paymentId,
+    deliveryId: latestChargePayment.deliveryId,
+    providerReference: latestChargePayment.providerReference
+  });
+
+  if (verification.status === "pending") {
+    return {
+      payment: latestChargePayment,
+      response: {
+        paymentId: latestChargePayment.paymentId,
+        deliveryId: latestChargePayment.deliveryId,
+        provider: latestChargePayment.provider,
+        paymentStatus: "pending",
+        providerReference: latestChargePayment.providerReference,
+        verificationCheckedAt: verification.verifiedAt
+      }
+    };
+  }
+
+  await deps.payments.updateStatus(latestChargePayment.paymentId, verification.status, {
+    verifiedAt: verification.verifiedAt,
+    ...(verification.failureReason === undefined
+      ? {}
+      : { failureReason: verification.failureReason })
+  });
+  await deps.deliveries.updatePaymentStatus(input.deliveryId, verification.status);
+
+  const payment: PaymentRecord = {
+    ...latestChargePayment,
+    status: verification.status,
+    verifiedAt: verification.verifiedAt,
+    ...(verification.failureReason === undefined
+      ? {}
+      : { failureReason: verification.failureReason })
+  };
+
+  return {
+    payment,
+    response: {
+      paymentId: payment.paymentId,
+      deliveryId: payment.deliveryId,
+      provider: payment.provider,
+      paymentStatus: verification.status,
+      providerReference: payment.providerReference,
+      verificationCheckedAt: verification.verifiedAt
+    }
   };
 }
