@@ -12,6 +12,7 @@ describe("pricing", () => {
         weightKg: 1.5,
         sizeTier: "standard",
         serviceType: "standard",
+        doorstepRequested: false,
         isFragile: false,
         declaredValueGhs: 300
       })
@@ -26,6 +27,7 @@ describe("pricing", () => {
         weightKg: 7,
         sizeTier: "bulky",
         serviceType: "standard",
+        doorstepRequested: false,
         isFragile: false,
         declaredValueGhs: 500
       })
@@ -40,6 +42,7 @@ describe("pricing", () => {
         weightKg: 15,
         sizeTier: "standard",
         serviceType: "standard",
+        doorstepRequested: false,
         isFragile: false,
         declaredValueGhs: 300
       })
@@ -54,6 +57,7 @@ describe("pricing", () => {
         weightKg: 3,
         sizeTier: "standard",
         serviceType: "express",
+        doorstepRequested: false,
         isFragile: true,
         declaredValueGhs: 2500
       })
@@ -67,12 +71,29 @@ describe("pricing", () => {
         destinationStationId: "ST-KMS-01",
         weightKg: 2,
         sizeTier: "standard",
-        serviceType: "doorstep",
+        serviceType: "standard",
+        doorstepRequested: true,
         isFragile: false,
         declaredValueGhs: 100,
         doorstepDistanceKm: 6
       })
     ).toBe(75);
+  });
+
+  it("allows express service and doorstep surcharge on the same booking", () => {
+    expect(
+      calculateDeliveryQuote({
+        originStationId: "ST-ACC-01",
+        destinationStationId: "ST-KMS-01",
+        weightKg: 1,
+        sizeTier: "standard",
+        serviceType: "express",
+        doorstepRequested: true,
+        isFragile: false,
+        declaredValueGhs: 100,
+        doorstepDistanceKm: 4
+      })
+    ).toBe(65);
   });
 
   it("uses the lower doorstep surcharge band for nearby final-mile delivery", () => {
@@ -82,7 +103,8 @@ describe("pricing", () => {
         destinationStationId: "ST-TML-01",
         weightKg: 2,
         sizeTier: "standard",
-        serviceType: "doorstep",
+        serviceType: "standard",
+        doorstepRequested: true,
         isFragile: false,
         declaredValueGhs: 150,
         doorstepDistanceKm: 3
@@ -97,7 +119,8 @@ describe("pricing", () => {
         destinationStationId: "ST-KMS-01",
         weightKg: 1,
         sizeTier: "standard",
-        serviceType: "doorstep",
+        serviceType: "standard",
+        doorstepRequested: true,
         isFragile: false,
         declaredValueGhs: 150
       })
@@ -112,6 +135,7 @@ describe("pricing", () => {
         weightKg: 1,
         sizeTier: "standard",
         serviceType: "standard",
+        doorstepRequested: false,
         isFragile: false,
         declaredValueGhs: 100
       })
@@ -124,6 +148,7 @@ describe("pricing", () => {
         weightKg: 21,
         sizeTier: "standard",
         serviceType: "standard",
+        doorstepRequested: false,
         isFragile: false,
         declaredValueGhs: 100
       })
@@ -138,6 +163,7 @@ describe("pricing", () => {
         weightKg: 5,
         sizeTier: "oversized",
         serviceType: "standard",
+        doorstepRequested: false,
         isFragile: false,
         declaredValueGhs: 200
       })
@@ -149,11 +175,27 @@ describe("pricing", () => {
         destinationStationId: "ST-TML-01",
         weightKg: 2,
         sizeTier: "standard",
-        serviceType: "doorstep",
+        serviceType: "standard",
+        doorstepRequested: true,
         isFragile: false,
         declaredValueGhs: 200,
         doorstepDistanceKm: 11
       })
     ).toThrow("Doorstep not available beyond 10km in v1.");
+  });
+
+  it("rejects declared values above the self-serve threshold", () => {
+    expect(() =>
+      calculateDeliveryQuote({
+        originStationId: "ST-KMS-01",
+        destinationStationId: "ST-ACC-01",
+        weightKg: 2,
+        sizeTier: "standard",
+        serviceType: "standard",
+        doorstepRequested: false,
+        isFragile: false,
+        declaredValueGhs: 5001
+      })
+    ).toThrow("Declared value above GHS 5,000 is not self-serve in v1.");
   });
 });

@@ -8,3 +8,4 @@ export const adminSurfaces = [
   "AdminSettings"
 ] as const;
 
+export const adminImplementationStatus = "contract_only" as const;
