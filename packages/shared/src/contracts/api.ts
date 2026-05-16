@@ -448,6 +448,27 @@ export const escalateIssueRequestSchema = z.object({
   note: z.string().trim().min(5).max(400)
 });
 
+export const resolveIssueRequestSchema = z.object({
+  nextStatus: z.enum(["in_review", "resolved", "closed"]),
+  resolutionCode: z.enum([
+    "station_confirmed",
+    "delivery_completed",
+    "refund_approved",
+    "sender_withdrew",
+    "duplicate_report",
+    "policy_denied"
+  ]).optional(),
+  note: z.string().trim().min(5).max(400)
+}).superRefine((value, ctx) => {
+  if ((value.nextStatus === "resolved" || value.nextStatus === "closed") && !value.resolutionCode) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "resolutionCode is required when resolving or closing an issue.",
+      path: ["resolutionCode"]
+    });
+  }
+});
+
 export const issueResponseSchema = z.object({
   issueId: issueIdSchema,
   deliveryId: deliveryIdSchema,
@@ -463,6 +484,12 @@ export const issueResponseSchema = z.object({
   escalatedAt: z.string().datetime().optional(),
   escalatedByActorId: userIdSchema.optional(),
   escalationReasonCode: z.string().trim().min(3).max(80).optional(),
+  resolvedAt: z.string().datetime().optional(),
+  resolvedByActorId: userIdSchema.optional(),
+  closedAt: z.string().datetime().optional(),
+  closedByActorId: userIdSchema.optional(),
+  resolutionCode: z.string().trim().min(3).max(80).optional(),
+  resolutionNote: z.string().trim().min(5).max(400).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 });

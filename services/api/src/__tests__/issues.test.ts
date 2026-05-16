@@ -5,6 +5,8 @@ import {
   escalateSupportIssue,
   getSupportIssue,
   listSupportIssues
+  ,
+  resolveSupportIssue
 } from "../issues";
 import type { DeliveryRecord } from "../deliveries";
 
@@ -343,6 +345,85 @@ describe("support issue services", () => {
           status: "open"
         }
       ]
+    });
+  });
+
+  it("moves escalated issues through resolution for support admins", async () => {
+    const response = await resolveSupportIssue(
+      {
+        userId: "USR-SUP-001",
+        role: "support_admin",
+        capabilities: [],
+        authMethod: "firebase_id_token"
+      },
+      "ISS-9303",
+      {
+        nextStatus: "resolved",
+        resolutionCode: "refund_approved",
+        note: "Customer was refunded and notified."
+      },
+      {
+        deliveries: {
+          create() {
+            return resolveVoid();
+          },
+          getById() {
+            return resolve(makeDelivery());
+          },
+          getByTrackingCode() {
+            return resolve(undefined);
+          },
+          updatePaymentStatus() {
+            return resolveVoid();
+          }
+        },
+        issues: {
+          create() {
+            return resolveVoid();
+          },
+          getById() {
+            return resolve({
+              issueId: "ISS-9303",
+              deliveryId: "DEL-9301",
+              status: "escalated" as const,
+              severity: "p1" as const,
+              category: "payment" as const,
+              summary: "Customer charged twice",
+              reporter: {
+                actorId: "USR-SND-001",
+                actorRole: "sender" as const
+              },
+              createdAt: "2026-05-16T14:30:00.000Z",
+              updatedAt: "2026-05-16T15:00:00.000Z"
+            });
+          },
+          save(issue) {
+            expect(issue.status).toBe("resolved");
+            expect(issue.resolutionCode).toBe("refund_approved");
+            return resolveVoid();
+          },
+          listByDeliveryId() {
+            return resolve([]);
+          },
+          listRecent() {
+            return resolve([]);
+          },
+          listByDeliveryIds() {
+            return resolve([]);
+          },
+          countOpenByStation() {
+            return resolve(0);
+          }
+        },
+        now: () => "2026-05-16T15:15:00.000Z"
+      }
+    );
+
+    expect(response.response).toMatchObject({
+      issueId: "ISS-9303",
+      status: "resolved",
+      resolutionCode: "refund_approved",
+      resolvedByActorId: "USR-SUP-001"
     });
   });
 });

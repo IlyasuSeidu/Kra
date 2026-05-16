@@ -5,6 +5,7 @@ import {
   issueListQuerySchema,
   issueListResponseSchema,
   issueResponseSchema,
+  resolveIssueRequestSchema,
   type Capability,
   type Role
 } from "@kra/shared";
@@ -30,6 +31,12 @@ export interface SupportIssueRecord {
   escalatedAt?: string;
   escalatedByActorId?: string;
   escalationReasonCode?: string;
+  resolvedAt?: string;
+  resolvedByActorId?: string;
+  closedAt?: string;
+  closedByActorId?: string;
+  resolutionCode?: string;
+  resolutionNote?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +77,12 @@ export interface EscalateSupportIssueDeps {
   now: () => string;
 }
 
+export interface ResolveSupportIssueDeps {
+  deliveries: DeliveryRepository;
+  issues: SupportIssueRepository;
+  now: () => string;
+}
+
 export type IssueResponse = z.infer<typeof issueResponseSchema>;
 export type IssueListResponse = z.infer<typeof issueListResponseSchema>;
 
@@ -100,6 +113,12 @@ function toIssueResponse(issue: SupportIssueRecord): IssueResponse {
     ...(issue.escalationReasonCode === undefined
       ? {}
       : { escalationReasonCode: issue.escalationReasonCode }),
+    ...(issue.resolvedAt === undefined ? {} : { resolvedAt: issue.resolvedAt }),
+    ...(issue.resolvedByActorId === undefined ? {} : { resolvedByActorId: issue.resolvedByActorId }),
+    ...(issue.closedAt === undefined ? {} : { closedAt: issue.closedAt }),
+    ...(issue.closedByActorId === undefined ? {} : { closedByActorId: issue.closedByActorId }),
+    ...(issue.resolutionCode === undefined ? {} : { resolutionCode: issue.resolutionCode }),
+    ...(issue.resolutionNote === undefined ? {} : { resolutionNote: issue.resolutionNote }),
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt
   });
@@ -141,6 +160,18 @@ function assertEscalationCapability(principal: AuthPrincipal): void {
 
   if (!hasCapability) {
     throw new ApiServiceError("FORBIDDEN", "Principal cannot escalate support issues.", {
+      userId: principal.userId,
+      role: principal.role
+    });
+  }
+}
+
+function assertIssueManagementCapability(principal: AuthPrincipal): void {
+  const allowedCapabilities: Capability[] = ["manage_issue_thread", "resolve_operational_issue"];
+  const hasCapability = allowedCapabilities.some((capability) => canPerform(principal.role, capability));
+
+  if (!hasCapability) {
+    throw new ApiServiceError("FORBIDDEN", "Principal cannot manage support issues.", {
       userId: principal.userId,
       role: principal.role
     });
@@ -355,5 +386,90 @@ export async function escalateSupportIssue(
   return {
     issue: escalatedIssue,
     response: toIssueResponse(escalatedIssue)
+  };
+}
+
+export async function resolveSupportIssue(
+  principal: AuthPrincipal,
+  issueId: string,
+  input: z.input<typeof resolveIssueRequestSchema>,
+  deps: ResolveSupportIssueDeps
+): Promise<{
+  issue: SupportIssueRecord;
+  response: IssueResponse;
+}> {
+  assertAdminPrincipal(principal);
+  assertIssueManagementCapability(principal);
+
+  const parsedInput = resolveIssueRequestSchema.parse(input);
+  const issue = await deps.issues.getById(issueId);
+
+  if (!issue) {
+    throw new ApiServiceError("NOT_FOUND", "Support issue was not found.", {
+      issueId
+    });
+  }
+
+  const delivery = await deps.deliveries.getById(issue.deliveryId);
+
+  if (!delivery) {
+    throw new ApiServiceError("NOT_FOUND", "Delivery linked to this issue was not found.", {
+      issueId,
+      deliveryId: issue.deliveryId
+    });
+  }
+
+  if (parsedInput.nextStatus === "in_review" && issue.status !== "open") {
+    throw new ApiServiceError("INVALID_STATUS_TRANSITION", "Only open issues can move to in review.", {
+      issueId,
+      currentStatus: issue.status,
+      nextStatus: parsedInput.nextStatus
+    });
+  }
+
+  if (parsedInput.nextStatus === "resolved" && issue.status === "closed") {
+    throw new ApiServiceError("INVALID_STATUS_TRANSITION", "Closed issues cannot be resolved again.", {
+      issueId,
+      currentStatus: issue.status,
+      nextStatus: parsedInput.nextStatus
+    });
+  }
+
+  if (parsedInput.nextStatus === "closed" && issue.status !== "resolved") {
+    throw new ApiServiceError("INVALID_STATUS_TRANSITION", "Only resolved issues can be closed.", {
+      issueId,
+      currentStatus: issue.status,
+      nextStatus: parsedInput.nextStatus
+    });
+  }
+
+  const timestamp = deps.now();
+  const resolvedIssue: SupportIssueRecord = {
+    ...issue,
+    status: parsedInput.nextStatus,
+    resolutionNote: parsedInput.note,
+    ...(parsedInput.resolutionCode === undefined
+      ? {}
+      : { resolutionCode: parsedInput.resolutionCode }),
+    ...(parsedInput.nextStatus === "resolved"
+      ? {
+          resolvedAt: timestamp,
+          resolvedByActorId: principal.userId
+        }
+      : {}),
+    ...(parsedInput.nextStatus === "closed"
+      ? {
+          closedAt: timestamp,
+          closedByActorId: principal.userId
+        }
+      : {}),
+    updatedAt: timestamp
+  };
+
+  await deps.issues.save(resolvedIssue);
+
+  return {
+    issue: resolvedIssue,
+    response: toIssueResponse(resolvedIssue)
   };
 }

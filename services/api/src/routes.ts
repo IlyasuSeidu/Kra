@@ -42,6 +42,7 @@ import {
   requestPhoneVerificationChallengeResponseSchema,
   recordFailedAttemptRequestSchema,
   receiveDestinationRequestSchema,
+  resolveIssueRequestSchema,
   verifyPhoneResponseSchema,
   verifyPhoneRequestSchema,
   type Capability
@@ -346,6 +347,17 @@ export const apiRoutes = [
     capability: "escalate_case",
     idempotent: true,
     requestSchema: escalateIssueRequestSchema,
+    responseSchema: issueResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "resolve_issue",
+    method: "POST",
+    path: "/v1/issues/:id/resolve",
+    module: "issues",
+    authScope: "admin",
+    idempotent: true,
+    requestSchema: resolveIssueRequestSchema,
     responseSchema: issueResponseSchema,
     errorSchema: apiErrorResponseSchema
   },

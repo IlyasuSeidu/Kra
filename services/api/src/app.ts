@@ -20,6 +20,7 @@ import {
   receiveDestinationRequestSchema,
   refundPaymentRequestSchema,
   requestPhoneVerificationChallengeRequestSchema,
+  resolveIssueRequestSchema,
   settleRefundRequestSchema,
   type Capability,
   verifyPhoneRequestSchema
@@ -92,6 +93,7 @@ import {
   escalateSupportIssue,
   getSupportIssue,
   listSupportIssues,
+  resolveSupportIssue,
   type SupportIssueIdentityFactory,
   type SupportIssueRepository
 } from "./issues";
@@ -580,6 +582,21 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         assertAdminPrincipal(principal);
         assertCapabilityForPrincipal(principal, capability);
       };
+    const requireIssueManagement = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+
+      if (
+        principal.role !== "ops_admin" &&
+        principal.role !== "support_admin" &&
+        principal.role !== "super_admin"
+      ) {
+        throw new ApiServiceError("FORBIDDEN", "Issue management scope is required.", {
+          userId: principal.userId,
+          role: principal.role
+        });
+      }
+    };
     const requireFinanceAdmin = async (request: FastifyRequest) => {
       const principal = await authenticateRequest(request, deps.authVerifier);
       assertAdminPrincipal(principal);
@@ -1260,6 +1277,29 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         statusCode: 200,
         responseBody: (
           await escalateSupportIssue(principal, issueId, input, {
+            deliveries: deps.deliveries,
+            issues: deps.issues,
+            now: deps.now
+          })
+        ).response
+      }));
+    });
+
+    rateLimitedApp.post("/v1/issues/:id/resolve", { preHandler: [adminMutationPreHandler, requireIssueManagement] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = resolveIssueRequestSchema.parse(request.body);
+      const issueId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "resolve_issue",
+        fingerprint: {
+          issueId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: (
+          await resolveSupportIssue(principal, issueId, input, {
             deliveries: deps.deliveries,
             issues: deps.issues,
             now: deps.now

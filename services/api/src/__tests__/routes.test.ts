@@ -133,5 +133,9 @@ describe("api routes", () => {
       authScope: "admin",
       capability: "escalate_case"
     });
+    expect(getApiRoute("resolve_issue")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/issues/:id/resolve"
+    });
   });
 });

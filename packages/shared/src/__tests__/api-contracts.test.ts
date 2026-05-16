@@ -28,6 +28,7 @@ import {
   receiveDestinationRequestSchema,
   refundPaymentRequestSchema,
   refundPaymentResponseSchema,
+  resolveIssueRequestSchema,
   settleRefundRequestSchema,
   settleRefundResponseSchema,
   verifyPhoneResponseSchema
@@ -170,6 +171,17 @@ describe("api contracts", () => {
 
   it("accepts issue, audit, and reconciliation list response contracts", () => {
     expect(
+      resolveIssueRequestSchema.parse({
+        nextStatus: "resolved",
+        resolutionCode: "refund_approved",
+        note: "Refund approved and sender informed."
+      })
+    ).toMatchObject({
+      nextStatus: "resolved",
+      resolutionCode: "refund_approved"
+    });
+
+    expect(
       issueListResponseSchema.parse({
         issues: [
           {
@@ -184,7 +196,11 @@ describe("api contracts", () => {
               actorRole: "sender"
             },
             createdAt: "2026-05-16T14:00:00.000Z",
-            updatedAt: "2026-05-16T14:05:00.000Z"
+            updatedAt: "2026-05-16T14:05:00.000Z",
+            resolvedAt: "2026-05-16T14:10:00.000Z",
+            resolvedByActorId: "USR-SUP-001",
+            resolutionCode: "refund_approved",
+            resolutionNote: "Refund approved and sender informed."
           }
         ]
       })
