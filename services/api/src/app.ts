@@ -20,12 +20,14 @@ import {
   refundPaymentRequestSchema,
   requestPhoneVerificationChallengeRequestSchema,
   settleRefundRequestSchema,
+  type Capability,
   verifyPhoneRequestSchema
 } from "@kra/shared";
 import { ZodError } from "zod";
 
 import {
   assertAdminPrincipal,
+  assertCanAccessDelivery,
   assertAuthenticatedPrincipal,
   assertCapabilityForPrincipal,
   createFirebaseAuthVerifier,
@@ -205,6 +207,14 @@ async function authenticateRequest(
   request.principal = principal;
 
   return principal;
+}
+
+function getAuthenticatedPrincipal(request: {
+  principal?: AuthPrincipal;
+}): AuthPrincipal {
+  assertAuthenticatedPrincipal(request.principal);
+
+  return request.principal;
 }
 
 function verifyWebhookSignature(
@@ -410,10 +420,75 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       timeWindow: "1 minute",
       skipOnError: false
     });
+    const requireAuthenticated = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAuthenticatedPrincipal(principal);
+    };
+    const requireCapability = (capability: Capability) =>
+      async (request: FastifyRequest) => {
+        const principal = await authenticateRequest(request, deps.authVerifier);
+        assertCapabilityForPrincipal(principal, capability);
+      };
+    const requireAdmin = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
+    };
+    const requireAdminCapability = (capability: Capability) =>
+      async (request: FastifyRequest) => {
+        const principal = await authenticateRequest(request, deps.authVerifier);
+        assertAdminPrincipal(principal);
+        assertCapabilityForPrincipal(principal, capability);
+      };
+    const requireFinanceAdmin = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      assertAdminPrincipal(principal);
 
-    rateLimitedApp.post("/v1/deliveries", { preHandler: createDeliveryPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
+      if (principal.role !== "finance_admin" && principal.role !== "super_admin") {
+        throw new ApiServiceError("FORBIDDEN", "Finance admin scope is required.", {
+          userId: principal.userId,
+          role: principal.role
+        });
+      }
+    };
+    const requirePaymentInitializationAccess = async (request: FastifyRequest) => {
       const principal = await authenticateRequest(request, deps.authVerifier);
       assertCapabilityForPrincipal(principal, "create_delivery");
+      const input = paymentInitializeRequestSchema.parse(request.body);
+      const delivery = await deps.deliveries.getById(input.deliveryId);
+
+      if (!delivery) {
+        throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+          deliveryId: input.deliveryId
+        });
+      }
+
+      if (principal.userId !== delivery.senderId) {
+        throw new ApiServiceError(
+          "FORBIDDEN",
+          "Payment initialization is restricted to the delivery sender.",
+          {
+            deliveryId: input.deliveryId,
+            userId: principal.userId
+          }
+        );
+      }
+    };
+    const requirePaymentVerificationAccess = async (request: FastifyRequest) => {
+      const principal = await authenticateRequest(request, deps.authVerifier);
+      const input = paymentVerifyRequestSchema.parse(request.body);
+      const delivery = await deps.deliveries.getById(input.deliveryId);
+
+      if (!delivery) {
+        throw new ApiServiceError("NOT_FOUND", "Delivery was not found.", {
+          deliveryId: input.deliveryId
+        });
+      }
+
+      assertCanAccessDelivery(principal, delivery);
+    };
+
+    rateLimitedApp.post("/v1/deliveries", { preHandler: [createDeliveryPreHandler, requireCapability("create_delivery")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = createDeliveryRequestSchema.parse(request.body);
       const result = await createDeliveryBooking(
         principal.userId,
@@ -442,8 +517,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       return result.response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/cancel", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/deliveries/:id/cancel", { preHandler: [authenticatedMutationPreHandler, requireCapability("cancel_eligible_delivery")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = cancelDeliveryRequestSchema.parse(request.body);
 
       return (
@@ -465,18 +540,16 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.get("/v1/deliveries/:id", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAuthenticatedPrincipal(principal);
+    rateLimitedApp.get("/v1/deliveries/:id", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
       setNoStore(reply);
       return getDeliveryDetail(principal, (request.params as { id: string }).id, {
         deliveries: deps.deliveries
       });
     });
 
-    rateLimitedApp.get("/v1/deliveries/:id/timeline", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAuthenticatedPrincipal(principal);
+    rateLimitedApp.get("/v1/deliveries/:id/timeline", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
       setNoStore(reply);
       return getDeliveryTimeline(principal, (request.params as { id: string }).id, {
         deliveries: deps.deliveries,
@@ -535,9 +608,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/payments/initialize", { preHandler: paymentInitializePreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertCapabilityForPrincipal(principal, "create_delivery");
+    rateLimitedApp.post("/v1/payments/initialize", { preHandler: [paymentInitializePreHandler, requirePaymentInitializationAccess] }, async (request: FastifyRequest) => {
       const input = paymentInitializeRequestSchema.parse(request.body);
 
       return (
@@ -551,9 +622,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/payments/verify", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAuthenticatedPrincipal(principal);
+    rateLimitedApp.post("/v1/payments/verify", { preHandler: [authenticatedMutationPreHandler, requirePaymentVerificationAccess] }, async (request: FastifyRequest) => {
       const input = paymentVerifyRequestSchema.parse(request.body);
 
       return (
@@ -572,10 +641,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/payments/refund", { preHandler: adminMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAdminPrincipal(principal);
-      assertCapabilityForPrincipal(principal, "execute_refund");
+    rateLimitedApp.post("/v1/payments/refund", { preHandler: [adminMutationPreHandler, requireAdminCapability("execute_refund")] }, async (request: FastifyRequest) => {
       const input = refundPaymentRequestSchema.parse(request.body);
 
       return (
@@ -600,10 +666,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/payments/refund/settle", { preHandler: adminMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAdminPrincipal(principal);
-      assertCapabilityForPrincipal(principal, "execute_refund");
+    rateLimitedApp.post("/v1/payments/refund/settle", { preHandler: [adminMutationPreHandler, requireAdminCapability("execute_refund")] }, async (request: FastifyRequest) => {
       const input = settleRefundRequestSchema.parse(request.body);
 
       return (
@@ -655,8 +718,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/intake", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/deliveries/:id/intake", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_intake")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = confirmIntakeRequestSchema.parse(request.body);
 
       return (
@@ -682,8 +745,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/assign-driver", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/deliveries/:id/assign-driver", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_driver")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = assignDriverRequestSchema.parse(request.body);
 
       return (
@@ -704,8 +767,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/dispatch", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/deliveries/:id/dispatch", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_dispatch")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = dispatchDeliveryRequestSchema.parse(request.body);
 
       return (
@@ -728,8 +791,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/receive-destination", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/deliveries/:id/receive-destination", { preHandler: [authenticatedMutationPreHandler, requireCapability("confirm_destination_receipt")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = receiveDestinationRequestSchema.parse(request.body);
 
       return (
@@ -754,8 +817,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/assign-final-mile", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/deliveries/:id/assign-final-mile", { preHandler: [authenticatedMutationPreHandler, requireCapability("assign_final_mile")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = assignFinalMileRequestSchema.parse(request.body);
 
       return (
@@ -776,8 +839,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: [authenticatedMutationPreHandler, requireCapability("complete_delivery_with_proof")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = completeDeliveryRequestSchema.parse(request.body);
 
       return (
@@ -800,8 +863,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.post("/v1/issues", { preHandler: authenticatedMutationPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/issues", { preHandler: [authenticatedMutationPreHandler, requireCapability("open_issue")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = createIssueRequestSchema.parse(request.body);
       const result = await createSupportIssue(principal, input, {
         deliveries: deps.deliveries,
@@ -814,8 +877,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       return result.response;
     });
 
-    rateLimitedApp.get("/v1/issues/:id", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.get("/v1/issues/:id", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
       setNoStore(reply);
       return getSupportIssue(principal, (request.params as { id: string }).id, {
         deliveries: deps.deliveries,
@@ -823,8 +886,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
-    rateLimitedApp.post("/v1/issues/:id/escalate", { preHandler: adminMutationPreHandler }, async (request: FastifyRequest) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
+    rateLimitedApp.post("/v1/issues/:id/escalate", { preHandler: [adminMutationPreHandler, requireAdminCapability("escalate_case")] }, async (request: FastifyRequest) => {
+      const principal = getAuthenticatedPrincipal(request);
       const input = escalateIssueRequestSchema.parse(request.body);
 
       return (
@@ -836,9 +899,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       ).response;
     });
 
-    rateLimitedApp.get("/v1/admin/overview", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAdminPrincipal(principal);
+    rateLimitedApp.get("/v1/admin/overview", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
       setNoStore(reply);
       return getAdminOverview({
         deliveries: deps.deliveries,
@@ -848,9 +909,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
-    rateLimitedApp.get("/v1/admin/deliveries", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAdminPrincipal(principal);
+    rateLimitedApp.get("/v1/admin/deliveries", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
       setNoStore(reply);
       return listAdminDeliveries({
         deliveries: deps.deliveries,
@@ -858,9 +917,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
-    rateLimitedApp.get("/v1/admin/stations", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAdminPrincipal(principal);
+    rateLimitedApp.get("/v1/admin/stations", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
       setNoStore(reply);
       return listAdminStations({
         deliveries: deps.deliveries,
@@ -869,17 +926,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
-    rateLimitedApp.get("/v1/admin/finance", { preHandler: authenticatedReadPreHandler }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const principal = await authenticateRequest(request, deps.authVerifier);
-      assertAdminPrincipal(principal);
-
-      if (principal.role !== "finance_admin" && principal.role !== "super_admin") {
-        throw new ApiServiceError("FORBIDDEN", "Finance admin scope is required.", {
-          userId: principal.userId,
-          role: principal.role
-        });
-      }
-
+    rateLimitedApp.get("/v1/admin/finance", { preHandler: [authenticatedReadPreHandler, requireFinanceAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
       setNoStore(reply);
       return listAdminFinance({
         payments: deps.payments,
