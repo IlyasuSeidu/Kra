@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import {
   assignDriverRequestSchema,
@@ -278,6 +279,13 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
   const app = Fastify({
     logger: false,
     genReqId: () => deps.identityFactory.nextRequestId()
+  });
+
+  void app.register(rateLimit, {
+    global: true,
+    max: 120,
+    timeWindow: "1 minute",
+    skipOnError: false
   });
 
   app.setErrorHandler((error: Error, request: FastifyRequest, reply: FastifyReply) => {
