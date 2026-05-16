@@ -57,5 +57,11 @@ Business logic should live in application services, not in route handlers and no
 - notification tasks retry up to `3` times before human review
 - unrecoverable async failures move into dead-letter review queues
 
+## Outbound Notification Outbox
+- Customer-facing SMS is persisted in `outbound_notifications` before provider dispatch.
+- Outbox records carry `status`, `attemptCount`, `nextAttemptAt`, provider, channel, dedupe key, delivery ID, recipient phone, and last error metadata.
+- Receiver SMS uses a stricter v1 policy than generic notification tasks: first attempt plus one retry after `30 minutes`, then `dead_letter`.
+- Delivery lifecycle writes remain authoritative even when the SMS provider is degraded; operations recover from the outbox instead of losing the event.
+
 ## Baseline Status
 This file is now concrete enough to guide backend scaffolding and async workflow design.

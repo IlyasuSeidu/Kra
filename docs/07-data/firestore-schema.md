@@ -10,6 +10,7 @@
 - `payments`
 - `support_issues`
 - `notifications`
+- `outbound_notifications`
 - `ratings`
 
 ## Suggested Document Shape
@@ -50,6 +51,14 @@ Store current delivery summary on the delivery document and keep detailed histor
 ### `support_issues/{issueId}`
 - issue status, category, severity, and linked delivery
 
+### `outbound_notifications/{outboundNotificationId}`
+- channel, provider, and notification kind
+- delivery ID and dedupe key
+- recipient destination, such as receiver phone
+- provider payload fields needed to retry safely
+- `pending`, `sent`, `failed`, or `dead_letter` status
+- attempt count, next attempt time, sent time, and last error metadata
+
 ### `audit_events/{eventId}`
 - admin and privileged-action audit records
 
@@ -60,6 +69,8 @@ Store current delivery summary on the delivery document and keep detailed histor
   - `deliveries` by `destinationStationId + currentStatus`
   - `payments` by `providerReference`
   - `support_issues` by `status + severity + createdAt`
+  - `outbound_notifications` by `dedupeKey`
+  - `outbound_notifications` by `status + nextAttemptAt`
 - station queues query only current delivery summary, not full event collections
 
 ## Partition And Archive Rule
@@ -68,7 +79,7 @@ Store current delivery summary on the delivery document and keep detailed histor
 - Event collections remain immutable and may be retained longer than hot query windows.
 
 ## Security Alignment Rule
-- Client writes to `events`, `payments`, and `audit_events` are blocked.
+- Client writes to `events`, `payments`, `outbound_notifications`, and `audit_events` are blocked.
 - Client reads are limited by sender ownership, assignment scope, or station scope.
 
 ## Baseline Status

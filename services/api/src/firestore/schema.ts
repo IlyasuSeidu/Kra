@@ -7,6 +7,7 @@ import type { SupportIssueRecord } from "../issues";
 import type { WebhookEventRecord } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
 import type { NotificationRecord } from "../notification-feed";
+import type { OutboundNotificationRecord } from "../outbound-notifications";
 import type { AuditEventRecord } from "../audit";
 import type { StationRecord } from "../stations";
 import type {
@@ -20,6 +21,7 @@ export const firestoreCollections = {
   users: "users",
   stations: "stations",
   notifications: "notifications",
+  outboundNotifications: "outbound_notifications",
   deliveries: "deliveries",
   deliveryEvents: "events",
   payments: "payments",
@@ -36,6 +38,7 @@ export const firestoreCollections = {
 export type UserDocument = UserRecord;
 export type StationDocument = StationRecord;
 export type NotificationDocument = NotificationRecord;
+export type OutboundNotificationDocument = OutboundNotificationRecord;
 export interface DeliveryDocument extends DeliveryRecord {
   updatedAt: string;
 }
@@ -72,6 +75,8 @@ function createPassThroughConverter<T extends DocumentData>(): FirestoreDataConv
 export const userConverter = createPassThroughConverter<UserDocument>();
 export const stationConverter = createPassThroughConverter<StationDocument>();
 export const notificationConverter = createPassThroughConverter<NotificationDocument>();
+export const outboundNotificationConverter =
+  createPassThroughConverter<OutboundNotificationDocument>();
 export const deliveryConverter = createPassThroughConverter<DeliveryDocument>();
 export const paymentConverter = createPassThroughConverter<PaymentDocument>();
 export const deliveryEventConverter = createPassThroughConverter<DeliveryEventDocument>();
@@ -97,6 +102,10 @@ export function stationDocumentPath(stationId: string): string {
 
 export function notificationDocumentPath(notificationId: string): string {
   return `${firestoreCollections.notifications}/${notificationId}`;
+}
+
+export function outboundNotificationDocumentPath(outboundNotificationId: string): string {
+  return `${firestoreCollections.outboundNotifications}/${outboundNotificationId}`;
 }
 
 export function deliveryDocumentPath(deliveryId: string): string {

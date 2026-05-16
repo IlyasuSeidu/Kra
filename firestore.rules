@@ -56,6 +56,10 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /outbound_notifications/{outboundNotificationId} {
+      allow read, write: if false;
+    }
+
     match /deliveries/{deliveryId} {
       allow read: if isAuthenticated() && canReadDelivery(resource.data);
       allow create, update, delete: if false;
