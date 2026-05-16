@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import {
   acceptFinalMileAssignmentRequestSchema,
   acceptRunRequestSchema,
+  adminUpdateStationValidationRequestSchema,
   adminUpdateStationStatusRequestSchema,
   adminUpdateUserAccessRequestSchema,
   adminUpsertUserRequestSchema,
@@ -149,7 +150,7 @@ import {
   type RefundPaymentRepository
 } from "./refunds";
 import { ApiServiceError } from "./service-errors";
-import { updateStationStatus, type StationRepository } from "./stations";
+import { updateStationStatus, updateStationValidation, type StationRepository } from "./stations";
 import {
   listAdminUsers,
   updateAdminUserAccess,
@@ -1829,6 +1830,25 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       }, async () => ({
         statusCode: 200,
         responseBody: await updateStationStatus(stationId, input, {
+          stations: deps.stations,
+          now: deps.now
+        })
+      }));
+    });
+
+    rateLimitedApp.post("/v1/admin/stations/:id/validation", { preHandler: [adminMutationPreHandler, requireStationManagement] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const input = adminUpdateStationValidationRequestSchema.parse(request.body);
+      const stationId = (request.params as { id: Parameters<StationRepository["getById"]>[0] }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "admin_update_station_validation",
+        fingerprint: {
+          stationId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: await updateStationValidation(stationId, input, {
           stations: deps.stations,
           now: deps.now
         })

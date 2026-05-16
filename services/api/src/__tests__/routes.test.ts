@@ -132,6 +132,11 @@ describe("api routes", () => {
       path: "/v1/admin/stations/:id/status",
       capability: "override_queue_state"
     });
+    expect(getApiRoute("admin_update_station_validation")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/stations/:id/validation",
+      capability: "override_queue_state"
+    });
     expect(getApiRoute("admin_audit_events")).toMatchObject({
       authScope: "admin",
       path: "/v1/admin/audit-events"

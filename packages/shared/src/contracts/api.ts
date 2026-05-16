@@ -679,6 +679,36 @@ export const adminStationServiceAvailabilitySchema = z.object({
   doorstep: z.boolean()
 });
 
+export const stationValidationStatusSchema = z.enum([
+  "not_started",
+  "in_progress",
+  "ready",
+  "blocked"
+]);
+
+export const stationValidationChecklistSchema = z.object({
+  activeOperatorsCanSignIn: z.boolean(),
+  intakeDispatchReceiptAudited: z.boolean(),
+  scanOrManualFallbackTested: z.boolean(),
+  noUnresolvedP1Incidents: z.boolean(),
+  escalationAndRefundHandoffTested: z.boolean(),
+  openingHoursStorageAndHandoffConfirmed: z.boolean()
+});
+
+export const stationValidationResponseSchema = z.object({
+  status: stationValidationStatusSchema,
+  dryRunBusinessDaysCompleted: z.number().int().min(0).max(2),
+  controlledPilotBusinessDaysCompleted: z.number().int().min(0).max(3),
+  checklist: stationValidationChecklistSchema,
+  scanFallbackSuccessRatePercent: z.number().min(0).max(100),
+  goLiveEligible: z.boolean(),
+  blockers: z.array(z.string().trim().min(3).max(160)),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
+  note: z.string().trim().min(3).max(240).optional(),
+  updatedAt: z.string().datetime()
+});
+
 export const adminStationListResponseSchema = z.object({
   generatedAt: z.string().datetime(),
   stations: z.array(
@@ -691,6 +721,7 @@ export const adminStationListResponseSchema = z.object({
       serviceAvailability: adminStationServiceAvailabilitySchema,
       activeQueueCount: z.number().int().nonnegative(),
       issueCount: z.number().int().nonnegative(),
+      validation: stationValidationResponseSchema,
       note: z.string().trim().min(3).max(240).optional(),
       updatedAt: z.string().datetime()
     })
@@ -791,6 +822,24 @@ export const adminUpdateStationStatusResponseSchema = z.object({
   serviceAvailability: adminStationServiceAvailabilitySchema,
   note: z.string().trim().min(3).max(240).optional(),
   updatedAt: z.string().datetime()
+});
+
+export const adminUpdateStationValidationRequestSchema = z.object({
+  dryRunBusinessDaysCompleted: z.number().int().min(0).max(2),
+  controlledPilotBusinessDaysCompleted: z.number().int().min(0).max(3),
+  checklist: stationValidationChecklistSchema,
+  scanFallbackSuccessRatePercent: z.number().min(0).max(100),
+  manualBlockers: z.array(z.string().trim().min(3).max(160)).max(10).optional(),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
+  note: z.string().trim().min(3).max(240).optional()
+});
+
+export const adminUpdateStationValidationResponseSchema = z.object({
+  stationId: stationIdSchema,
+  name: z.string().trim().min(3).max(120),
+  city: z.string().trim().min(2).max(120),
+  validation: stationValidationResponseSchema
 });
 
 export const adminFinanceResponseSchema = z.object({

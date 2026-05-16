@@ -461,6 +461,66 @@ describe("api app", () => {
     });
   });
 
+  it("lets an operations admin update station validation readiness", async () => {
+    const deps = makeAppDeps();
+    let savedStation: unknown;
+
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-OPS-001",
+          role: "ops_admin",
+          capabilities: ["override_queue_state"],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.stations.save = (station) => {
+      savedStation = station;
+      return resolveVoid();
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/admin/stations/ST-ACC-01/validation",
+      headers: {
+        authorization: "Bearer token-ops-admin"
+      },
+      payload: {
+        dryRunBusinessDaysCompleted: 2,
+        controlledPilotBusinessDaysCompleted: 3,
+        checklist: {
+          activeOperatorsCanSignIn: true,
+          intakeDispatchReceiptAudited: true,
+          scanOrManualFallbackTested: true,
+          noUnresolvedP1Incidents: true,
+          escalationAndRefundHandoffTested: true,
+          openingHoursStorageAndHandoffConfirmed: true
+        },
+        scanFallbackSuccessRatePercent: 98
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      stationId: "ST-ACC-01",
+      validation: {
+        status: "ready",
+        goLiveEligible: true,
+        blockers: []
+      }
+    });
+    expect(savedStation).toMatchObject({
+      stationId: "ST-ACC-01",
+      validation: {
+        status: "ready"
+      }
+    });
+  });
+
   it("lists accessible deliveries over the authenticated route surface", async () => {
     const app = createApiApp(makeAppDeps());
     appsToClose.push(app);
