@@ -4,6 +4,7 @@ import { deliveryStatuses } from "@kra/shared";
 import type {
   AdminDeliveryMetricsRepository,
   AdminIssueMetricsRepository,
+  AdminOutboundNotificationRepository,
   AdminPaymentMetricsRepository,
   AdminWebhookMetricsRepository
 } from "../admin";
@@ -299,7 +300,7 @@ function sortOutboundNotificationsByUpdatedAt(
 
 export function createFirestoreOutboundNotificationRepository(
   firestore: Firestore
-): OutboundNotificationRepository {
+): OutboundNotificationRepository & AdminOutboundNotificationRepository {
   const outboundNotificationsCollection = firestore
     .collection(firestoreCollections.outboundNotifications)
     .withConverter(outboundNotificationConverter);
@@ -383,6 +384,11 @@ export function createFirestoreOutboundNotificationRepository(
         .get();
 
       return sortOutboundNotificationsByUpdatedAt(snapshot.docs.map((document) => document.data()));
+    },
+    async countByStatus(status) {
+      const snapshot = await outboundNotificationsCollection.where("status", "==", status).count().get();
+
+      return snapshot.data().count;
     }
   };
 }
@@ -700,6 +706,15 @@ export function createFirestorePaymentRepository(
 
       return snapshot.docs.map((document) => fromPaymentDocument(document.data()));
     },
+    async countReconciliationReviewRequired() {
+      const snapshot = await paymentsCollection
+        .where("status", "==", "pending")
+        .where("reconciliationReviewRequiredAt", ">", "")
+        .count()
+        .get();
+
+      return snapshot.data().count;
+    },
     async getById(paymentId: string) {
       const snapshot = await paymentsCollection.doc(paymentId).get();
 
@@ -989,6 +1004,26 @@ export function createFirestoreHandoffEventRepository(
   };
 }
 
+async function listDeliveryIdsTouchingStation(
+  firestore: Firestore,
+  stationId: DeliveryRecord["originStationId"]
+): Promise<string[]> {
+  const deliveriesCollection = firestore
+    .collection(firestoreCollections.deliveries)
+    .withConverter(deliveryConverter);
+  const [originSnapshot, destinationSnapshot] = await Promise.all([
+    deliveriesCollection.where("originStationId", "==", stationId).get(),
+    deliveriesCollection.where("destinationStationId", "==", stationId).get()
+  ]);
+
+  return [
+    ...new Set([
+      ...originSnapshot.docs.map((document) => document.id),
+      ...destinationSnapshot.docs.map((document) => document.id)
+    ])
+  ];
+}
+
 export function createFirestoreSupportIssueRepository(
   firestore: Firestore,
   now: () => string
@@ -1088,12 +1123,7 @@ export function createFirestoreSupportIssueRepository(
       ).slice(0, input.limit);
     },
     async countOpenByStation(stationId) {
-      const deliveryIdsSnapshot = await firestore
-        .collection(firestoreCollections.deliveries)
-        .withConverter(deliveryConverter)
-        .where("originStationId", "==", stationId)
-        .get();
-      const deliveryIds = deliveryIdsSnapshot.docs.map((document) => document.id);
+      const deliveryIds = await listDeliveryIdsTouchingStation(firestore, stationId);
 
       if (deliveryIds.length === 0) {
         return 0;
@@ -1118,6 +1148,40 @@ export function createFirestoreSupportIssueRepository(
             issue.status === "open" ||
             issue.status === "in_review" ||
             issue.status === "escalated"
+          ).length;
+      }
+
+      return count;
+    },
+    async countOpenP1ByStation(stationId) {
+      const deliveryIds = await listDeliveryIdsTouchingStation(firestore, stationId);
+
+      if (deliveryIds.length === 0) {
+        return 0;
+      }
+
+      const chunks: string[][] = [];
+
+      for (let index = 0; index < deliveryIds.length; index += 10) {
+        chunks.push(deliveryIds.slice(index, index + 10));
+      }
+
+      let count = 0;
+
+      for (const chunk of chunks) {
+        const snapshot = await issuesCollection
+          .where("deliveryId", "in", chunk)
+          .get();
+
+        count += snapshot.docs
+          .map((document) => document.data())
+          .filter((issue) =>
+            issue.severity === "p1" &&
+            (
+              issue.status === "open" ||
+              issue.status === "in_review" ||
+              issue.status === "escalated"
+            )
           ).length;
       }
 

@@ -38,6 +38,7 @@
 - station cannot intake or dispatch reliably
 - missing audit history on core transitions
 - broken sender tracking timeline
+- `GET /v1/admin/launch-readiness` returns `blocked`
 
 ## Baseline Status
 This file is now concrete enough to support sign-off and launch gating.

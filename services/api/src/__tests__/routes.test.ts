@@ -128,6 +128,11 @@ describe("api routes", () => {
       authScope: "admin",
       path: "/v1/admin/finance"
     });
+    expect(getApiRoute("admin_launch_readiness")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/launch-readiness"
+    });
+    expect(getApiRoute("admin_launch_readiness")?.responseSchema).toBeDefined();
     expect(getApiRoute("admin_payment_reconciliation")).toMatchObject({
       authScope: "admin",
       path: "/v1/admin/payment-reconciliation",

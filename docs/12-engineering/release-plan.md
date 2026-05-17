@@ -25,6 +25,7 @@ Do not widen route coverage until operational discipline is proven on the curren
   - `3 business days` of controlled pilot-volume execution
 - Public launch is blocked if any launch station fails readiness.
 - Controlled pilot volume should stay capped until all three stations complete readiness checks.
+- Backend launch gating is read from `GET /v1/admin/launch-readiness`; release approval must not rely on frontend-only status aggregation.
 
 ## Rollout Communications Plan
 - internal pilot brief before station validation

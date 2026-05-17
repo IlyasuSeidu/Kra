@@ -56,6 +56,7 @@
 - `GET /v1/admin/overview`
 - `GET /v1/admin/deliveries`
 - `GET /v1/admin/stations`
+- `GET /v1/admin/launch-readiness`
 - `POST /v1/admin/stations/:id/status`
 - `POST /v1/admin/stations/:id/validation`
 - `GET /v1/admin/finance`
@@ -402,6 +403,68 @@ Response:
   }
 }
 ```
+
+### `GET /v1/admin/launch-readiness`
+Response:
+```json
+{
+  "generatedAt": "2026-05-16T16:00:00.000Z",
+  "goLiveEligible": false,
+  "status": "blocked",
+  "blockers": [
+    {
+      "code": "unresolved_p1_issue",
+      "severity": "p1",
+      "stationId": "ST-ACC-01",
+      "count": 1,
+      "message": "Accra Central has unresolved P1 issues."
+    },
+    {
+      "code": "payment_reconciliation_review",
+      "severity": "p1",
+      "count": 1,
+      "message": "Payment reconciliation review queue must be cleared before launch."
+    }
+  ],
+  "stations": [
+    {
+      "stationId": "ST-ACC-01",
+      "name": "Accra Central",
+      "city": "Accra",
+      "operatingStatus": "active",
+      "intakeStatus": "open",
+      "serviceAvailability": {
+        "standard": true,
+        "express": true,
+        "doorstep": true
+      },
+      "validationStatus": "ready",
+      "goLiveEligible": true,
+      "validationBlockerCount": 0,
+      "activeQueueCount": 5,
+      "unresolvedP1IssueCount": 1,
+      "updatedAt": "2026-05-16T15:00:00.000Z"
+    }
+  ],
+  "systemChecks": {
+    "stationValidation": {
+      "readyStations": 1,
+      "totalStations": 3
+    },
+    "unresolvedP1Issues": {
+      "count": 1
+    },
+    "paymentReconciliation": {
+      "reviewRequiredCount": 1
+    },
+    "receiverSms": {
+      "deadLetterCount": 0
+    }
+  }
+}
+```
+
+Launch readiness is `ready` only when every launch station is go-live eligible, active, open for intake, has launch services enabled, has zero unresolved `P1` issues, payment reconciliation review is clear, and receiver SMS dead-letter backlog is zero.
 
 ## Error Response Format
 All non-2xx responses must use:

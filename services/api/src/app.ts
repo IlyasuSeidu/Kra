@@ -54,12 +54,14 @@ import {
 } from "./auth";
 import {
   getAdminOverview,
+  getAdminLaunchReadiness,
   listAdminDeliveries,
   listAdminFinance,
   listAdminOutboundNotifications,
   listAdminStations,
   type AdminDeliveryMetricsRepository,
   type AdminIssueMetricsRepository,
+  type AdminOutboundNotificationRepository,
   type AdminPaymentMetricsRepository,
   type AdminWebhookMetricsRepository
 } from "./admin";
@@ -216,7 +218,7 @@ export interface ApiAppDeps {
   users: UserRepository;
   stations: StationRepository;
   notificationFeed: NotificationRepository;
-  outboundNotifications: OutboundNotificationRepository;
+  outboundNotifications: OutboundNotificationRepository & AdminOutboundNotificationRepository;
   deliveries: DeliveryRepository &
     DeliveryLifecycleRepository &
     DeliveryListRepository &
@@ -2102,6 +2104,18 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       return listAdminStations({
         deliveries: deps.deliveries,
         issues: deps.issues,
+        stations: deps.stations,
+        now: deps.now
+      });
+    });
+
+    rateLimitedApp.get("/v1/admin/launch-readiness", { preHandler: [authenticatedReadPreHandler, requireAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
+      setNoStore(reply);
+      return getAdminLaunchReadiness({
+        deliveries: deps.deliveries,
+        issues: deps.issues,
+        outboundNotifications: deps.outboundNotifications,
+        payments: deps.payments,
         stations: deps.stations,
         now: deps.now
       });

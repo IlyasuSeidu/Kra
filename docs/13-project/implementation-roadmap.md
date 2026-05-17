@@ -134,6 +134,7 @@
   - `3 business days` controlled pilot volume
 - No launch station has an unresolved `p1` incident.
 - Receiver delivery-link access and SMS-based notifications are verified end-to-end.
+- Backend launch-readiness gate returns `ready` before public pilot volume opens.
 
 ## Critical Path
 1. lifecycle and status model
