@@ -112,9 +112,13 @@ Request:
 {
   "measuredWeightKg": 1.9,
   "sizeTier": "standard",
-  "receivedByUserId": "USR-OP-001"
+  "condition": "ok",
+  "labelScanCode": "PKG-0001"
 }
 ```
+
+Rule:
+- `labelScanCode` is reserved as an immutable `package_labels` binding for this delivery. The same code cannot be reused for another delivery.
 
 ### `POST /v1/deliveries/:id/assign-driver`
 Request:
@@ -128,10 +132,23 @@ Request:
 Request:
 ```json
 {
-  "packageScanCode": "PKG-0001",
-  "dispatchedByUserId": "USR-OP-001"
+  "packageScanCode": "PKG-0001"
 }
 ```
+
+Rule:
+- This endpoint records station dispatch readiness only. Custody remains with the origin station until the assigned driver confirms pickup with the same registered package scan code.
+
+### `POST /v1/deliveries/:id/confirm-pickup`
+Request:
+```json
+{
+  "packageScanCode": "PKG-0001"
+}
+```
+
+Rule:
+- Only the assigned driver can confirm pickup. This is the custody transfer from origin station to driver.
 
 ### `POST /v1/deliveries/:id/receive-destination`
 Request:
@@ -139,9 +156,12 @@ Request:
 {
   "packageScanCode": "PKG-0001",
   "condition": "ok",
-  "receivedByUserId": "USR-OP-002"
+  "nextStep": "doorstep"
 }
 ```
+
+Rule:
+- Destination receipt requires confirmed driver custody and the registered package scan code.
 
 ### `POST /v1/internal/outbound-notifications/dispatch-due`
 Auth:
@@ -378,12 +398,27 @@ Request:
 }
 ```
 
+Rule:
+- Assignment reserves the job for the courier but does not transfer custody.
+
+### `POST /v1/deliveries/:id/accept-final-mile-assignment`
+Request:
+```json
+{
+  "packageScanCode": "PKG-0001",
+  "note": "Courier accepted with scan"
+}
+```
+
+Rule:
+- Only the assigned final-mile courier can accept. This is the custody transfer from destination station to courier.
+
 ### `POST /v1/deliveries/:id/complete`
 Request:
 ```json
 {
   "proofType": "otp",
-  "proofReference": "OTP-VERIFIED",
+  "proofReference": "pvt_live_delivery_scope_token_0001",
   "receivedByName": "Kojo Asante"
 }
 ```
@@ -449,7 +484,7 @@ Response:
 ```
 
 Completion rule:
-- `otp` proof uses an OTP proof reference.
+- `otp` proof uses the active delivery-scoped receiver verification token returned by `/v1/public/track/:trackingCode/verify-phone`.
 - `signature` and `delivery_photo` proof references must be uploaded `PFA-*` proof asset IDs before `/complete` succeeds.
 
 ### `GET /v1/public/track/:trackingCode`

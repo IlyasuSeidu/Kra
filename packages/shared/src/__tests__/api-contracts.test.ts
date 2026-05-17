@@ -456,9 +456,11 @@ describe("api contracts", () => {
 
     expect(
       acceptFinalMileAssignmentRequestSchema.parse({
+        packageScanCode: "PKG-0001",
         note: "Courier accepted assignment"
       })
     ).toEqual({
+      packageScanCode: "PKG-0001",
       note: "Courier accepted assignment"
     });
   });
@@ -585,6 +587,16 @@ describe("api contracts", () => {
       })
     ).toEqual({
       courierUserId: "USR-COR-001"
+    });
+
+    expect(
+      acceptFinalMileAssignmentRequestSchema.parse({
+        packageScanCode: "PKG-0001",
+        note: "Courier accepted with scan"
+      })
+    ).toEqual({
+      packageScanCode: "PKG-0001",
+      note: "Courier accepted with scan"
     });
 
     expect(

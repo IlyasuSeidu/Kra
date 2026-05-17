@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type DeliveryRecord } from "../deliveries";
 import {
+  assertActiveReceiverVerificationToken,
   verifyPublicTrackingPhone,
   type PublicTrackingPhoneChallengeRecord,
   type PublicTrackingVerificationFailedAttemptRecord,
@@ -190,6 +191,82 @@ describe("public tracking phone verification", () => {
       verificationToken: "pvt_live_delivery_scope_token_5001",
       verifiedAt: "2026-05-16T10:00:00.000Z",
       expiresAt: "2026-05-16T10:30:00.000Z"
+    });
+  });
+
+  it("requires the active receiver verification token for OTP delivery completion", async () => {
+    await expect(
+      assertActiveReceiverVerificationToken(
+        {
+          delivery: makeDelivery(),
+          verificationToken: "wrong-token"
+        },
+        {
+          verification: {
+            getActiveGrant() {
+              return resolve(makeGrant());
+            },
+            getLatestChallenge() {
+              return resolve(undefined);
+            },
+            createChallenge() {
+              return resolveVoid();
+            },
+            listFailedAttemptsSince() {
+              return resolve([]);
+            },
+            createFailedAttempt() {
+              return resolveVoid();
+            },
+            consumeChallenge() {
+              return resolveVoid();
+            },
+            createGrant() {
+              return resolveVoid();
+            }
+          },
+          now: () => "2026-05-16T10:00:00.000Z"
+        }
+      )
+    ).rejects.toMatchObject({
+      code: "PHONE_VERIFICATION_REQUIRED"
+    });
+
+    await expect(
+      assertActiveReceiverVerificationToken(
+        {
+          delivery: makeDelivery(),
+          verificationToken: "pvt_live_delivery_scope_token_5001"
+        },
+        {
+          verification: {
+            getActiveGrant() {
+              return resolve(makeGrant());
+            },
+            getLatestChallenge() {
+              return resolve(undefined);
+            },
+            createChallenge() {
+              return resolveVoid();
+            },
+            listFailedAttemptsSince() {
+              return resolve([]);
+            },
+            createFailedAttempt() {
+              return resolveVoid();
+            },
+            consumeChallenge() {
+              return resolveVoid();
+            },
+            createGrant() {
+              return resolveVoid();
+            }
+          },
+          now: () => "2026-05-16T10:00:00.000Z"
+        }
+      )
+    ).resolves.toMatchObject({
+      verificationToken: "pvt_live_delivery_scope_token_5001"
     });
   });
 

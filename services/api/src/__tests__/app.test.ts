@@ -235,6 +235,23 @@ function makeAppDeps(): ApiAppDeps {
         return resolve([]);
       }
     },
+    packageLabels: {
+      getByScanCode() {
+        return resolve({
+          scanCode: "PKG-9401",
+          deliveryId: "DEL-9401",
+          trackingCode: "KRA-9401",
+          originStationId: "ST-ACC-01",
+          destinationStationId: "ST-KMS-01",
+          createdAt: "2026-05-16T15:00:00.000Z",
+          createdByUserId: "USR-OP-001",
+          createdByRole: "station_operator"
+        });
+      },
+      reserveForDelivery(label) {
+        return resolve(label);
+      }
+    },
     deliveryEvents: {
       create() {
         return resolveVoid();
@@ -1191,6 +1208,54 @@ describe("api app", () => {
       reference: "PFA-9401"
     });
     expect(attachedProofAssets).toEqual(["PFA-9401:USR-COR-001"]);
+  });
+
+  it("requires receiver phone verification token before OTP delivery completion", async () => {
+    const deps = makeAppDeps();
+    let currentDelivery = makeDelivery({
+      currentStatus: "out_for_delivery",
+      assignedFinalMileCourierId: "USR-COR-001",
+      currentCustodyRole: "final_mile_courier",
+      currentCustodyActorId: "USR-COR-001"
+    });
+
+    deps.authVerifier.verifyBearerToken = () =>
+      resolve({
+        userId: "USR-COR-001",
+        role: "final_mile_courier",
+        capabilities: ["complete_delivery_with_proof"],
+        authMethod: "firebase_id_token" as const
+      });
+    deps.deliveries.getById = () => resolve(currentDelivery);
+    deps.deliveries.save = (delivery) => {
+      currentDelivery = delivery;
+      return resolveVoid();
+    };
+    deps.verification.getActiveGrant = () => resolve(undefined);
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries/DEL-9401/complete",
+      headers: {
+        authorization: "Bearer token-courier",
+        "idempotency-key": "complete-with-unverified-otp-1"
+      },
+      payload: {
+        proofType: "otp",
+        proofReference: "unverified-token",
+        receivedByName: "Kojo Asante"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "PHONE_VERIFICATION_REQUIRED"
+      }
+    });
   });
 
   it("lets a super admin create a managed user record", async () => {

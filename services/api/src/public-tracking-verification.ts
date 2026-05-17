@@ -449,3 +449,43 @@ export async function verifyPublicTrackingPhone(
     })
   };
 }
+
+export async function assertActiveReceiverVerificationToken(
+  input: {
+    delivery: {
+      deliveryId: string;
+      trackingCode: string;
+      receiver: {
+        phone: string;
+      };
+    };
+    verificationToken: string;
+  },
+  deps: {
+    verification: PublicTrackingVerificationRepository;
+    now: () => string;
+  }
+): Promise<PublicTrackingVerificationGrantRecord> {
+  const activeGrant = await deps.verification.getActiveGrant(
+    input.delivery.trackingCode,
+    input.delivery.receiver.phone,
+    deps.now()
+  );
+
+  if (
+    !activeGrant ||
+    activeGrant.deliveryId !== input.delivery.deliveryId ||
+    activeGrant.verificationToken !== input.verificationToken
+  ) {
+    throw new ApiServiceError(
+      "PHONE_VERIFICATION_REQUIRED",
+      "Receiver phone verification is required before OTP delivery completion.",
+      {
+        deliveryId: input.delivery.deliveryId,
+        trackingCode: input.delivery.trackingCode
+      }
+    );
+  }
+
+  return activeGrant;
+}

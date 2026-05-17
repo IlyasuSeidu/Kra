@@ -20,7 +20,9 @@
 | `INVALID_STATUS_TRANSITION` | `409` | `staff_safe` | `warn` | Requested state change is not allowed from current delivery state | `This delivery cannot move to that state yet.` |
 | `DELIVERY_NOT_PAID` | `409` | `customer_safe` | `warn` | Transport or final-mile action requested before payment confirmation | `Payment must be confirmed before this action.` |
 | `HANDOFF_PROOF_REQUIRED` | `422` | `staff_safe` | `warn` | Staff-to-staff or staff-to-courier handoff is missing mandatory proof | `Required handoff proof is missing.` |
+| `PHONE_VERIFICATION_REQUIRED` | `403` | `staff_safe` | `warn` | OTP completion attempted without an active receiver phone-verification token | `Receiver phone verification is required before completion.` |
 | `PACKAGE_ALREADY_RECEIVED` | `409` | `staff_safe` | `warn` | Duplicate intake or receipt operation attempted | `This package was already received.` |
+| `PACKAGE_SCAN_MISMATCH` | `422` | `staff_safe` | `warn` | Package scan code is missing, unknown, or bound to another delivery | `This scan code does not match the delivery.` |
 | `PACKAGE_NOT_READY_FOR_DISPATCH` | `409` | `staff_safe` | `warn` | Dispatch attempted before intake, payment, or assignment requirements are satisfied | `This package is not ready for dispatch.` |
 | `FINAL_PROOF_REQUIRED` | `422` | `staff_safe` | `warn` | Final delivery completion attempted without accepted proof | `Delivery proof is required to complete this job.` |
 | `FINAL_MILE_NOT_AVAILABLE` | `409` | `customer_safe` | `info` | Doorstep requested outside service zone or without serviceable prerequisites | `Doorstep delivery is not available for this package.` |

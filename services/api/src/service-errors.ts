@@ -7,6 +7,7 @@ export class ApiServiceError extends Error {
     | "PAYMENT_REQUIRED"
     | "INVALID_STATUS_TRANSITION"
     | "PHONE_VERIFICATION_REQUIRED"
+    | "PACKAGE_SCAN_MISMATCH"
     | "RATE_LIMITED"
     | "INTERNAL_ERROR";
 

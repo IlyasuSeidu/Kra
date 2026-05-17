@@ -161,6 +161,7 @@ import {
   type PaymentIdentityFactory,
   type PaymentRepository
 } from "./payments";
+import type { PackageLabelRepository } from "./package-labels";
 import {
   getActivePricingRulesResponse,
   updateActivePricingRules,
@@ -230,6 +231,7 @@ export interface ApiAppDeps {
     DeliveryLifecycleRepository &
     DeliveryListRepository &
     AdminDeliveryMetricsRepository;
+  packageLabels: PackageLabelRepository;
   deliveryEvents: DeliveryEventRepository & DeliveryEventReadRepository;
   handoffEvents: HandoffEventRepository & HandoffEventReadRepository;
   payments: PaymentRepository &
@@ -767,6 +769,7 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
     notificationFeed: repositories.notificationFeed,
     outboundNotifications: repositories.outboundNotifications,
     deliveries: repositories.deliveries,
+    packageLabels: repositories.packageLabels,
     deliveryEvents: repositories.deliveryEvents,
     handoffEvents: repositories.handoffEvents,
     payments: repositories.payments,
@@ -830,9 +833,13 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
                 ? 409
                 : error.code === "RATE_LIMITED"
                   ? 429
-                  : error.code === "ROUTE_NOT_ENABLED"
-                    ? 503
-                    : 400;
+                  : error.code === "PHONE_VERIFICATION_REQUIRED"
+                    ? 403
+                    : error.code === "PACKAGE_SCAN_MISMATCH"
+                      ? 422
+                      : error.code === "ROUTE_NOT_ENABLED"
+                        ? 503
+                        : 400;
 
       reply.status(statusCode).send(
         buildApiErrorResponse(request.id, error.code, error.message, error.details)
@@ -1480,6 +1487,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             deliveries: deps.deliveries,
             deliveryEvents: deps.deliveryEvents,
             handoffEvents: deps.handoffEvents,
+            packageLabels: deps.packageLabels,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
@@ -1517,6 +1525,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
               deliveries: deps.deliveries,
               deliveryEvents: deps.deliveryEvents,
               handoffEvents: deps.handoffEvents,
+              packageLabels: deps.packageLabels,
               identityFactory: deps.identityFactory,
               now: deps.now
             }
@@ -1549,6 +1558,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
               deliveries: deps.deliveries,
               deliveryEvents: deps.deliveryEvents,
               handoffEvents: deps.handoffEvents,
+              packageLabels: deps.packageLabels,
               identityFactory: deps.identityFactory,
               now: deps.now
             }
@@ -1581,6 +1591,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             deliveries: deps.deliveries,
             deliveryEvents: deps.deliveryEvents,
             handoffEvents: deps.handoffEvents,
+            packageLabels: deps.packageLabels,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
@@ -1620,6 +1631,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
               deliveries: deps.deliveries,
               deliveryEvents: deps.deliveryEvents,
               handoffEvents: deps.handoffEvents,
+              packageLabels: deps.packageLabels,
               identityFactory: deps.identityFactory,
               now: deps.now
             }
@@ -1652,6 +1664,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
               deliveries: deps.deliveries,
               deliveryEvents: deps.deliveryEvents,
               handoffEvents: deps.handoffEvents,
+              packageLabels: deps.packageLabels,
               identityFactory: deps.identityFactory,
               now: deps.now
             }
@@ -1686,6 +1699,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             deliveries: deps.deliveries,
             deliveryEvents: deps.deliveryEvents,
             handoffEvents: deps.handoffEvents,
+            packageLabels: deps.packageLabels,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
@@ -1721,6 +1735,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             deliveries: deps.deliveries,
             deliveryEvents: deps.deliveryEvents,
             handoffEvents: deps.handoffEvents,
+            packageLabels: deps.packageLabels,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
@@ -1751,6 +1766,9 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           await acceptFinalMileAssignment(
             {
               deliveryId,
+              packageScanCode: input.packageScanCode,
+              ...withOptionalValue("fallbackUsed", input.fallbackUsed),
+              ...withOptionalValue("supervisorOverrideActorId", input.supervisorOverrideActorId),
               ...withOptionalValue("note", input.note)
             },
             mapPrincipalToOperationalActor(principal),
@@ -1758,6 +1776,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
               deliveries: deps.deliveries,
               deliveryEvents: deps.deliveryEvents,
               handoffEvents: deps.handoffEvents,
+              packageLabels: deps.packageLabels,
               identityFactory: deps.identityFactory,
               now: deps.now
             }
@@ -1788,6 +1807,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             deliveries: deps.deliveries,
             deliveryEvents: deps.deliveryEvents,
             handoffEvents: deps.handoffEvents,
+            packageLabels: deps.packageLabels,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
@@ -1824,6 +1844,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             deliveries: deps.deliveries,
             deliveryEvents: deps.deliveryEvents,
             handoffEvents: deps.handoffEvents,
+            packageLabels: deps.packageLabels,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
@@ -1957,6 +1978,8 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             deliveries: deps.deliveries,
             deliveryEvents: deps.deliveryEvents,
             handoffEvents: deps.handoffEvents,
+            packageLabels: deps.packageLabels,
+            verification: deps.verification,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
