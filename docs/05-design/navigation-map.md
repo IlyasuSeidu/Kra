@@ -85,7 +85,7 @@
 - Advanced analytics tabs remain admin-only.
 
 ## Screen Inventory Mapping Rule
-- Every navigation item must map to at least one screen in `screen-list.md`.
+- Every navigation item must map to at least one screen in `frontend-screen-inventory.md`.
 - No orphan screens may exist outside the navigation or deep-link system.
 
 ## Baseline Status
