@@ -329,6 +329,442 @@ Claude Code should build these before or alongside screens to avoid duplicated b
 | Analytics tracking | Track major funnel, handoff, payment, proof, issue, refund, admin actions |
 | Test harness | Unit/component tests plus E2E journeys for critical flows |
 
+## Implementation Blueprint Rule
+- Route paths, hook names, analytics event names, and test IDs in this section are binding for frontend implementation unless the backend contract changes.
+- Any renamed screen must update this file, tests, navigation, analytics, and API hook usage in the same PR.
+- Frontend code must not invent backend states, roles, statuses, payment outcomes, proof types, issue categories, or error codes outside shared contracts.
+- Public and receiver routes must be treated as privacy-sensitive. They must never render sender IDs, staff IDs, provider references, audit metadata, raw issue descriptions, or internal payment details.
+- Staff and admin routes must render operational detail only after role/capability checks pass.
+
+## Exact Route Map
+### Public Web Routes
+| Screen ID | App Route | Primary Test ID |
+| --- | --- | --- |
+| `PublicLanding` | `/` | `screen-public-landing` |
+| `PublicHowItWorks` | `/how-it-works` | `screen-public-how-it-works` |
+| `PublicServiceAreas` | `/service-areas` | `screen-public-service-areas` |
+| `PublicPricingExplainer` | `/pricing` | `screen-public-pricing` |
+| `PublicTrustCustody` | `/trust-and-custody` | `screen-public-trust-custody` |
+| `PublicSupportEntry` | `/support` | `screen-public-support` |
+| `PublicDeliveryPolicy` | `/delivery-policy` | `screen-public-delivery-policy` |
+| `PublicRefundPolicy` | `/refund-policy` | `screen-public-refund-policy` |
+| `PublicPrivacy` | `/privacy` | `screen-public-privacy` |
+| `PublicTerms` | `/terms` | `screen-public-terms` |
+| `PublicTrackingEntry` | `/track` | `screen-public-track-entry` |
+| `PublicMaintenance` | `/maintenance` | `screen-public-maintenance` |
+
+### Receiver Public Routes
+| Screen ID | App Route | Primary Test ID |
+| --- | --- | --- |
+| `ReceiverTrackingLanding` | `/r/:trackingCode` | `screen-receiver-tracking-landing` |
+| `ReceiverPhoneChallenge` | `/r/:trackingCode/verify-phone` | `screen-receiver-phone-challenge` |
+| `ReceiverOtpVerify` | `/r/:trackingCode/verify-otp` | `screen-receiver-otp-verify` |
+| `ReceiverTrackingTimeline` | `/r/:trackingCode/timeline` | `screen-receiver-timeline` |
+| `ReceiverArrivalInstructions` | `/r/:trackingCode/arrival` | `screen-receiver-arrival` |
+| `ReceiverFailedAttempt` | `/r/:trackingCode/failed-attempt` | `screen-receiver-failed-attempt` |
+| `ReceiverRefusalInfo` | `/r/:trackingCode/refusal` | `screen-receiver-refusal` |
+| `TrackingLinkExpired` | `/r/expired` | `screen-tracking-expired` |
+| `TrackingAccessDenied` | `/r/access-denied` | `screen-tracking-access-denied` |
+
+### Sender Mobile Routes
+| Screen ID | Expo Route | Primary Test ID |
+| --- | --- | --- |
+| `SenderOnboarding` | `/(sender)/onboarding` | `screen-sender-onboarding` |
+| `SenderSignIn` | `/(auth)/sender/sign-in` | `screen-sender-sign-in` |
+| `SenderAuthRecovery` | `/(auth)/sender/recovery` | `screen-sender-auth-recovery` |
+| `SenderHome` | `/(sender)/home` | `screen-sender-home` |
+| `CreateDeliveryStart` | `/(sender)/create` | `screen-create-delivery-start` |
+| `CreateDeliveryStations` | `/(sender)/create/stations` | `screen-create-delivery-stations` |
+| `CreateReceiverDetails` | `/(sender)/create/receiver` | `screen-create-receiver-details` |
+| `CreatePackageDetails` | `/(sender)/create/package` | `screen-create-package-details` |
+| `CreateDeliveryOptions` | `/(sender)/create/options` | `screen-create-delivery-options` |
+| `QuoteReview` | `/(sender)/create/quote` | `screen-quote-review` |
+| `DeliverySummary` | `/(sender)/create/summary` | `screen-delivery-summary` |
+| `PaymentMethod` | `/(sender)/payments/:deliveryId/method` | `screen-payment-method` |
+| `PaymentProcessing` | `/(sender)/payments/:deliveryId/processing` | `screen-payment-processing` |
+| `PaymentResult` | `/(sender)/payments/:deliveryId/result` | `screen-payment-result` |
+| `PaymentProviderReturn` | `/(sender)/payments/:deliveryId/provider-return` | `screen-payment-provider-return` |
+| `PaymentFailedRecovery` | `/(sender)/payments/:deliveryId/recover` | `screen-payment-failed-recovery` |
+| `SenderDeliveryDetail` | `/(sender)/deliveries/:deliveryId` | `screen-sender-delivery-detail` |
+| `SenderTrackingTimeline` | `/(sender)/deliveries/:deliveryId/timeline` | `screen-sender-tracking-timeline` |
+| `SenderDeliveryHistory` | `/(sender)/history` | `screen-sender-delivery-history` |
+| `SenderReceiptDetail` | `/(sender)/receipts/:deliveryId` | `screen-sender-receipt-detail` |
+| `SenderReceiptShare` | `/(sender)/receipts/:deliveryId/share` | `screen-sender-receipt-share` |
+| `CancelDeliveryRequest` | `/(sender)/deliveries/:deliveryId/cancel` | `screen-cancel-delivery-request` |
+| `SenderRefundStatus` | `/(sender)/deliveries/:deliveryId/refund` | `screen-sender-refund-status` |
+| `SenderIssueCreate` | `/(sender)/deliveries/:deliveryId/issues/new` | `screen-sender-issue-create` |
+| `SenderSupportThread` | `/(sender)/support/:issueId` | `screen-sender-support-thread` |
+| `SenderNotifications` | `/(sender)/notifications` | `screen-sender-notifications` |
+| `SenderProfile` | `/(sender)/profile` | `screen-sender-profile` |
+| `SenderSettings` | `/(sender)/settings` | `screen-sender-settings` |
+
+### Operations Shared Routes
+| Screen ID | Expo Route | Primary Test ID |
+| --- | --- | --- |
+| `OpsRoleHome` | `/(ops)/home` | `screen-ops-role-home` |
+| `OpsDeliveryDetail` | `/(ops)/deliveries/:deliveryId` | `screen-ops-delivery-detail` |
+| `OpsScanPackage` | `/(ops)/deliveries/:deliveryId/scan` | `screen-ops-scan-package` |
+| `OpsCustodyChain` | `/(ops)/deliveries/:deliveryId/custody` | `screen-ops-custody-chain` |
+| `OpsOfflineOutbox` | `/(ops)/offline-outbox` | `screen-ops-offline-outbox` |
+| `OpsActionRecovery` | `/(ops)/offline-outbox/:queuedActionId/recover` | `screen-ops-action-recovery` |
+| `OpsIssueCreate` | `/(ops)/deliveries/:deliveryId/issues/new` | `screen-ops-issue-create` |
+| `OpsSupport` | `/(ops)/support` | `screen-ops-support` |
+
+### Station Operator Routes
+| Screen ID | Expo Route | Primary Test ID |
+| --- | --- | --- |
+| `StationSignIn` | `/(auth)/station/sign-in` | `screen-station-sign-in` |
+| `StationOverview` | `/(ops)/station/overview` | `screen-station-overview` |
+| `StationIntakeQueue` | `/(ops)/station/intake` | `screen-station-intake-queue` |
+| `StationPackageIntake` | `/(ops)/station/intake/:deliveryId` | `screen-station-package-intake` |
+| `StationIntakeConfirmation` | `/(ops)/station/intake/:deliveryId/confirmation` | `screen-station-intake-confirmation` |
+| `PackageLabelPrint` | `/(ops)/station/packages/:deliveryId/label/print` | `screen-package-label-print` |
+| `PackageLabelReprint` | `/(ops)/station/packages/:deliveryId/label/reprint` | `screen-package-label-reprint` |
+| `StationOutboundQueue` | `/(ops)/station/outbound` | `screen-station-outbound-queue` |
+| `StationDriverAssignment` | `/(ops)/station/outbound/:deliveryId/assign-driver` | `screen-station-driver-assignment` |
+| `StationDispatchReadiness` | `/(ops)/station/outbound/:deliveryId/dispatch` | `screen-station-dispatch-readiness` |
+| `StationDriverPickupScan` | `/(ops)/station/outbound/:deliveryId/driver-pickup` | `screen-station-driver-pickup-scan` |
+| `StationInboundQueue` | `/(ops)/station/inbound` | `screen-station-inbound-queue` |
+| `StationDestinationReceipt` | `/(ops)/station/inbound/:deliveryId/receive` | `screen-station-destination-receipt` |
+| `StationConditionCheck` | `/(ops)/station/inbound/:deliveryId/condition` | `screen-station-condition-check` |
+| `StationFinalMileQueue` | `/(ops)/station/final-mile` | `screen-station-final-mile-queue` |
+| `StationFinalMileAssignment` | `/(ops)/station/final-mile/:deliveryId/assign` | `screen-station-final-mile-assignment` |
+| `StationHandoffLog` | `/(ops)/station/handoffs` | `screen-station-handoff-log` |
+| `StationBlockedQueue` | `/(ops)/station/blocked` | `screen-station-blocked-queue` |
+| `StationReports` | `/(ops)/station/reports` | `screen-station-reports` |
+| `StationSupport` | `/(ops)/station/support` | `screen-station-support` |
+
+### Driver Routes
+| Screen ID | Expo Route | Primary Test ID |
+| --- | --- | --- |
+| `DriverSignIn` | `/(auth)/driver/sign-in` | `screen-driver-sign-in` |
+| `DriverHome` | `/(ops)/driver/home` | `screen-driver-home` |
+| `AssignedRuns` | `/(ops)/driver/runs` | `screen-assigned-runs` |
+| `AssignedRunDetail` | `/(ops)/driver/runs/:deliveryId` | `screen-assigned-run-detail` |
+| `DriverAcceptRun` | `/(ops)/driver/runs/:deliveryId/accept` | `screen-driver-accept-run` |
+| `DriverManifest` | `/(ops)/driver/runs/:deliveryId/manifest` | `screen-driver-manifest` |
+| `DriverOriginPickupScan` | `/(ops)/driver/runs/:deliveryId/pickup-scan` | `screen-driver-origin-pickup-scan` |
+| `DriverCustodyAccepted` | `/(ops)/driver/runs/:deliveryId/custody-accepted` | `screen-driver-custody-accepted` |
+| `DriverRoute` | `/(ops)/driver/runs/:deliveryId/route` | `screen-driver-route` |
+| `DriverMarkInTransit` | `/(ops)/driver/runs/:deliveryId/in-transit` | `screen-driver-mark-in-transit` |
+| `DriverDestinationArrival` | `/(ops)/driver/runs/:deliveryId/destination-arrival` | `screen-driver-destination-arrival` |
+| `DriverDestinationHandoff` | `/(ops)/driver/runs/:deliveryId/destination-handoff` | `screen-driver-destination-handoff` |
+| `DriverHistory` | `/(ops)/driver/history` | `screen-driver-history` |
+| `DriverEarnings` | `/(ops)/driver/earnings` | `screen-driver-earnings` |
+| `DriverSupport` | `/(ops)/driver/support` | `screen-driver-support` |
+
+### Final-Mile Courier Routes
+| Screen ID | Expo Route | Primary Test ID |
+| --- | --- | --- |
+| `CourierSignIn` | `/(auth)/courier/sign-in` | `screen-courier-sign-in` |
+| `CourierHome` | `/(ops)/courier/home` | `screen-courier-home` |
+| `CourierAssignments` | `/(ops)/courier/assignments` | `screen-courier-assignments` |
+| `CourierAssignmentDetail` | `/(ops)/courier/assignments/:deliveryId` | `screen-courier-assignment-detail` |
+| `CourierAcceptAssignmentScan` | `/(ops)/courier/assignments/:deliveryId/accept-scan` | `screen-courier-accept-assignment-scan` |
+| `CourierCustodyAccepted` | `/(ops)/courier/assignments/:deliveryId/custody-accepted` | `screen-courier-custody-accepted` |
+| `CourierOutForDelivery` | `/(ops)/courier/assignments/:deliveryId/out-for-delivery` | `screen-courier-out-for-delivery` |
+| `CourierRoute` | `/(ops)/courier/assignments/:deliveryId/route` | `screen-courier-route` |
+| `CourierProofCapture` | `/(ops)/courier/assignments/:deliveryId/proof` | `screen-courier-proof-capture` |
+| `CourierOtpCompletion` | `/(ops)/courier/assignments/:deliveryId/proof/otp` | `screen-courier-otp-completion` |
+| `CourierSignatureProof` | `/(ops)/courier/assignments/:deliveryId/proof/signature` | `screen-courier-signature-proof` |
+| `CourierPhotoProof` | `/(ops)/courier/assignments/:deliveryId/proof/photo` | `screen-courier-photo-proof` |
+| `CourierFailedAttempt` | `/(ops)/courier/assignments/:deliveryId/failed-attempt` | `screen-courier-failed-attempt` |
+| `CourierReturnToStation` | `/(ops)/courier/assignments/:deliveryId/return-to-station` | `screen-courier-return-to-station` |
+| `CourierCompletedJobs` | `/(ops)/courier/completed` | `screen-courier-completed-jobs` |
+| `CourierEarnings` | `/(ops)/courier/earnings` | `screen-courier-earnings` |
+| `CourierIssues` | `/(ops)/courier/issues` | `screen-courier-issues` |
+
+### Admin Web Routes
+| Screen ID | React Router Path | Primary Test ID |
+| --- | --- | --- |
+| `AdminSignIn` | `/admin/sign-in` | `screen-admin-sign-in` |
+| `AdminOverview` | `/admin` | `screen-admin-overview` |
+| `AdminLaunchReadiness` | `/admin/launch-readiness` | `screen-admin-launch-readiness` |
+| `AdminLaunchReadinessDetail` | `/admin/launch-readiness/:blockerCode` | `screen-admin-launch-readiness-detail` |
+| `AdminDeliveryExplorer` | `/admin/deliveries` | `screen-admin-delivery-explorer` |
+| `AdminDeliveryDetail` | `/admin/deliveries/:deliveryId` | `screen-admin-delivery-detail` |
+| `AdminPackageDetail` | `/admin/deliveries/:deliveryId/package` | `screen-admin-package-detail` |
+| `AdminPackageLabelRegistry` | `/admin/package-labels` | `screen-admin-package-label-registry` |
+| `AdminCustodyChain` | `/admin/deliveries/:deliveryId/custody` | `screen-admin-custody-chain` |
+| `AdminManualCustodyException` | `/admin/custody-exceptions/:issueId` | `screen-admin-manual-custody-exception` |
+| `AdminBlockedDeliveryQueue` | `/admin/deliveries/blocked` | `screen-admin-blocked-delivery-queue` |
+| `AdminStations` | `/admin/stations` | `screen-admin-stations` |
+| `AdminStationDetail` | `/admin/stations/:stationId` | `screen-admin-station-detail` |
+| `AdminStationValidation` | `/admin/stations/:stationId/validation` | `screen-admin-station-validation` |
+| `AdminStationStatusOverride` | `/admin/stations/:stationId/status` | `screen-admin-station-status-override` |
+| `AdminStationCapacity` | `/admin/stations/capacity` | `screen-admin-station-capacity` |
+| `AdminUsers` | `/admin/users` | `screen-admin-users` |
+| `AdminUserDetail` | `/admin/users/:userId` | `screen-admin-user-detail` |
+| `AdminUserAccess` | `/admin/users/:userId/access` | `screen-admin-user-access` |
+| `AdminStaffActivityLog` | `/admin/staff-activity` | `screen-admin-staff-activity-log` |
+| `AdminPricingRules` | `/admin/pricing-rules` | `screen-admin-pricing-rules` |
+| `AdminPricingRuleEdit` | `/admin/pricing-rules/edit` | `screen-admin-pricing-rule-edit` |
+| `AdminFinanceSummary` | `/admin/finance` | `screen-admin-finance-summary` |
+| `AdminPaymentReconciliation` | `/admin/finance/reconciliation` | `screen-admin-payment-reconciliation` |
+| `AdminPaymentReconciliationDetail` | `/admin/finance/reconciliation/:paymentId` | `screen-admin-payment-reconciliation-detail` |
+| `AdminRefundReview` | `/admin/finance/refunds/:paymentId/review` | `screen-admin-refund-review` |
+| `AdminRefundSettlement` | `/admin/finance/refunds/:paymentId/settle` | `screen-admin-refund-settlement` |
+| `AdminRefundEvidenceReview` | `/admin/finance/refunds/:paymentId/evidence` | `screen-admin-refund-evidence-review` |
+| `AdminIssueQueue` | `/admin/issues` | `screen-admin-issue-queue` |
+| `AdminIssueDetail` | `/admin/issues/:issueId` | `screen-admin-issue-detail` |
+| `AdminSlaBreachDashboard` | `/admin/sla-breaches` | `screen-admin-sla-breach-dashboard` |
+| `AdminAuditEvents` | `/admin/audit-events` | `screen-admin-audit-events` |
+| `AdminAuditEventDetail` | `/admin/audit-events/:eventId` | `screen-admin-audit-event-detail` |
+| `AdminOutboundNotifications` | `/admin/outbound-notifications` | `screen-admin-outbound-notifications` |
+| `AdminNotificationDetail` | `/admin/outbound-notifications/:outboundNotificationId` | `screen-admin-notification-detail` |
+| `AdminWebhookEvents` | `/admin/webhook-events` | `screen-admin-webhook-events` |
+| `AdminWebhookEventDetail` | `/admin/webhook-events/:eventId` | `screen-admin-webhook-event-detail` |
+| `AdminAnalytics` | `/admin/analytics` | `screen-admin-analytics` |
+| `AdminExportReport` | `/admin/exports/new` | `screen-admin-export-report` |
+| `AdminSettings` | `/admin/settings` | `screen-admin-settings` |
+
+### Auth And Utility Routes
+| Screen ID | App Route | Primary Test ID |
+| --- | --- | --- |
+| `AuthRoleSelection` | `/(auth)/role-selection` | `screen-auth-role-selection` |
+| `InviteAcceptance` | `/invite/:inviteToken` | `screen-invite-acceptance` |
+| `StaffAccountActivation` | `/(auth)/staff/activate` | `screen-staff-account-activation` |
+| `PasswordlessPhoneLogin` | `/(auth)/phone-login` | `screen-passwordless-phone-login` |
+| `SessionExpired` | `/session-expired` | `screen-session-expired` |
+| `AccountLocked` | `/account-locked` | `screen-account-locked` |
+| `PermissionDenied` | `/permission-denied` | `screen-permission-denied` |
+
+## Field Requirements By Flow
+### Sender Delivery Creation
+| Flow Step | Required Fields | Validation Source | UI Rule |
+| --- | --- | --- | --- |
+| Station selection | `originStationId`, `destinationStationId` | `createDeliveryRequestSchema` | Origin and destination must be different. |
+| Receiver details | `receiver.name`, `receiver.phone`, optional `receiver.addressText` | `deliveryReceiverSchema` | Phone must be E.164. Doorstep requires address. |
+| Package details | `package.description`, `package.weightKg`, `package.sizeTier`, `package.isFragile`, `package.declaredValueGhs` | `deliveryPackageSchema` | Declared value max is `5000` GHS. |
+| Delivery options | `serviceType`, `doorstepRequested`, optional `doorstepDistanceKm` | `serviceTypeSchema`, `createDeliveryRequestSchema` | Doorstep requires distance estimate and address; omit distance when not doorstep. |
+| Quote review | backend quote response | `createDeliveryResponseSchema` | Show GHS amount and payment-before-dispatch rule. |
+
+### Payment And Refund
+| Flow Step | Required Fields | Validation Source | UI Rule |
+| --- | --- | --- | --- |
+| Initialize payment | `deliveryId`, `provider=mtn_momo`, `payerPhone`, `amountGhs` | `paymentInitializeRequestSchema` | Never let user edit amount after backend quote locks. |
+| Verify payment | `deliveryId` | `paymentVerifyRequestSchema` | Poll or retry without creating duplicate payments. |
+| Refund review | `paymentId`, refund reason booleans | `refundPaymentRequestSchema` | Show policy explanation before approval. |
+| Refund settlement | `paymentId`, `refundReference`, optional `settledAt` | `settleRefundRequestSchema` | Finance-only and audit acknowledged. |
+
+### Handoff And Custody
+| Flow Step | Required Fields | Validation Source | UI Rule |
+| --- | --- | --- | --- |
+| Intake | `measuredWeightKg`, `sizeTier`, `condition`, `labelScanCode` | `confirmIntakeRequestSchema` | This binds first scan code to delivery. |
+| Dispatch readiness | `packageScanCode` | `dispatchDeliveryRequestSchema` | Dispatch readiness does not move custody. |
+| Driver pickup | `packageScanCode` | `confirmDriverPickupRequestSchema` | Assigned driver scan moves custody to driver. |
+| Destination receipt | `packageScanCode`, `condition`, `nextStep` | `receiveDestinationRequestSchema` | Destination station scan moves custody to station. |
+| Final-mile assignment | `courierUserId` | `assignFinalMileRequestSchema` | Assignment does not move custody. |
+| Courier accept assignment | `packageScanCode`, optional `note` | `acceptFinalMileAssignmentRequestSchema` | Assigned courier scan moves custody to courier. |
+| Out for delivery | optional `note` | `markOutForDeliveryRequestSchema` | Only allowed after confirmed courier custody. |
+| Failed attempt | `reasonCode`, optional `note` | `recordFailedAttemptRequestSchema` | Reason must be one of the backend enum values. |
+
+### Proof And Completion
+| Flow Step | Required Fields | Validation Source | UI Rule |
+| --- | --- | --- | --- |
+| Receiver phone challenge | `phone` | `requestPhoneVerificationChallengeRequestSchema` | Show masked phone and resend availability. |
+| Receiver OTP verify | `phone`, `otp` | `verifyPhoneRequestSchema` | Store verification token only for delivery completion context. |
+| Create proof upload | `proofType`, `contentType`, `byteSize`, optional `sha256` | `createProofAssetUploadRequestSchema` | Max file size is `8_000_000` bytes. |
+| Confirm proof upload | `byteSize`, `sha256`, optional `storageGeneration` | `confirmProofAssetUploadRequestSchema` | Must confirm upload before completion. |
+| Complete delivery | `proofType`, `proofReference`, `receivedByName` | `completeDeliveryRequestSchema` | OTP proof reference must be active receiver verification token. |
+
+### Issues, Users, Stations, Pricing
+| Flow Step | Required Fields | Validation Source | UI Rule |
+| --- | --- | --- | --- |
+| Create issue | `deliveryId`, `category`, `severity`, `summary`, optional `description` | `createIssueRequestSchema` | Do not expose internal-only issue detail to receiver. |
+| Escalate issue | `reasonCode`, `note` | `escalateIssueRequestSchema` | Admin/support only. |
+| Resolve issue | `nextStatus`, `note`, conditional `resolutionCode` | `resolveIssueRequestSchema` | `resolutionCode` required for resolved or closed. |
+| Upsert user | `userId`, `fullName`, `role`, optional `status`, `stationId`, `email`, `phone` | `adminUpsertUserRequestSchema` | Station operators require `stationId`; admin/sender roles must not have one. |
+| Update access | `role`, `status`, optional `stationId` | `adminUpdateUserAccessRequestSchema` | Suspending users requires confirmation modal. |
+| Update station status | `operatingStatus`, `intakeStatus`, `serviceAvailability`, optional `note` | `adminUpdateStationStatusRequestSchema` | Audit-sensitive override copy required. |
+| Update station validation | dry-run days, pilot days, checklist, scan fallback rate, optional blockers/timestamps/note | `adminUpdateStationValidationRequestSchema` | Validation drives launch readiness. |
+| Update pricing rules | complete `routeBaseFees`, optional `effectiveAt`, optional `note` | `adminUpdatePricingRulesRequestSchema` | Must include all launch corridors and no duplicates. |
+
+## Planned API Hook Contract
+| Operation ID | RTK Query Hook | Type | Cache Tags |
+| --- | --- | --- | --- |
+| `list_deliveries` | `useListDeliveriesQuery` | query | `DeliveryList`, `Delivery` |
+| `create_delivery` | `useCreateDeliveryMutation` | mutation | invalidates `DeliveryList` |
+| `cancel_delivery` | `useCancelDeliveryMutation` | mutation | invalidates `Delivery`, `DeliveryList`, `Payment` |
+| `get_delivery` | `useGetDeliveryQuery` | query | `Delivery` |
+| `get_delivery_timeline` | `useGetDeliveryTimelineQuery` | query | `DeliveryTimeline` |
+| `get_public_tracking` | `useGetPublicTrackingQuery` | query | `PublicTracking` |
+| `request_public_tracking_phone_challenge` | `useRequestPublicTrackingPhoneChallengeMutation` | mutation | invalidates `PublicTracking` |
+| `verify_public_tracking_phone` | `useVerifyPublicTrackingPhoneMutation` | mutation | invalidates `PublicTracking` |
+| `initialize_payment` | `useInitializePaymentMutation` | mutation | invalidates `Payment`, `Delivery` |
+| `verify_payment` | `useVerifyPaymentMutation` | mutation | invalidates `Payment`, `Delivery` |
+| `refund_payment` | `useRefundPaymentMutation` | mutation | invalidates `Payment`, `AdminFinance` |
+| `settle_refund_payment` | `useSettleRefundPaymentMutation` | mutation | invalidates `Payment`, `AdminFinance` |
+| `confirm_intake` | `useConfirmIntakeMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `StationQueue` |
+| `assign_driver` | `useAssignDriverMutation` | mutation | invalidates `Delivery`, `StationQueue`, `DriverQueue` |
+| `accept_run` | `useAcceptRunMutation` | mutation | invalidates `Delivery`, `DriverQueue` |
+| `dispatch_delivery` | `useDispatchDeliveryMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `StationQueue` |
+| `confirm_pickup` | `useConfirmPickupMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `DriverQueue`, `StationQueue` |
+| `mark_in_transit` | `useMarkInTransitMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `DriverQueue` |
+| `receive_destination` | `useReceiveDestinationMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `StationQueue` |
+| `assign_final_mile` | `useAssignFinalMileMutation` | mutation | invalidates `Delivery`, `StationQueue`, `CourierQueue` |
+| `accept_final_mile_assignment` | `useAcceptFinalMileAssignmentMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `CourierQueue` |
+| `mark_out_for_delivery` | `useMarkOutForDeliveryMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `CourierQueue` |
+| `record_failed_attempt` | `useRecordFailedAttemptMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `CourierQueue`, `IssueList` |
+| `create_delivery_proof_asset` | `useCreateDeliveryProofAssetMutation` | mutation | invalidates `ProofAsset` |
+| `confirm_delivery_proof_asset_upload` | `useConfirmDeliveryProofAssetUploadMutation` | mutation | invalidates `ProofAsset` |
+| `complete_delivery` | `useCompleteDeliveryMutation` | mutation | invalidates `Delivery`, `DeliveryTimeline`, `CourierQueue` |
+| `list_issues` | `useListIssuesQuery` | query | `IssueList`, `Issue` |
+| `create_issue` | `useCreateIssueMutation` | mutation | invalidates `IssueList`, `Delivery` |
+| `get_issue` | `useGetIssueQuery` | query | `Issue` |
+| `escalate_issue` | `useEscalateIssueMutation` | mutation | invalidates `Issue`, `IssueList` |
+| `resolve_issue` | `useResolveIssueMutation` | mutation | invalidates `Issue`, `IssueList`, `Delivery` |
+| `list_notifications` | `useListNotificationsQuery` | query | `NotificationList` |
+| `admin_overview` | `useAdminOverviewQuery` | query | `AdminOverview` |
+| `admin_deliveries` | `useAdminDeliveriesQuery` | query | `AdminDeliveryList`, `Delivery` |
+| `admin_stations` | `useAdminStationsQuery` | query | `AdminStationList`, `Station` |
+| `admin_launch_readiness` | `useAdminLaunchReadinessQuery` | query | `LaunchReadiness` |
+| `admin_finance` | `useAdminFinanceQuery` | query | `AdminFinance`, `Payment` |
+| `admin_pricing_rules` | `useAdminPricingRulesQuery` | query | `PricingRules` |
+| `admin_update_pricing_rules` | `useAdminUpdatePricingRulesMutation` | mutation | invalidates `PricingRules` |
+| `admin_users` | `useAdminUsersQuery` | query | `AdminUserList`, `User` |
+| `admin_upsert_user` | `useAdminUpsertUserMutation` | mutation | invalidates `AdminUserList`, `User` |
+| `admin_update_user_access` | `useAdminUpdateUserAccessMutation` | mutation | invalidates `AdminUserList`, `User` |
+| `admin_update_station_status` | `useAdminUpdateStationStatusMutation` | mutation | invalidates `AdminStationList`, `Station`, `LaunchReadiness` |
+| `admin_update_station_validation` | `useAdminUpdateStationValidationMutation` | mutation | invalidates `AdminStationList`, `Station`, `LaunchReadiness` |
+| `admin_audit_events` | `useAdminAuditEventsQuery` | query | `AuditEventList` |
+| `admin_outbound_notifications` | `useAdminOutboundNotificationsQuery` | query | `OutboundNotificationList` |
+| `admin_payment_reconciliation` | `useAdminPaymentReconciliationQuery` | query | `PaymentReconciliation` |
+| `admin_webhook_events` | `useAdminWebhookEventsQuery` | query | `WebhookEventList` |
+| `ingest_mtn_momo_webhook` | none | server-only | admin observes through `useAdminWebhookEventsQuery` |
+| `dispatch_due_outbound_notifications` | none | server-only | admin observes through `useAdminOutboundNotificationsQuery` |
+| `reconcile_due_payments` | none | server-only | admin observes through `useAdminPaymentReconciliationQuery` |
+
+## Copy And Error Handling Contract
+| Backend Error/State | User-Facing Copy | Primary CTA | Applies To |
+| --- | --- | --- | --- |
+| `AUTH_REQUIRED` | `Sign in again to continue.` | `Sign in` | authenticated apps |
+| `FORBIDDEN` or `FORBIDDEN_ROLE` | `You do not have permission for this action.` | `Go back` | all role-gated screens |
+| `STATION_SCOPE_VIOLATION` | `This delivery is outside your station scope.` | `Return to station queue` | station |
+| `ASSIGNMENT_SCOPE_VIOLATION` | `This job is not assigned to you.` | `Refresh assignments` | driver, courier |
+| `NOT_FOUND` or `DELIVERY_NOT_FOUND` | `Delivery record not found.` | `Check code or contact support` | sender, receiver, admin |
+| `INVALID_STATUS_TRANSITION` | `This delivery cannot move to that state yet.` | `View current status` | staff, admin |
+| `DELIVERY_NOT_PAID` or `PAYMENT_REQUIRED` | `Payment must be confirmed before this action.` | `View payment` | sender, station, driver, courier |
+| `HANDOFF_PROOF_REQUIRED` | `Required handoff proof is missing.` | `Add proof` | staff |
+| `PHONE_VERIFICATION_REQUIRED` | `Receiver phone verification is required before completion.` | `Verify receiver` | receiver, courier |
+| `PACKAGE_ALREADY_RECEIVED` | `This package was already received.` | `View handoff log` | station |
+| `PACKAGE_SCAN_MISMATCH` | `This scan code does not match the delivery.` | `Scan again` | station, driver, courier |
+| `PACKAGE_NOT_READY_FOR_DISPATCH` | `This package is not ready for dispatch.` | `Review blockers` | station |
+| `FINAL_PROOF_REQUIRED` | `Delivery proof is required to complete this job.` | `Capture proof` | courier |
+| `FINAL_MILE_NOT_AVAILABLE` | `Doorstep delivery is not available for this package.` | `Choose pickup` | sender, station |
+| `REATTEMPT_LIMIT_REACHED` | `The reattempt limit has been reached.` | `Return to station` | courier, station |
+| `PAYMENT_FAILED` | `Payment could not be completed.` | `Try again` | sender |
+| `PAYMENT_ALREADY_CONFIRMED` | `This payment was already confirmed.` | `View receipt` | sender, admin |
+| `PAYMENT_PROVIDER_UNAVAILABLE` | `Payment service is temporarily unavailable.` | `Try later` | sender |
+| `REFUND_NOT_ALLOWED` | `This payment is not eligible for refund.` | `Review policy` | sender, finance |
+| `REFUND_ALREADY_PROCESSED` | `This refund has already been processed.` | `View refund` | finance |
+| `DUPLICATE_SCAN` | `This package scan was already recorded.` | `View custody chain` | staff |
+| `CONFLICTING_HANDOFF_STATE` | `The handoff state conflicts with the current record.` | `Escalate issue` | staff, admin |
+| `ISSUE_LOCK_ACTIVE` | `This delivery is locked while an issue is being reviewed.` | `Open issue` | staff, admin |
+| `VALIDATION_ERROR` | `Some required information is missing or invalid.` | `Fix details` | all forms |
+| `RATE_LIMITED` | `Too many attempts. Please wait before trying again.` | `Try later` | public, receiver, auth |
+| `PROVIDER_TIMEOUT` | `The external service took too long to respond.` | `Retry` | payment, webhooks |
+| `INTERNAL_ERROR` or `UNKNOWN_INTERNAL_ERROR` | `Something went wrong on our side.` | `Try again` | all surfaces |
+| `manual_review` | `This needs manual review before it can continue.` | `View review` | admin, support |
+| `dead_letter` | `Notification delivery failed after retries.` | `Review notification` | admin |
+
+## Analytics Event Contract
+| Event Name | Trigger | Required Properties |
+| --- | --- | --- |
+| `public_landing_viewed` | public landing render | `surface`, `route` |
+| `public_tracking_submitted` | tracking code submit | `trackingCodePrefix`, `result` |
+| `receiver_phone_challenge_requested` | receiver requests SMS challenge | `trackingCode`, `challengeStatus` |
+| `receiver_phone_verified` | receiver OTP verified | `trackingCode`, `verifiedAt` |
+| `sender_delivery_create_started` | sender starts delivery draft | `senderId` |
+| `sender_delivery_quote_viewed` | quote screen rendered | `originStationId`, `destinationStationId`, `serviceType`, `doorstepRequested` |
+| `sender_delivery_created` | create delivery succeeds | `deliveryId`, `trackingCode`, `quoteAmountGhs` |
+| `payment_initialized` | payment initialization succeeds | `deliveryId`, `paymentId`, `provider` |
+| `payment_verified` | payment verification returns | `deliveryId`, `paymentId`, `paymentStatus` |
+| `delivery_cancel_requested` | cancellation submitted | `deliveryId`, `reasonCode` |
+| `issue_created` | issue creation succeeds | `deliveryId`, `issueId`, `category`, `severity` |
+| `station_intake_confirmed` | intake succeeds | `deliveryId`, `stationId`, `condition`, `sizeTier` |
+| `package_scan_failed` | scan mismatch or duplicate | `deliveryId`, `actorRole`, `errorCode` |
+| `driver_run_accepted` | driver accepts run | `deliveryId`, `driverUserId` |
+| `driver_pickup_confirmed` | driver custody accepted | `deliveryId`, `driverUserId` |
+| `delivery_marked_in_transit` | in-transit update succeeds | `deliveryId`, `driverUserId` |
+| `destination_receipt_confirmed` | destination station receipt succeeds | `deliveryId`, `stationId`, `condition`, `nextStep` |
+| `final_mile_assigned` | courier assignment succeeds | `deliveryId`, `courierUserId` |
+| `courier_assignment_accepted` | courier custody accepted | `deliveryId`, `courierUserId` |
+| `delivery_marked_out_for_delivery` | out-for-delivery succeeds | `deliveryId`, `courierUserId` |
+| `proof_asset_uploaded` | proof upload confirmed | `deliveryId`, `proofAssetId`, `proofType`, `byteSize` |
+| `delivery_completed` | completion succeeds | `deliveryId`, `proofType` |
+| `failed_attempt_recorded` | final-mile failed attempt recorded | `deliveryId`, `reasonCode` |
+| `admin_launch_readiness_viewed` | launch readiness screen viewed | `status`, `blockerCount` |
+| `admin_pricing_rules_updated` | pricing rules update succeeds | `pricingRuleId`, `routeCount` |
+| `admin_user_access_updated` | user access update succeeds | `userId`, `role`, `status` |
+| `admin_station_status_updated` | station status update succeeds | `stationId`, `operatingStatus`, `intakeStatus` |
+| `admin_station_validation_updated` | station validation update succeeds | `stationId`, `validationStatus`, `goLiveEligible` |
+| `refund_review_completed` | refund review succeeds | `paymentId`, `refundStatus`, `refundAmountGhs` |
+| `refund_settled` | refund settlement succeeds | `paymentId`, `refundReference` |
+| `issue_escalated` | issue escalated | `issueId`, `reasonCode` |
+| `issue_resolved` | issue resolved or closed | `issueId`, `nextStatus`, `resolutionCode` |
+| `offline_action_queued` | offline mutation queued | `routeKey`, `actorRole`, `deliveryId` |
+| `offline_action_replayed` | queued mutation replayed | `routeKey`, `actorRole`, `result` |
+
+## E2E Test Case Contract
+| Test Case ID | Journey | Required Assertions |
+| --- | --- | --- |
+| `e2e-public-track-receiver-otp` | Receiver opens tracking link, requests challenge, verifies OTP | receiver-safe status renders, OTP token path works, no internal data leaks |
+| `e2e-sender-create-pay-track` | Sender creates delivery, pays, and tracks | quote locks, payment confirms, timeline updates |
+| `e2e-sender-cancel-eligible-delivery` | Sender cancels eligible delivery | cancellation reason submits, refund state renders when applicable |
+| `e2e-station-intake-label-binding` | Station intakes package | package scan binds once, duplicate label blocks |
+| `e2e-station-dispatch-no-custody-transfer` | Station dispatches readiness | custody remains station until driver scan |
+| `e2e-driver-pickup-custody-transfer` | Driver accepts run and confirms pickup | assigned driver required, scan match required, custody becomes driver |
+| `e2e-destination-receipt-condition-check` | Destination station receives package | package scan required, condition stored, next step routes |
+| `e2e-final-mile-assignment-no-custody-transfer` | Station assigns courier | custody remains station until courier scan |
+| `e2e-courier-accepts-custody` | Courier scans package and accepts assignment | assigned courier required, custody becomes courier |
+| `e2e-courier-completes-with-otp` | Courier completes delivery with receiver OTP | active receiver token required, proof recorded |
+| `e2e-courier-completes-with-photo-proof` | Courier uploads photo and completes delivery | upload create, storage PUT, confirm upload, complete |
+| `e2e-courier-failed-attempt-reroute` | Courier records failed attempt | reason stored, correct route/status shown |
+| `e2e-admin-delivery-custody-audit` | Admin opens delivery detail and custody chain | timeline, handoff events, scan evidence, audit links visible |
+| `e2e-admin-pricing-rule-update` | Finance admin updates pricing rules | complete corridor table enforced, new quote uses new rule |
+| `e2e-admin-refund-settlement` | Finance admin reviews and settles refund | evidence shown, approval/settlement states update |
+| `e2e-admin-launch-readiness-blocked-ready` | Admin reviews launch readiness | blockers render, ready state renders when clear |
+| `e2e-offline-outbox-replay` | Staff action queues offline and replays online | idempotency key persists, duplicate prevention works |
+| `e2e-role-permission-guards` | Users attempt wrong-role actions | forbidden state renders, no restricted data leaks |
+
+## Implementation Ownership And Order
+| Order | Work Package | Owner Role | Exit Criteria |
+| --- | --- | --- | --- |
+| 1 | Shared design tokens, app shells, route guards, API client, state components | frontend platform | apps can render protected shells and shared states |
+| 2 | Public web landing, policy pages, tracking entry, receiver tracking and OTP | web frontend | receiver-safe public flow passes E2E |
+| 3 | Sender create, quote, payment, delivery detail, tracking, history, issue creation | mobile frontend | sender create-pay-track E2E passes |
+| 4 | Shared ops scan, custody chain, offline outbox, issue creation | mobile platform | station/driver/courier can share scan and offline systems |
+| 5 | Station intake, dispatch, destination receipt, final-mile assignment, blocked queue | ops mobile | custody gates and label binding E2E pass |
+| 6 | Driver assigned runs, accept, pickup, in-transit, destination handoff | ops mobile | driver custody E2E passes |
+| 7 | Courier assignment, out-for-delivery, proof, completion, failed attempt | ops mobile | OTP/photo/signature proof E2E passes |
+| 8 | Admin overview, launch readiness, deliveries, custody, stations, users | admin frontend | launch readiness and admin delivery audit E2E pass |
+| 9 | Admin finance, pricing, refunds, reconciliation, webhooks, notifications, audit | admin/frontend finance | finance/refund/reconciliation E2E pass |
+| 10 | Analytics, accessibility, localization, export, polish, regression pass | frontend platform | all P0/P1 screens meet launch checklist |
+
+## Design Reference Contract
+| Screen Family | Primary Design Reference | Required Visual Behavior |
+| --- | --- | --- |
+| Public web | `design-system.md`, `copy-deck.md`, `accessibility-and-localization.md` | outcome-led, trust-heavy, one primary CTA per page |
+| Sender mobile | `sender-app-spec.md`, `wireframes.md`, `design-system.md` | fast booking, clear payment and tracking hierarchy |
+| Receiver public | `tracking-spec.md`, `notifications-spec.md`, `accessibility-and-localization.md` | privacy-safe, low-friction, OTP guidance prominent |
+| Station ops | `station-operator-spec.md`, `handoff-rules.md`, `delivery-lifecycle.md` | scan-first, queue-first, blocked states obvious |
+| Driver ops | `driver-app-spec.md`, `handoff-rules.md` | assigned work first, custody status always visible |
+| Courier ops | `doorstep-delivery-spec.md`, `doorstep-delivery-rules.md`, `handoff-rules.md` | next stop/proof action first, failed attempt recovery clear |
+| Admin | `admin-dashboard-spec.md`, `dashboard-metrics.md`, `support-and-escalation-rules.md` | dense but calm, filters, evidence, audit, and owner visible |
+| Finance | `payments-spec.md`, `refund-and-dispute-rules.md`, `reconciliation-spec.md` | amounts, provider references, status, and evidence hierarchy visible |
+
+## Test ID Convention
+- Screen root: `screen-{screen-slug}`.
+- Primary action button: `action-{screen-slug}-{verb}`.
+- Form field: `field-{schema-field-path}` using kebab case, for example `field-receiver-phone`.
+- Error state: `state-{screen-slug}-{state-id}`.
+- Modal root: `modal-{modal-slug}`.
+- Queue row: `row-{entity-slug}-{entity-id}`.
+- Timeline entry: `timeline-entry-{entry-id}`.
+- Custody step: `custody-step-{delivery-id}-{step-name}`.
+- Offline queued action: `offline-action-{route-key}-{local-id}`.
+
 ## Backend Route Coverage
 | Operation ID | Required Frontend Coverage |
 | --- | --- |
