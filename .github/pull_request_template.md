@@ -14,10 +14,10 @@
 - [ ] `pnpm typecheck`
 - [ ] `pnpm test:coverage`
 - [ ] `pnpm check:critical-coverage`
+- [ ] `pnpm check:security-rules`
 - [ ] docs updated if behavior changed
 
 ## Rollout Notes
 - staging verification required:
 - production verification required:
 - rollback target:
-

@@ -19,7 +19,8 @@
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "check:critical-coverage": "node scripts/check-critical-coverage.mjs",
-    "ci:verify": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm check:critical-coverage && pnpm build",
+    "check:security-rules": "node scripts/check-security-rules.mjs",
+    "ci:verify": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm check:critical-coverage && pnpm check:security-rules && pnpm build",
     "format": "prettier --write .",
     "prepare": "husky"
   },
