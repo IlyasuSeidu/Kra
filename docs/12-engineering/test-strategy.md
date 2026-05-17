@@ -52,6 +52,9 @@
 - release gate: full suite + manual UAT sign-off
 - security rules gate: `pnpm check:security-rules` must pass inside `pnpm ci:verify`
 - security rules gate verifies Firebase config points to committed Firestore and Storage rules, default-deny rules remain present, protected backend-owned collections deny direct writes, pricing rules stay backend-mediated, proof assets stay backend-mediated, and critical Firestore indexes exist
+- backend readiness gate: `pnpm check:backend-readiness` must pass inside `pnpm ci:verify`
+- backend readiness gate verifies API deployment env validation is configured and launch Firestore bootstrap data can be generated without credentials
+- runtime artifact gate: `pnpm check:api-runtime-imports` must pass after build so the compiled Node API is importable before Cloud Run deployment
 
 ## Owners
 - automated test owner: `technical owner`

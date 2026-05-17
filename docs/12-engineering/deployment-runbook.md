@@ -11,8 +11,12 @@
 
 ## Release Checklist
 - Secrets present.
+- `pnpm check:api-env:staging` or `pnpm check:api-env:production` passes against the target environment.
+- `pnpm --filter @kra/api check:launch-bootstrap` confirms launch bootstrap payload shape.
 - Rules deployed.
 - `pnpm check:security-rules` passes against committed `firebase.json`, `firestore.rules`, `storage.rules`, and `firestore.indexes.json`.
+- Launch station and active pricing defaults have been bootstrapped with `pnpm --filter @kra/api bootstrap:launch-data` when the environment is new.
+- `pnpm check:api-runtime-imports` passes after build, proving the compiled API artifact can be imported by Node before Cloud Run deployment.
 - Callback URLs verified.
 - Monitoring enabled.
 - Rollback plan available.
@@ -28,6 +32,8 @@
 - `pnpm lint`
 - `pnpm test`
 - `pnpm build`
+- `pnpm check:api-runtime-imports`
+- `pnpm check:backend-readiness`
 - `pnpm deploy:rules:staging`
 - `pnpm deploy:api:staging`
 - `pnpm deploy:ai:staging`
