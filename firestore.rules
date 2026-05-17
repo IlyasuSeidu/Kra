@@ -81,6 +81,10 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /proof_assets/{proofAssetId} {
+      allow read, write: if false;
+    }
+
     match /support_issues/{issueId} {
       allow read: if isAuthenticated() && (
         isSupportOrOpsAdmin() ||

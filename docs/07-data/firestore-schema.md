@@ -8,6 +8,7 @@
 - `packages`
 - `handoff_events`
 - `payments`
+- `proof_assets`
 - `support_issues`
 - `notifications`
 - `outbound_notifications`
@@ -54,6 +55,15 @@ Store current delivery summary on the delivery document and keep detailed histor
 - reconciliation field `reconciliationReviewReason`
 - reconciliation field `lastReconciliationError`
 - unresolved pending payments move to finance review after the `5m`, `15m`, and `30m` verification checkpoints are exhausted
+
+### `proof_assets/{proofAssetId}`
+- delivery ID and fallback proof type
+- upload status: `pending_upload`, `uploaded`, `attached`, or `rejected`
+- Cloud Storage bucket and object path
+- content type, byte size, SHA-256 hash, and storage generation where available
+- actor that requested the upload intent
+- upload expiry, uploaded timestamp, and attached timestamp
+- direct Firestore client access is blocked; proof metadata is exposed only through backend APIs
 
 ### `support_issues/{issueId}`
 - issue status, category, severity, and linked delivery

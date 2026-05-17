@@ -62,6 +62,7 @@ export const deliveryIdSchema = z.string().regex(/^DEL-[A-Z0-9-]+$/);
 export const paymentIdSchema = z.string().regex(/^PAY-[A-Z0-9-]+$/);
 export const issueIdSchema = z.string().regex(/^ISS-[A-Z0-9-]+$/);
 export const notificationIdSchema = z.string().regex(/^NTF-[A-Z0-9-]+$/);
+export const proofAssetIdSchema = z.string().regex(/^PFA-[A-Z0-9-]+$/);
 export const trackingCodeSchema = z.string().regex(/^KRA-[A-Z0-9-]+$/);
 export const challengeIdSchema = z.string().regex(/^CHL-[A-Z0-9-]+$/);
 export const userIdSchema = z.string().regex(/^USR-[A-Z0-9-]+$/);
@@ -78,6 +79,14 @@ export const deliveryCustodyRoleSchema = z.enum([
 ]);
 export const packageConditionSchema = z.enum(["ok", "damaged"]);
 export const deliveryProofTypeSchema = z.enum(["otp", "signature", "delivery_photo"]);
+export const deliveryProofAssetTypeSchema = z.enum(["signature", "delivery_photo"]);
+export const proofAssetContentTypeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
+export const proofAssetStatusSchema = z.enum([
+  "pending_upload",
+  "uploaded",
+  "attached",
+  "rejected"
+]);
 
 const moneySchema = z.object({
   currency: z.literal("GHS"),
@@ -423,6 +432,53 @@ export const acceptFinalMileAssignmentRequestSchema = z.object({
 
 export const markOutForDeliveryRequestSchema = z.object({
   note: z.string().trim().min(3).max(240).optional()
+});
+
+export const createProofAssetUploadRequestSchema = z.object({
+  proofType: deliveryProofAssetTypeSchema,
+  contentType: proofAssetContentTypeSchema,
+  byteSize: z.number().int().positive().max(8_000_000),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/).optional()
+});
+
+export const createProofAssetUploadResponseSchema = z.object({
+  proofAssetId: proofAssetIdSchema,
+  deliveryId: deliveryIdSchema,
+  proofReference: proofAssetIdSchema,
+  proofType: deliveryProofAssetTypeSchema,
+  status: z.literal("pending_upload"),
+  upload: z.object({
+    method: z.literal("PUT"),
+    url: z.string().url(),
+    bucket: z.string().trim().min(3),
+    objectPath: z.string().trim().min(10),
+    contentType: proofAssetContentTypeSchema,
+    expiresAt: z.string().datetime()
+  })
+});
+
+export const confirmProofAssetUploadRequestSchema = z.object({
+  byteSize: z.number().int().positive().max(8_000_000),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  storageGeneration: z.string().trim().min(1).max(120).optional()
+});
+
+export const proofAssetResponseSchema = z.object({
+  proofAssetId: proofAssetIdSchema,
+  deliveryId: deliveryIdSchema,
+  proofReference: proofAssetIdSchema,
+  proofType: deliveryProofAssetTypeSchema,
+  status: proofAssetStatusSchema,
+  contentType: proofAssetContentTypeSchema,
+  byteSize: z.number().int().positive().max(8_000_000),
+  storageBucket: z.string().trim().min(3),
+  storageObjectPath: z.string().trim().min(10),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  storageGeneration: z.string().trim().min(1).max(120).optional(),
+  createdAt: z.string().datetime(),
+  uploadExpiresAt: z.string().datetime(),
+  uploadedAt: z.string().datetime().optional(),
+  attachedAt: z.string().datetime().optional()
 });
 
 export const completeDeliveryRequestSchema = z.object({

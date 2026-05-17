@@ -6,6 +6,7 @@ import type { IdempotencyRecord } from "../idempotency";
 import type { SupportIssueRecord } from "../issues";
 import type { WebhookEventRecord } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
+import type { ProofAssetRecord } from "../proof-assets";
 import type { NotificationRecord } from "../notification-feed";
 import type { OutboundNotificationRecord } from "../outbound-notifications";
 import type { AuditEventRecord } from "../audit";
@@ -25,6 +26,7 @@ export const firestoreCollections = {
   deliveries: "deliveries",
   deliveryEvents: "events",
   payments: "payments",
+  proofAssets: "proof_assets",
   handoffEvents: "handoff_events",
   webhookEvents: "provider_webhook_events",
   supportIssues: "support_issues",
@@ -50,6 +52,7 @@ export interface PaymentDocument extends PaymentRecord {
   refundRequestedAt?: string;
 }
 
+export type ProofAssetDocument = ProofAssetRecord;
 export type DeliveryEventDocument = DeliveryEventRecord;
 export type HandoffEventDocument = HandoffEventRecord;
 export type WebhookEventDocument = WebhookEventRecord;
@@ -79,6 +82,7 @@ export const outboundNotificationConverter =
   createPassThroughConverter<OutboundNotificationDocument>();
 export const deliveryConverter = createPassThroughConverter<DeliveryDocument>();
 export const paymentConverter = createPassThroughConverter<PaymentDocument>();
+export const proofAssetConverter = createPassThroughConverter<ProofAssetDocument>();
 export const deliveryEventConverter = createPassThroughConverter<DeliveryEventDocument>();
 export const handoffEventConverter = createPassThroughConverter<HandoffEventDocument>();
 export const webhookEventConverter = createPassThroughConverter<WebhookEventDocument>();
@@ -118,6 +122,10 @@ export function deliveryEventDocumentPath(deliveryId: string, eventId: string): 
 
 export function paymentDocumentPath(paymentId: string): string {
   return `${firestoreCollections.payments}/${paymentId}`;
+}
+
+export function proofAssetDocumentPath(proofAssetId: string): string {
+  return `${firestoreCollections.proofAssets}/${proofAssetId}`;
 }
 
 export function handoffEventDocumentPath(handoffEventId: string): string {

@@ -34,6 +34,9 @@ export function createApiIdentityFactory() {
     nextOutboundNotificationId() {
       return buildPrefixedId("ONF");
     },
+    nextProofAssetId() {
+      return buildPrefixedId("PFA");
+    },
     nextChallengeId() {
       return buildPrefixedId("CHL");
     },

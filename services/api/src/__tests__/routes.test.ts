@@ -187,8 +187,22 @@ describe("api routes", () => {
       "accept_final_mile_assignment",
       "mark_out_for_delivery",
       "record_failed_attempt",
-      "complete_delivery"
+      "complete_delivery",
+      "create_delivery_proof_asset",
+      "confirm_delivery_proof_asset_upload"
     ]);
+    expect(getApiRoute("create_delivery_proof_asset")).toMatchObject({
+      authScope: "staff",
+      path: "/v1/deliveries/:id/proof-assets",
+      capability: "complete_delivery_with_proof"
+    });
+    expect(getApiRoute("create_delivery_proof_asset")?.requestSchema).toBeDefined();
+    expect(getApiRoute("create_delivery_proof_asset")?.responseSchema).toBeDefined();
+    expect(getApiRoute("confirm_delivery_proof_asset_upload")).toMatchObject({
+      authScope: "staff",
+      path: "/v1/deliveries/:id/proof-assets/:proofAssetId/confirm-upload",
+      capability: "complete_delivery_with_proof"
+    });
   });
 
   it("registers issue management routes", () => {

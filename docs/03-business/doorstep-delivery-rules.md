@@ -37,6 +37,8 @@ Doorstep delivery extends the network from destination-station receipt to receiv
 - If OTP cannot be completed, the courier may use exactly one approved fallback:
   - receiver signature
   - delivery photo showing the handoff
+- Signature and delivery-photo fallback proof must use a backend-issued `PFA-*` proof asset reference.
+- A fallback proof asset must be uploaded and confirmed before the delivery can be completed.
 - Every non-OTP completion must store:
   - `proof_fallback_reason`
   - receiver name

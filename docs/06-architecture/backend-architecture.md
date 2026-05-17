@@ -73,5 +73,13 @@ Business logic should live in application services, not in route handlers and no
 - Payments still unresolved after the `30m` checkpoint are marked with `reconciliationReviewRequiredAt` and exposed through `GET /v1/admin/payment-reconciliation`.
 - Finance admins receive fixed-column reconciliation rows and CSV text from the backend without relying on frontend-only export logic.
 
+## Proof Asset Storage
+- Signature and delivery-photo fallback proof must start with a backend-created proof upload intent.
+- The API signs short-lived `PUT` upload URLs for Cloud Storage and persists `proof_assets/{proofAssetId}` metadata before upload.
+- Direct Firebase Storage client SDK access is denied by default storage rules; app clients use backend-issued signed URLs.
+- Upload confirmation records byte size, SHA-256 hash, and storage generation before the asset can be used as final proof.
+- `/v1/deliveries/:id/complete` accepts fallback proof only when `proofReference` is an uploaded `PFA-*` asset for the same delivery and proof type.
+- Raw proof URLs are not exposed in delivery summaries, timelines, or public tracking responses.
+
 ## Baseline Status
 This file is now concrete enough to guide backend scaffolding and async workflow design.

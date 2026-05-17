@@ -13,7 +13,9 @@ import {
   assignFinalMileRequestSchema,
   buildApiErrorResponse,
   cancelDeliveryRequestSchema,
+  confirmProofAssetUploadRequestSchema,
   completeDeliveryRequestSchema,
+  createProofAssetUploadRequestSchema,
   confirmDriverPickupRequestSchema,
   confirmIntakeRequestSchema,
   createDeliveryRequestSchema,
@@ -168,6 +170,16 @@ import {
   settlePaymentRefund,
   type RefundPaymentRepository
 } from "./refunds";
+import {
+  assertUploadedProofAssetForCompletion,
+  confirmProofAssetUpload,
+  createProofAssetUploadIntent,
+  markProofAssetAttachedToDelivery,
+  type ProofAssetIdentityFactory,
+  type ProofAssetRepository,
+  type ProofStorageGateway
+} from "./proof-assets";
+import { createFirebaseProofStorageGateway } from "./proof-storage";
 import { ApiServiceError } from "./service-errors";
 import { updateStationStatus, updateStationValidation, type StationRepository } from "./stations";
 import {
@@ -190,7 +202,8 @@ type SharedIdentityFactory = PaymentIdentityFactory &
   OutboundNotificationIdentityFactory &
   PublicTrackingVerificationIdentityFactory &
   AuditIdentityFactory &
-  SupportIssueIdentityFactory & {
+  SupportIssueIdentityFactory &
+  ProofAssetIdentityFactory & {
     nextRequestId(): string;
     nextDeliveryId(): string;
     nextTrackingCode(): string;
@@ -215,12 +228,14 @@ export interface ApiAppDeps {
     PaymentReconciliationRepository &
     RefundPaymentRepository &
     AdminPaymentMetricsRepository;
+  proofAssets: ProofAssetRepository;
   issues: SupportIssueRepository & AdminIssueMetricsRepository & DeliveryIssueReadRepository;
   verification: PublicTrackingVerificationRepository;
   webhookEvents: WebhookEventRepository & AdminWebhookMetricsRepository;
   idempotency: IdempotencyRepository;
   auditEvents: AuditEventRepository;
   gateway: MtnMomoGateway;
+  proofStorage?: ProofStorageGateway;
   notifications?: PublicTrackingOtpNotificationGateway & ReceiverDeliveryNotificationGateway;
   identityFactory: SharedIdentityFactory;
   now: () => string;
@@ -745,12 +760,16 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
     deliveryEvents: repositories.deliveryEvents,
     handoffEvents: repositories.handoffEvents,
     payments: repositories.payments,
+    proofAssets: repositories.proofAssets,
     issues: repositories.issues,
     verification: repositories.verification,
     webhookEvents: repositories.webhookEvents,
     idempotency: repositories.idempotency,
     auditEvents: repositories.auditEvents,
     gateway: createMtnMomoGateway(config),
+    ...(config.firebaseStorageBucket === undefined
+      ? {}
+      : { proofStorage: createFirebaseProofStorageGateway(config) }),
     ...(config.hubtelSms === undefined
       ? {}
       : { notifications: createHubtelSmsGateway(config) }),
@@ -1807,6 +1826,88 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
     });
 
+    rateLimitedApp.post("/v1/deliveries/:id/proof-assets", { preHandler: [authenticatedMutationPreHandler, requireDeliveryCompletionAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!deps.proofStorage) {
+        throw new ApiServiceError("ROUTE_NOT_ENABLED", "Proof asset storage is not configured.", {
+          reason: "missing_proof_storage_gateway"
+        });
+      }
+
+      const proofStorage = deps.proofStorage;
+      const principal = getAuthenticatedPrincipal(request);
+      const input = createProofAssetUploadRequestSchema.parse(request.body);
+      const deliveryId = (request.params as { id: string }).id;
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "create_delivery_proof_asset",
+        fingerprint: {
+          deliveryId,
+          body: input
+        }
+      }, async () => {
+        const result = await createProofAssetUploadIntent(
+          {
+            deliveryId,
+            requestedByUserId: principal.userId,
+            requestedByRole: principal.role,
+            ...(principal.stationId === undefined ? {} : { requestedByStationId: principal.stationId }),
+            proofType: input.proofType,
+            contentType: input.contentType,
+            byteSize: input.byteSize,
+            ...(input.sha256 === undefined ? {} : { sha256: input.sha256 })
+          },
+          {
+            deliveries: deps.deliveries,
+            proofAssets: deps.proofAssets,
+            proofStorage,
+            identityFactory: deps.identityFactory,
+            now: deps.now
+          }
+        );
+
+        return {
+          statusCode: 201,
+          responseBody: result.response
+        };
+      });
+    });
+
+    rateLimitedApp.post("/v1/deliveries/:id/proof-assets/:proofAssetId/confirm-upload", { preHandler: [authenticatedMutationPreHandler, requireDeliveryCompletionAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = confirmProofAssetUploadRequestSchema.parse(request.body);
+      const { id: deliveryId, proofAssetId } = request.params as {
+        id: string;
+        proofAssetId: string;
+      };
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "confirm_delivery_proof_asset_upload",
+        fingerprint: {
+          deliveryId,
+          proofAssetId,
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: await confirmProofAssetUpload(
+          {
+            deliveryId,
+            proofAssetId,
+            confirmedByUserId: principal.userId,
+            byteSize: input.byteSize,
+            sha256: input.sha256,
+            ...(input.storageGeneration === undefined
+              ? {}
+              : { storageGeneration: input.storageGeneration })
+          },
+          {
+            proofAssets: deps.proofAssets,
+            now: deps.now
+          }
+        )
+      }));
+    });
+
     rateLimitedApp.post("/v1/deliveries/:id/complete", { preHandler: [authenticatedMutationPreHandler, requireDeliveryCompletionAccess] }, async (request: FastifyRequest, reply: FastifyReply) => {
       const principal = getAuthenticatedPrincipal(request);
       const input = completeDeliveryRequestSchema.parse(request.body);
@@ -1819,6 +1920,19 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           body: input
         }
       }, async () => {
+        if (input.proofType !== "otp") {
+          await assertUploadedProofAssetForCompletion(
+            {
+              deliveryId,
+              proofAssetId: input.proofReference,
+              proofType: input.proofType
+            },
+            {
+              proofAssets: deps.proofAssets
+            }
+          );
+        }
+
         const result = await completeDelivery(
           {
             deliveryId,
@@ -1835,6 +1949,18 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
             now: deps.now
           }
         );
+        if (input.proofType !== "otp") {
+          await markProofAssetAttachedToDelivery(
+            {
+              proofAssetId: input.proofReference,
+              attachedByUserId: principal.userId
+            },
+            {
+              proofAssets: deps.proofAssets,
+              now: deps.now
+            }
+          );
+        }
         await notifyDeliveryStatusChange(deps, result.delivery);
 
         return {

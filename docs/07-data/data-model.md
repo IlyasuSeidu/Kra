@@ -10,6 +10,7 @@
 - `Payment`
 - `SupportIssue`
 - `Notification`
+- `ProofAsset`
 - `Rating`
 - `Route`
 
@@ -72,11 +73,25 @@ The package can be modeled as part of the delivery in early versions if one deli
 - `proofType`
 - `occurredAt`
 
+### ProofAsset
+- `proofAssetId`
+- `deliveryId`
+- `proofType`
+- `status`
+- `contentType`
+- `byteSize`
+- `storageBucket`
+- `storageObjectPath`
+- `sha256`
+- `createdAt`
+- `uploadedAt`
+- `attachedAt`
+
 ## Optional Fields
 - `addressText`
 - `specialHandlingNotes`
 - `gpsSnapshot`
-- `proofAssetUrl`
+- `proofAssetId`
 - `issueId`
 
 ## Source Of Truth Rule
