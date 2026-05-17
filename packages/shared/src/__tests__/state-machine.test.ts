@@ -22,6 +22,10 @@ describe("state-machine", () => {
     );
   });
 
+  it("accepts valid transitions without throwing", () => {
+    expect(() => assertTransition("draft", "created")).not.toThrow();
+  });
+
   it("models issue and hold exception flows", () => {
     expect(canTransition("awaiting_driver_assignment", "issue_reported")).toBe(true);
     expect(canTransition("awaiting_receiver_pickup", "on_hold")).toBe(true);
