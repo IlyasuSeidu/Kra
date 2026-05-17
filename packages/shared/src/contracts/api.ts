@@ -242,7 +242,7 @@ export const mtnMomoWebhookRequestSchema = z.object({
   amountGhs: z.number().int().positive(),
   currency: z.literal("GHS"),
   occurredAt: z.string().datetime(),
-  rawPayload: z.record(z.unknown()).optional()
+  rawPayload: z.record(z.string(), z.unknown()).optional()
 });
 
 export const mtnMomoWebhookResponseSchema = z.object({
@@ -318,7 +318,7 @@ export const deliveryTimelineEntrySchema = z.object({
   actorId: userIdSchema.optional(),
   actorRole: z.string().trim().min(3).max(80).optional(),
   stationId: stationIdSchema.optional(),
-  metadata: z.record(z.unknown()).optional()
+  metadata: z.record(z.string(), z.unknown()).optional()
 });
 
 export const deliveryTimelineResponseSchema = z.object({
@@ -764,7 +764,7 @@ export const auditEventListResponseSchema = z.object({
       stationId: stationIdSchema.optional(),
       targetType: auditTargetTypeSchema.optional(),
       targetId: z.string().trim().min(3).max(120).optional(),
-      metadata: z.record(z.unknown()).optional()
+      metadata: z.record(z.string(), z.unknown()).optional()
     })
   )
 });
@@ -1211,7 +1211,7 @@ export const apiErrorResponseSchema = z.object({
   error: z.object({
     code: apiErrorCodeSchema,
     message: z.string().min(3),
-    details: z.record(z.unknown())
+    details: z.record(z.string(), z.unknown())
   })
 });
 
