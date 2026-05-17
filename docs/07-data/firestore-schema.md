@@ -8,6 +8,7 @@
 - `packages`
 - `handoff_events`
 - `payments`
+- `pricing_rules`
 - `proof_assets`
 - `support_issues`
 - `notifications`
@@ -56,6 +57,13 @@ Store current delivery summary on the delivery document and keep detailed histor
 - reconciliation field `lastReconciliationError`
 - unresolved pending payments move to finance review after the `5m`, `15m`, and `30m` verification checkpoints are exhausted
 
+### `pricing_rules/active`
+- current finance-approved route base fee table
+- `PRC-*` pricing rule ID, `active` status, `GHS` currency, route base fees, effective timestamp, update timestamp, updater user ID, and optional note
+- contains every one-way launch corridor exactly once
+- read access is finance-admin scoped; direct client writes are blocked
+- copied to `pricing_rules/{pricingRuleId}` on every update to preserve immutable pricing history
+
 ### `proof_assets/{proofAssetId}`
 - delivery ID and fallback proof type
 - upload status: `pending_upload`, `uploaded`, `attached`, or `rejected`
@@ -88,6 +96,7 @@ Store current delivery summary on the delivery document and keep detailed histor
   - `payments` by `status + nextReconciliationAt`
   - `payments` by `status + reconciliationReviewRequiredAt`
   - `payments` by `reconciliationReviewReason + reconciliationReviewRequiredAt`
+  - `pricing_rules` by `status + effectiveAt` if historical pricing search is exposed after v1
   - `support_issues` by `status + severity + createdAt`
   - `outbound_notifications` by `dedupeKey`
   - `outbound_notifications` by `status + nextAttemptAt`
@@ -100,7 +109,7 @@ Store current delivery summary on the delivery document and keep detailed histor
 - Event collections remain immutable and may be retained longer than hot query windows.
 
 ## Security Alignment Rule
-- Client writes to `events`, `payments`, `outbound_notifications`, and `audit_events` are blocked.
+- Client writes to `events`, `payments`, `pricing_rules`, `outbound_notifications`, and `audit_events` are blocked.
 - Client reads are limited by sender ownership, assignment scope, or station scope.
 
 ## Baseline Status

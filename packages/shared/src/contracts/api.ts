@@ -63,6 +63,7 @@ export const paymentIdSchema = z.string().regex(/^PAY-[A-Z0-9-]+$/);
 export const issueIdSchema = z.string().regex(/^ISS-[A-Z0-9-]+$/);
 export const notificationIdSchema = z.string().regex(/^NTF-[A-Z0-9-]+$/);
 export const proofAssetIdSchema = z.string().regex(/^PFA-[A-Z0-9-]+$/);
+export const pricingRuleIdSchema = z.string().regex(/^PRC-[A-Z0-9-]+$/);
 export const trackingCodeSchema = z.string().regex(/^KRA-[A-Z0-9-]+$/);
 export const challengeIdSchema = z.string().regex(/^CHL-[A-Z0-9-]+$/);
 export const userIdSchema = z.string().regex(/^USR-[A-Z0-9-]+$/);
@@ -833,6 +834,76 @@ export const adminPaymentReconciliationResponseSchema = z.object({
     })
   ),
   csv: z.string()
+});
+
+const allLaunchRouteKeys = stationIds.flatMap((originStationId) =>
+  stationIds
+    .filter((destinationStationId) => destinationStationId !== originStationId)
+    .map((destinationStationId) => `${originStationId}:${destinationStationId}`)
+);
+
+export const adminPricingRouteBaseFeeSchema = z.object({
+  originStationId: stationIdSchema,
+  destinationStationId: stationIdSchema,
+  baseFeeGhs: z.number().int().positive().max(10000)
+});
+
+function validateCompleteRouteBaseFeeTable(
+  value: {
+    routeBaseFees: Array<z.infer<typeof adminPricingRouteBaseFeeSchema>>;
+  },
+  ctx: z.RefinementCtx
+): void {
+  const routeKeys = value.routeBaseFees.map(
+    (fee) => `${fee.originStationId}:${fee.destinationStationId}`
+  );
+  const uniqueRouteKeys = new Set(routeKeys);
+
+  if (uniqueRouteKeys.size !== routeKeys.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Route base fees must not contain duplicate corridors.",
+      path: ["routeBaseFees"]
+    });
+  }
+
+  for (const [index, fee] of value.routeBaseFees.entries()) {
+    if (fee.originStationId === fee.destinationStationId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Route base fee origin and destination must be different.",
+        path: ["routeBaseFees", index, "destinationStationId"]
+      });
+    }
+  }
+
+  const missingRouteKeys = allLaunchRouteKeys.filter((routeKey) => !uniqueRouteKeys.has(routeKey));
+  if (missingRouteKeys.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Route base fee table is missing launch corridors: ${missingRouteKeys.join(", ")}.`,
+      path: ["routeBaseFees"]
+    });
+  }
+}
+
+export const adminUpdatePricingRulesRequestSchema = z
+  .object({
+    routeBaseFees: z.array(adminPricingRouteBaseFeeSchema).length(allLaunchRouteKeys.length),
+    effectiveAt: z.string().datetime().optional(),
+    note: z.string().trim().min(3).max(240).optional()
+  })
+  .superRefine(validateCompleteRouteBaseFeeTable);
+
+export const adminPricingRulesResponseSchema = z.object({
+  pricingRuleId: pricingRuleIdSchema,
+  status: z.literal("active"),
+  currency: z.literal("GHS"),
+  routeBaseFees: z.array(adminPricingRouteBaseFeeSchema).length(allLaunchRouteKeys.length),
+  effectiveAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  updatedByUserId: userIdSchema,
+  note: z.string().trim().min(3).max(240).optional()
 });
 
 export const adminOverviewResponseSchema = z.object({

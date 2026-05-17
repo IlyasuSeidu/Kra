@@ -133,6 +133,19 @@ describe("api routes", () => {
       path: "/v1/admin/launch-readiness"
     });
     expect(getApiRoute("admin_launch_readiness")?.responseSchema).toBeDefined();
+    expect(getApiRoute("admin_pricing_rules")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/pricing-rules",
+      capability: "manage_pricing_rules"
+    });
+    expect(getApiRoute("admin_pricing_rules")?.responseSchema).toBeDefined();
+    expect(getApiRoute("admin_update_pricing_rules")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/pricing-rules/active",
+      capability: "manage_pricing_rules"
+    });
+    expect(getApiRoute("admin_update_pricing_rules")?.requestSchema).toBeDefined();
+    expect(getApiRoute("admin_update_pricing_rules")?.responseSchema).toBeDefined();
     expect(getApiRoute("admin_payment_reconciliation")).toMatchObject({
       authScope: "admin",
       path: "/v1/admin/payment-reconciliation",

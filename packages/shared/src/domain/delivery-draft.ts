@@ -39,6 +39,7 @@ export interface CreateDeliveryDraftRefs {
   deliveryId: string;
   trackingCode: string;
   createdAt: string;
+  quoteAmountGhs?: number;
 }
 
 export interface DeliveryDraft {
@@ -125,7 +126,7 @@ export function createDeliveryDraft(
     paymentStatus: "pending",
     quote: {
       currency: "GHS",
-      amount: calculateDeliveryQuote(toQuoteInput(input))
+      amount: refs.quoteAmountGhs ?? calculateDeliveryQuote(toQuoteInput(input))
     },
     paymentRequiredBeforeDispatch: true,
     currentCustodyRole: null,

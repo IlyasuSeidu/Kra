@@ -7,8 +7,10 @@ import {
   adminLaunchReadinessResponseSchema,
   adminOutboundNotificationListQuerySchema,
   adminOutboundNotificationListResponseSchema,
+  adminPricingRulesResponseSchema,
   adminUpdateStationStatusRequestSchema,
   adminUpdateStationStatusResponseSchema,
+  adminUpdatePricingRulesRequestSchema,
   adminUpdateStationValidationRequestSchema,
   adminUpdateStationValidationResponseSchema,
   adminUpdateUserAccessRequestSchema,
@@ -760,6 +762,39 @@ describe("api contracts", () => {
   });
 
   it("accepts admin user and station-management contracts", () => {
+    const routeBaseFees = [
+      {
+        originStationId: "ST-ACC-01",
+        destinationStationId: "ST-KMS-01",
+        baseFeeGhs: 35
+      },
+      {
+        originStationId: "ST-ACC-01",
+        destinationStationId: "ST-TML-01",
+        baseFeeGhs: 65
+      },
+      {
+        originStationId: "ST-KMS-01",
+        destinationStationId: "ST-ACC-01",
+        baseFeeGhs: 35
+      },
+      {
+        originStationId: "ST-KMS-01",
+        destinationStationId: "ST-TML-01",
+        baseFeeGhs: 50
+      },
+      {
+        originStationId: "ST-TML-01",
+        destinationStationId: "ST-ACC-01",
+        baseFeeGhs: 65
+      },
+      {
+        originStationId: "ST-TML-01",
+        destinationStationId: "ST-KMS-01",
+        baseFeeGhs: 50
+      }
+    ];
+
     expect(
       adminUpsertUserRequestSchema.parse({
         userId: "USR-OPS-001",
@@ -908,6 +943,32 @@ describe("api contracts", () => {
         status: "ready",
         goLiveEligible: true
       }
+    });
+
+    expect(
+      adminUpdatePricingRulesRequestSchema.parse({
+        routeBaseFees,
+        note: "Launch corridor finance approval."
+      })
+    ).toMatchObject({
+      routeBaseFees,
+      note: "Launch corridor finance approval."
+    });
+
+    expect(
+      adminPricingRulesResponseSchema.parse({
+        pricingRuleId: "PRC-0001",
+        status: "active",
+        currency: "GHS",
+        routeBaseFees,
+        effectiveAt: "2026-05-16T12:20:00.000Z",
+        updatedAt: "2026-05-16T12:20:00.000Z",
+        updatedByUserId: "USR-FIN-001",
+        note: "Launch corridor finance approval."
+      })
+    ).toMatchObject({
+      pricingRuleId: "PRC-0001",
+      routeBaseFees
     });
 
     expect(

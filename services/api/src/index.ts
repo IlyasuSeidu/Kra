@@ -34,6 +34,7 @@ export * from "./outbound-notifications";
 export * from "./payment-reconciliation";
 export * from "./payment-webhooks";
 export * from "./payments";
+export * from "./pricing-rules";
 export * from "./proof-assets";
 export * from "./proof-storage";
 export * from "./public-tracking";

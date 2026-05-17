@@ -43,7 +43,11 @@ export interface QuoteInput {
   doorstepDistanceKm?: number;
 }
 
-const baseRouteFees: Record<string, number> = {
+export interface PricingConfig {
+  routeBaseFees: Record<string, number>;
+}
+
+const defaultBaseRouteFees: Record<string, number> = {
   "ST-ACC-01:ST-KMS-01": 35,
   "ST-KMS-01:ST-ACC-01": 35,
   "ST-ACC-01:ST-TML-01": 65,
@@ -51,6 +55,17 @@ const baseRouteFees: Record<string, number> = {
   "ST-KMS-01:ST-TML-01": 50,
   "ST-TML-01:ST-KMS-01": 50
 };
+
+export const defaultPricingConfig: PricingConfig = {
+  routeBaseFees: defaultBaseRouteFees
+};
+
+export function getRoutePricingKey(
+  originStationId: StationId,
+  destinationStationId: StationId
+): string {
+  return `${originStationId}:${destinationStationId}`;
+}
 
 function getWeightSurcharge(weightKg: number): number {
   if (weightKg <= 2) return 0;
@@ -75,9 +90,10 @@ function getDoorstepSurcharge(distanceKm: number | undefined): number {
 
 export function getBaseRouteFee(
   originStationId: StationId,
-  destinationStationId: StationId
+  destinationStationId: StationId,
+  pricingConfig: PricingConfig = defaultPricingConfig
 ): number {
-  const fee = baseRouteFees[`${originStationId}:${destinationStationId}`];
+  const fee = pricingConfig.routeBaseFees[getRoutePricingKey(originStationId, destinationStationId)];
   if (!fee) {
     throw new Error("Route is not enabled.");
   }
@@ -95,12 +111,19 @@ export interface QuoteBreakdown {
   totalAmount: number;
 }
 
-export function calculateDeliveryQuoteBreakdown(input: QuoteInput): QuoteBreakdown {
+export function calculateDeliveryQuoteBreakdown(
+  input: QuoteInput,
+  pricingConfig: PricingConfig = defaultPricingConfig
+): QuoteBreakdown {
   if (input.declaredValueGhs > 5000) {
     throw new Error("Declared value above GHS 5,000 is not self-serve in v1.");
   }
 
-  const baseFee = getBaseRouteFee(input.originStationId, input.destinationStationId);
+  const baseFee = getBaseRouteFee(
+    input.originStationId,
+    input.destinationStationId,
+    pricingConfig
+  );
   const weightSurcharge = getWeightSurcharge(input.weightKg);
   const sizeSurcharge = getSizeSurcharge(input.sizeTier);
   const fragileSurcharge = input.isFragile ? 10 : 0;
@@ -129,6 +152,9 @@ export function calculateDeliveryQuoteBreakdown(input: QuoteInput): QuoteBreakdo
   };
 }
 
-export function calculateDeliveryQuote(input: QuoteInput): number {
-  return calculateDeliveryQuoteBreakdown(input).totalAmount;
+export function calculateDeliveryQuote(
+  input: QuoteInput,
+  pricingConfig: PricingConfig = defaultPricingConfig
+): number {
+  return calculateDeliveryQuoteBreakdown(input, pricingConfig).totalAmount;
 }

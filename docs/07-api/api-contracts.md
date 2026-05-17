@@ -57,6 +57,8 @@
 - `GET /v1/admin/deliveries`
 - `GET /v1/admin/stations`
 - `GET /v1/admin/launch-readiness`
+- `GET /v1/admin/pricing-rules`
+- `POST /v1/admin/pricing-rules/active`
 - `POST /v1/admin/stations/:id/status`
 - `POST /v1/admin/stations/:id/validation`
 - `GET /v1/admin/finance`
@@ -243,6 +245,103 @@ Query:
   "limit": 20
 }
 ```
+
+### `GET /v1/admin/pricing-rules`
+Auth:
+- `finance_admin` or `super_admin` with `manage_pricing_rules`
+
+Response:
+```json
+{
+  "pricingRuleId": "PRC-0001",
+  "status": "active",
+  "currency": "GHS",
+  "routeBaseFees": [
+    {
+      "originStationId": "ST-ACC-01",
+      "destinationStationId": "ST-KMS-01",
+      "baseFeeGhs": 35
+    },
+    {
+      "originStationId": "ST-ACC-01",
+      "destinationStationId": "ST-TML-01",
+      "baseFeeGhs": 65
+    },
+    {
+      "originStationId": "ST-KMS-01",
+      "destinationStationId": "ST-ACC-01",
+      "baseFeeGhs": 35
+    },
+    {
+      "originStationId": "ST-KMS-01",
+      "destinationStationId": "ST-TML-01",
+      "baseFeeGhs": 50
+    },
+    {
+      "originStationId": "ST-TML-01",
+      "destinationStationId": "ST-ACC-01",
+      "baseFeeGhs": 65
+    },
+    {
+      "originStationId": "ST-TML-01",
+      "destinationStationId": "ST-KMS-01",
+      "baseFeeGhs": 50
+    }
+  ],
+  "effectiveAt": "2026-05-16T12:20:00.000Z",
+  "updatedAt": "2026-05-16T12:20:00.000Z",
+  "updatedByUserId": "USR-FIN-001",
+  "note": "Launch corridor finance approval."
+}
+```
+
+### `POST /v1/admin/pricing-rules/active`
+Auth:
+- `finance_admin` or `super_admin` with `manage_pricing_rules`
+
+Request:
+```json
+{
+  "routeBaseFees": [
+    {
+      "originStationId": "ST-ACC-01",
+      "destinationStationId": "ST-KMS-01",
+      "baseFeeGhs": 42
+    },
+    {
+      "originStationId": "ST-ACC-01",
+      "destinationStationId": "ST-TML-01",
+      "baseFeeGhs": 65
+    },
+    {
+      "originStationId": "ST-KMS-01",
+      "destinationStationId": "ST-ACC-01",
+      "baseFeeGhs": 35
+    },
+    {
+      "originStationId": "ST-KMS-01",
+      "destinationStationId": "ST-TML-01",
+      "baseFeeGhs": 50
+    },
+    {
+      "originStationId": "ST-TML-01",
+      "destinationStationId": "ST-ACC-01",
+      "baseFeeGhs": 65
+    },
+    {
+      "originStationId": "ST-TML-01",
+      "destinationStationId": "ST-KMS-01",
+      "baseFeeGhs": 50
+    }
+  ],
+  "note": "Temporary Accra to Kumasi fuel adjustment."
+}
+```
+
+Rules:
+- The route table must include every approved one-way launch corridor exactly once.
+- Same-station corridors are rejected.
+- Existing deliveries keep the quote amount captured at booking time.
 
 Response:
 ```json

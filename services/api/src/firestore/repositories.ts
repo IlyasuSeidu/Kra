@@ -32,6 +32,7 @@ import type {
   PaymentRepository
 } from "../payments";
 import type { PaymentReconciliationRepository } from "../payment-reconciliation";
+import type { PricingRuleRepository } from "../pricing-rules";
 import type { ProofAssetRepository } from "../proof-assets";
 import type {
   PaymentLookupRepository,
@@ -56,6 +57,7 @@ import {
   notificationConverter,
   outboundNotificationConverter,
   paymentConverter,
+  pricingRuleConverter,
   proofAssetConverter,
   publicTrackingPhoneChallengeConverter,
   publicTrackingVerificationAttemptConverter,
@@ -781,6 +783,32 @@ export function createFirestorePaymentRepository(
   };
 }
 
+export function createFirestorePricingRuleRepository(
+  firestore: Firestore
+): PricingRuleRepository {
+  const pricingRulesCollection = firestore
+    .collection(firestoreCollections.pricingRules)
+    .withConverter(pricingRuleConverter);
+
+  return {
+    async getActive() {
+      const snapshot = await pricingRulesCollection.doc("active").get();
+
+      if (!snapshot.exists) {
+        return undefined;
+      }
+
+      return snapshot.data();
+    },
+    async saveActive(record) {
+      await Promise.all([
+        pricingRulesCollection.doc("active").set(record),
+        pricingRulesCollection.doc(record.pricingRuleId).set(record)
+      ]);
+    }
+  };
+}
+
 export function createFirestoreProofAssetRepository(
   firestore: Firestore,
   now: () => string
@@ -1293,6 +1321,7 @@ export function createFirestoreApiRepositories(
     outboundNotifications: createFirestoreOutboundNotificationRepository(firestore),
     deliveries: createFirestoreDeliveryRepository(firestore, now),
     payments: createFirestorePaymentRepository(firestore, now),
+    pricingRules: createFirestorePricingRuleRepository(firestore),
     proofAssets: createFirestoreProofAssetRepository(firestore, now),
     issues: createFirestoreSupportIssueRepository(firestore, now),
     verification: createFirestorePublicTrackingVerificationRepository(firestore),

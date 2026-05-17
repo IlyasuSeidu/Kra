@@ -34,6 +34,7 @@
   - create -> pay -> doorstep -> deliver
   - create -> pay -> failed attempt -> pickup
   - refund and dispute path
+  - finance admin updates active pricing -> new delivery quote uses updated route fee
 - UI:
   - sender create-delivery
   - station intake
@@ -50,7 +51,7 @@
 - merge gate: lint + unit + integration
 - release gate: full suite + manual UAT sign-off
 - security rules gate: `pnpm check:security-rules` must pass inside `pnpm ci:verify`
-- security rules gate verifies Firebase config points to committed Firestore and Storage rules, default-deny rules remain present, protected backend-owned collections deny direct writes, proof assets stay backend-mediated, and critical Firestore indexes exist
+- security rules gate verifies Firebase config points to committed Firestore and Storage rules, default-deny rules remain present, protected backend-owned collections deny direct writes, pricing rules stay backend-mediated, proof assets stay backend-mediated, and critical Firestore indexes exist
 
 ## Owners
 - automated test owner: `technical owner`

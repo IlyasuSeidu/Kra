@@ -30,6 +30,10 @@ That reduces the risk of client-side privilege abuse and keeps domain validation
   - sender read for own payments
   - finance-admin read
   - no direct client write
+- `pricing_rules/{pricingRuleId}`:
+  - finance-admin read
+  - no direct client write
+  - updates must go through the backend pricing API so route-table validation and audit metadata cannot be bypassed
 - `support_issues/{issueId}`:
   - linked sender read
   - support and ops admin read and managed write through backend
@@ -42,6 +46,7 @@ That reduces the risk of client-side privilege abuse and keeps domain validation
   - status transitions
   - handoff events
   - payments
+  - pricing rules
   - refunds
   - admin overrides
 
@@ -50,7 +55,7 @@ That reduces the risk of client-side privilege abuse and keeps domain validation
 - driver can read assigned run and cannot read unassigned run
 - station operator can read station-scoped queue only
 - admin can read privileged collections by subrole
-- client cannot write audit, payment, or event collections directly
+- client cannot write audit, payment, pricing, or event collections directly
 
 ## Baseline Status
 This file is now concrete enough to guide security-rule implementation and emulator tests.

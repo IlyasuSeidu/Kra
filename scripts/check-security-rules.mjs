@@ -62,6 +62,7 @@ requireSnippet("Firestore default deny", firestoreRules, "match /{document=**} {
 requireSnippet("deliveries direct writes denied", firestoreRules, "match /deliveries/{deliveryId} {\n      allow read: if isAuthenticated() && canReadDelivery(resource.data);\n      allow create, update, delete: if false;");
 requireSnippet("delivery events writes denied", firestoreRules, "match /events/{eventId} {\n        allow read: if isAuthenticated() && canReadDelivery(get(/databases/$(database)/documents/deliveries/$(deliveryId)).data);\n        allow create, update, delete: if false;");
 requireSnippet("payments writes denied", firestoreRules, "match /payments/{paymentId} {\n      allow read: if isAuthenticated() && (");
+requireSnippet("pricing rules writes denied", firestoreRules, "match /pricing_rules/{pricingRuleId} {\n      allow read: if isAuthenticated() && isFinanceAdmin();\n      allow create, update, delete: if false;");
 requireSnippet("proof assets direct access denied", firestoreRules, "match /proof_assets/{proofAssetId} {\n      allow read, write: if false;");
 requireSnippet("outbound notifications direct access denied", firestoreRules, "match /outbound_notifications/{outboundNotificationId} {\n      allow read, write: if false;");
 requireSnippet("idempotency records direct access denied", firestoreRules, "match /idempotency_records/{recordId} {\n      allow read, write: if false;");

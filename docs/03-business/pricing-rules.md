@@ -28,6 +28,14 @@ Use tier-based pricing for v1 rather than a highly dynamic formula. That reduces
 - Do not support ad hoc bargaining inside the app.
 - Keep route tables simple and transparent.
 
+## Backend Enforcement
+- The backend reads the active route pricing table before creating every delivery quote.
+- Active pricing lives in Firestore as `pricing_rules/active` and is also snapshotted under its immutable `PRC-*` rule ID.
+- Finance admins update launch corridor base fees through `POST /v1/admin/pricing-rules/active`; app clients never write pricing directly.
+- The API rejects incomplete route tables. Every one-way launch corridor must be present exactly once before a pricing change can become active.
+- Delivery quotes store the final amount at booking time, so later route-price changes never mutate existing deliveries or payment obligations.
+- If no active database rule exists during first deploy, the API falls back to the approved default launch table in shared domain code.
+
 ## Approved V1 Decisions
 ### Launch Corridor Base Fees
 All launch prices are one-way and customer-facing in `GHS`.
