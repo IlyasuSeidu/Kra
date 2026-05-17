@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @kra/shared build && tsc -p tsconfig.build.json",
+    "build": "pnpm --filter @kra/shared build && tsc -p tsconfig.build.json && node ../../scripts/patch-esm-extensions.mjs dist",
+    "bootstrap:launch-data": "pnpm --filter @kra/shared build && node scripts/bootstrap-launch-data.mjs --apply",
+    "check:launch-bootstrap": "pnpm --filter @kra/shared build && node scripts/bootstrap-launch-data.mjs --dry-run",
     "dev": "pnpm --filter @kra/shared build && node --watch dist/server.js",
     "lint": "pnpm --filter @kra/shared build && eslint src",
     "start": "node dist/server.js",
