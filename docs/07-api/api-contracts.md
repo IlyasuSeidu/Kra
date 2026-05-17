@@ -5,6 +5,7 @@
 - Authenticated user requests use `Authorization: Bearer <firebase-id-token>`.
 - Admin endpoints use the same bearer pattern with server-side admin-role validation.
 - Payment provider callbacks use signed webhook verification and never Firebase bearer auth.
+- Internal scheduler endpoints use `X-Kra-Internal-Task-Secret`.
 
 ## Delivery APIs
 - `GET /v1/deliveries`
@@ -31,6 +32,7 @@
 - `POST /v1/payments/refund`
 - `POST /v1/payments/refund/settle`
 - `POST /v1/webhooks/payments/mtn-momo`
+- `POST /v1/internal/payments/reconcile-due`
 
 ## Support APIs
 - `GET /v1/issues`
@@ -55,6 +57,7 @@
 - `POST /v1/admin/stations/:id/status`
 - `POST /v1/admin/stations/:id/validation`
 - `GET /v1/admin/finance`
+- `GET /v1/admin/payment-reconciliation`
 - `GET /v1/admin/users`
 - `POST /v1/admin/users`
 - `POST /v1/admin/users/:id/access`
@@ -163,6 +166,42 @@ Response:
 }
 ```
 
+### `POST /v1/internal/payments/reconcile-due`
+Auth:
+- `X-Kra-Internal-Task-Secret: <INTERNAL_TASK_SHARED_SECRET>`
+
+Request:
+```json
+{
+  "limit": 25
+}
+```
+
+Response:
+```json
+{
+  "processed": 1,
+  "confirmed": 1,
+  "failed": 0,
+  "stillPending": 0,
+  "reviewRequired": 0,
+  "providerErrors": 0,
+  "results": [
+    {
+      "paymentId": "PAY-0001",
+      "deliveryId": "DEL-0001",
+      "provider": "mtn_momo",
+      "providerReference": "MTN-REF-0001",
+      "previousPaymentStatus": "pending",
+      "providerPaymentStatus": "confirmed",
+      "action": "confirmed",
+      "reconciliationAttemptCount": 1,
+      "checkedAt": "2026-05-16T08:05:30.000Z"
+    }
+  ]
+}
+```
+
 ### `GET /v1/admin/outbound-notifications`
 Query:
 ```json
@@ -190,6 +229,42 @@ Response:
       "maxAttempts": 2
     }
   ]
+}
+```
+
+### `GET /v1/admin/payment-reconciliation`
+Query:
+```json
+{
+  "reviewReason": "verification_unresolved_after_30_minutes",
+  "limit": 20
+}
+```
+
+Response:
+```json
+{
+  "generatedAt": "2026-05-16T09:00:00.000Z",
+  "rows": [
+    {
+      "businessDate": "2026-05-16",
+      "provider": "mtn_momo",
+      "providerReference": "MTN-REF-0001",
+      "paymentId": "PAY-0001",
+      "deliveryId": "DEL-0001",
+      "quotedAmountGhs": 35,
+      "chargedAmountGhs": 0,
+      "refundedAmountGhs": 0,
+      "internalPaymentStatus": "pending",
+      "providerPaymentStatus": "pending",
+      "mismatchType": "verification_unresolved_after_30_minutes",
+      "reconciliationAttemptCount": 3,
+      "initiatedAt": "2026-05-16T08:00:00.000Z",
+      "lastReconciliationAt": "2026-05-16T08:30:00.000Z",
+      "reviewRequiredAt": "2026-05-16T08:30:00.000Z"
+    }
+  ],
+  "csv": "businessDate,provider,providerReference,paymentId,deliveryId,quotedAmountGhs,chargedAmountGhs,refundedAmountGhs,internalPaymentStatus,providerPaymentStatus,mismatchType,reviewedBy,reviewedAt\n2026-05-16,mtn_momo,MTN-REF-0001,PAY-0001,DEL-0001,35,0,0,pending,pending,verification_unresolved_after_30_minutes,,"
 }
 ```
 

@@ -26,6 +26,8 @@ import {
   outboundNotificationDispatchRequestSchema,
   outboundNotificationDispatchResponseSchema,
   paymentInitializeRequestSchema,
+  paymentReconciliationDispatchRequestSchema,
+  paymentReconciliationDispatchResponseSchema,
   paymentVerifyRequestSchema,
   recordFailedAttemptRequestSchema,
   receiveDestinationRequestSchema,
@@ -143,6 +145,11 @@ import {
   type WebhookEventRepository
 } from "./payment-webhooks";
 import {
+  listAdminPaymentReconciliation,
+  reconcileDueMtnMomoPayments,
+  type PaymentReconciliationRepository
+} from "./payment-reconciliation";
+import {
   initializeMtnMomoPayment,
   verifyMtnMomoPayment,
   type MtnMomoGateway,
@@ -205,6 +212,7 @@ export interface ApiAppDeps {
   handoffEvents: HandoffEventRepository & HandoffEventReadRepository;
   payments: PaymentRepository &
     PaymentLookupRepository &
+    PaymentReconciliationRepository &
     RefundPaymentRepository &
     AdminPaymentMetricsRepository;
   issues: SupportIssueRepository & AdminIssueMetricsRepository & DeliveryIssueReadRepository;
@@ -1057,6 +1065,26 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
       });
 
       return outboundNotificationDispatchResponseSchema.parse(result);
+    });
+
+    rateLimitedApp.post("/v1/internal/payments/reconcile-due", { preHandler: [internalTaskPreHandler, requireInternalTaskSecret] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      setNoStore(reply);
+
+      const input = paymentReconciliationDispatchRequestSchema.parse(request.body ?? {});
+      const result = await reconcileDueMtnMomoPayments(input, {
+        payments: deps.payments,
+        deliveries: deps.deliveries,
+        gateway: deps.gateway,
+        now: deps.now
+      });
+
+      for (const item of result.results) {
+        if (item.action === "confirmed" || item.action === "failed") {
+          await queuePaymentStatusNotification(deps, item.deliveryId, item.action);
+        }
+      }
+
+      return paymentReconciliationDispatchResponseSchema.parse(result);
     });
 
     rateLimitedApp.get("/v1/deliveries", { preHandler: [authenticatedReadPreHandler, requireAuthenticated] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1994,6 +2022,14 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
     rateLimitedApp.get("/v1/admin/finance", { preHandler: [authenticatedReadPreHandler, requireFinanceAdmin] }, async (_request: FastifyRequest, reply: FastifyReply) => {
       setNoStore(reply);
       return listAdminFinance({
+        payments: deps.payments,
+        now: deps.now
+      });
+    });
+
+    rateLimitedApp.get("/v1/admin/payment-reconciliation", { preHandler: [authenticatedReadPreHandler, requireAdminCapability("review_reconciliation")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      setNoStore(reply);
+      return listAdminPaymentReconciliation((request.query as Record<string, unknown>) ?? {}, {
         payments: deps.payments,
         now: deps.now
       });

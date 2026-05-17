@@ -47,6 +47,13 @@ Store current delivery summary on the delivery document and keep detailed histor
 
 ### `payments/{paymentId}`
 - payment summary and provider mapping
+- reconciliation field `reconciliationAttemptCount`
+- reconciliation field `nextReconciliationAt`
+- reconciliation field `lastReconciliationAt`
+- reconciliation field `reconciliationReviewRequiredAt`
+- reconciliation field `reconciliationReviewReason`
+- reconciliation field `lastReconciliationError`
+- unresolved pending payments move to finance review after the `5m`, `15m`, and `30m` verification checkpoints are exhausted
 
 ### `support_issues/{issueId}`
 - issue status, category, severity, and linked delivery
@@ -68,6 +75,9 @@ Store current delivery summary on the delivery document and keep detailed histor
   - `deliveries` by `originStationId + currentStatus`
   - `deliveries` by `destinationStationId + currentStatus`
   - `payments` by `providerReference`
+  - `payments` by `status + nextReconciliationAt`
+  - `payments` by `status + reconciliationReviewRequiredAt`
+  - `payments` by `reconciliationReviewReason + reconciliationReviewRequiredAt`
   - `support_issues` by `status + severity + createdAt`
   - `outbound_notifications` by `dedupeKey`
   - `outbound_notifications` by `status + nextAttemptAt`

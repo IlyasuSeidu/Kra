@@ -132,6 +132,30 @@
       ]
     },
     {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "nextReconciliationAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "reconciliationReviewRequiredAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "reconciliationReviewReason", "order": "ASCENDING" },
+        { "fieldPath": "reconciliationReviewRequiredAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "support_issues",
       "queryScope": "COLLECTION",
       "fields": [

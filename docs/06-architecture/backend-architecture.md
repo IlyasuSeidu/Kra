@@ -55,6 +55,7 @@ Business logic should live in application services, not in route handlers and no
 - state-changing commands are idempotent through `Idempotency-Key`
 - webhook processing retries: immediate, `1m`, `5m`, `30m`, `2h`
 - notification tasks retry up to `3` times before human review
+- payment reconciliation verifies unresolved MTN MoMo charges at the `5m`, `15m`, and `30m` checkpoints before finance review
 - unrecoverable async failures move into dead-letter review queues
 
 ## Outbound Notification Outbox
@@ -63,6 +64,14 @@ Business logic should live in application services, not in route handlers and no
 - Receiver SMS uses a stricter v1 policy than generic notification tasks: first attempt plus one retry after `30 minutes`, then `dead_letter`.
 - Delivery lifecycle writes remain authoritative even when the SMS provider is degraded; operations recover from the outbox instead of losing the event.
 - Due outbox records are processed by the secured internal task endpoint `POST /v1/internal/outbound-notifications/dispatch-due` using `X-Kra-Internal-Task-Secret`.
+
+## Payment Reconciliation Worker
+- Pending MTN MoMo charges carry `nextReconciliationAt` and `reconciliationAttemptCount` on the payment document.
+- Cloud Scheduler or Cloud Tasks calls `POST /v1/internal/payments/reconcile-due` with `X-Kra-Internal-Task-Secret`.
+- The worker reuses the provider verification adapter, finalizes confirmed or failed payments, and updates delivery payment entitlement in the same service flow.
+- Still-pending provider results are rescheduled for the approved `15m` or `30m` checkpoints.
+- Payments still unresolved after the `30m` checkpoint are marked with `reconciliationReviewRequiredAt` and exposed through `GET /v1/admin/payment-reconciliation`.
+- Finance admins receive fixed-column reconciliation rows and CSV text from the backend without relying on frontend-only export logic.
 
 ## Baseline Status
 This file is now concrete enough to guide backend scaffolding and async workflow design.

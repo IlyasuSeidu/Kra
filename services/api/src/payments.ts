@@ -24,6 +24,22 @@ export interface PaymentRecord {
   refundReference?: string;
   refundSettledAt?: string;
   checkoutMode: "ussd_push";
+  reconciliationAttemptCount?: number;
+  nextReconciliationAt?: string;
+  lastReconciliationAt?: string;
+  reconciliationReviewRequiredAt?: string;
+  reconciliationReviewReason?: PaymentReconciliationReviewReason;
+  lastReconciliationError?: PaymentReconciliationError;
+}
+
+export type PaymentReconciliationReviewReason =
+  | "verification_unresolved_after_30_minutes"
+  | "provider_verification_error";
+
+export interface PaymentReconciliationError {
+  name: string;
+  message: string;
+  code?: string;
 }
 
 type ChargePaymentStatus = Extract<PaymentStatus, "pending" | "confirmed" | "failed">;
@@ -112,6 +128,10 @@ function getLatestChargePayment(payments: PaymentRecord[]): ChargePaymentRecord 
     .sort((left, right) => right.initiatedAt.localeCompare(left.initiatedAt))[0];
 }
 
+function addMinutes(isoTimestamp: string, minutes: number): string {
+  return new Date(new Date(isoTimestamp).getTime() + minutes * 60_000).toISOString();
+}
+
 export async function initializeMtnMomoPayment(
   input: {
     deliveryId: string;
@@ -173,6 +193,7 @@ export async function initializeMtnMomoPayment(
     };
   }
 
+  const initiatedAt = deps.now();
   const gatewayResult = await deps.gateway.initializeCharge({
     deliveryId: input.deliveryId,
     payerPhone: input.payerPhone,
@@ -187,8 +208,10 @@ export async function initializeMtnMomoPayment(
     payerPhone: input.payerPhone,
     amountGhs: input.amountGhs,
     status: "pending",
-    initiatedAt: deps.now(),
-    checkoutMode: gatewayResult.checkoutMode
+    initiatedAt,
+    checkoutMode: gatewayResult.checkoutMode,
+    reconciliationAttemptCount: 0,
+    nextReconciliationAt: addMinutes(initiatedAt, 5)
   };
 
   await deps.payments.create(payment);

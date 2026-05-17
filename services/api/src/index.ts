@@ -31,6 +31,7 @@ export * from "./issues";
 export * from "./mtn-momo";
 export * from "./notification-feed";
 export * from "./outbound-notifications";
+export * from "./payment-reconciliation";
 export * from "./payment-webhooks";
 export * from "./payments";
 export * from "./public-tracking";

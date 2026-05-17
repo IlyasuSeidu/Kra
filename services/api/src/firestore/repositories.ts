@@ -30,6 +30,7 @@ import type {
   PaymentRecord,
   PaymentRepository
 } from "../payments";
+import type { PaymentReconciliationRepository } from "../payment-reconciliation";
 import type {
   PaymentLookupRepository,
   WebhookEventRecord,
@@ -582,6 +583,7 @@ export function createFirestorePaymentRepository(
   now: () => string
 ): PaymentRepository &
   PaymentLookupRepository &
+  PaymentReconciliationRepository &
   RefundPaymentRepository &
   AdminPaymentMetricsRepository {
   const paymentsCollection = firestore
@@ -620,6 +622,10 @@ export function createFirestorePaymentRepository(
           status,
           updatedAt: now(),
           verifiedAt: metadata.verifiedAt,
+          nextReconciliationAt: FieldValue.delete(),
+          reconciliationReviewRequiredAt: FieldValue.delete(),
+          reconciliationReviewReason: FieldValue.delete(),
+          lastReconciliationError: FieldValue.delete(),
           ...(metadata.failureReason === undefined
             ? {}
             : { failureReason: metadata.failureReason })
@@ -639,6 +645,58 @@ export function createFirestorePaymentRepository(
       }
 
       return fromPaymentDocument(match.data());
+    },
+    async listPendingReconciliationDue(input) {
+      const snapshot = await paymentsCollection
+        .where("status", "==", "pending")
+        .where("nextReconciliationAt", "<=", input.now)
+        .orderBy("nextReconciliationAt", "asc")
+        .limit(input.limit)
+        .get();
+
+      return snapshot.docs.map((document) => fromPaymentDocument(document.data()));
+    },
+    async markReconciliationPending(input) {
+      await paymentsCollection.doc(input.paymentId).set(
+        {
+          reconciliationAttemptCount: input.attemptCount,
+          lastReconciliationAt: input.checkedAt,
+          nextReconciliationAt: input.nextReconciliationAt,
+          reconciliationReviewRequiredAt: FieldValue.delete(),
+          reconciliationReviewReason: FieldValue.delete(),
+          lastReconciliationError:
+            input.lastError === undefined ? FieldValue.delete() : input.lastError,
+          updatedAt: now()
+        },
+        { merge: true }
+      );
+    },
+    async markReconciliationReviewRequired(input) {
+      await paymentsCollection.doc(input.paymentId).set(
+        {
+          reconciliationAttemptCount: input.attemptCount,
+          lastReconciliationAt: input.checkedAt,
+          nextReconciliationAt: FieldValue.delete(),
+          reconciliationReviewRequiredAt: input.reviewRequiredAt,
+          reconciliationReviewReason: input.reason,
+          lastReconciliationError:
+            input.lastError === undefined ? FieldValue.delete() : input.lastError,
+          updatedAt: now()
+        },
+        { merge: true }
+      );
+    },
+    async listReconciliationReview(input) {
+      const baseQuery = input.reviewReason
+        ? paymentsCollection
+            .where("reconciliationReviewReason", "==", input.reviewReason)
+            .orderBy("reconciliationReviewRequiredAt", "desc")
+        : paymentsCollection
+            .where("status", "==", "pending")
+            .orderBy("reconciliationReviewRequiredAt", "desc");
+      const snapshot = await baseQuery.limit(input.limit).get();
+
+      return snapshot.docs.map((document) => fromPaymentDocument(document.data()));
     },
     async getById(paymentId: string) {
       const snapshot = await paymentsCollection.doc(paymentId).get();
