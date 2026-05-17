@@ -183,6 +183,48 @@ export const paymentVerifyResponseSchema = z.object({
   verificationCheckedAt: z.string().datetime()
 });
 
+export const paymentReconciliationReviewReasonSchema = z.enum([
+  "verification_unresolved_after_30_minutes",
+  "provider_verification_error"
+]);
+
+export const paymentReconciliationDispatchRequestSchema = z.object({
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const paymentReconciliationDispatchResponseSchema = z.object({
+  processed: z.number().int().nonnegative(),
+  confirmed: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  stillPending: z.number().int().nonnegative(),
+  reviewRequired: z.number().int().nonnegative(),
+  providerErrors: z.number().int().nonnegative(),
+  results: z.array(
+    z.object({
+      paymentId: paymentIdSchema,
+      deliveryId: deliveryIdSchema,
+      provider: z.literal("mtn_momo"),
+      providerReference: z.string().min(6),
+      previousPaymentStatus: z.enum(["pending", "confirmed", "failed"]),
+      providerPaymentStatus: z.enum(["pending", "confirmed", "failed"]).optional(),
+      action: z.enum([
+        "confirmed",
+        "failed",
+        "rescheduled",
+        "review_required",
+        "provider_error"
+      ]),
+      reconciliationAttemptCount: z.number().int().nonnegative(),
+      checkedAt: z.string().datetime(),
+      nextReconciliationAt: z.string().datetime().optional(),
+      reviewRequiredAt: z.string().datetime().optional(),
+      reviewReason: paymentReconciliationReviewReasonSchema.optional(),
+      failureReason: z.string().trim().min(1).max(300).optional(),
+      errorMessage: z.string().trim().min(1).max(300).optional()
+    })
+  )
+});
+
 export const mtnMomoWebhookRequestSchema = z.object({
   providerEventId: z.string().trim().min(3).max(120).optional(),
   providerReference: z.string().trim().min(6).max(120),
@@ -700,6 +742,41 @@ export const adminWebhookEventListResponseSchema = z.object({
       processingNotes: z.string().trim().min(3).max(120).optional()
     })
   )
+});
+
+export const adminPaymentReconciliationQuerySchema = z.object({
+  reviewReason: paymentReconciliationReviewReasonSchema.optional(),
+  limit: z.coerce.number().int().positive().max(100).optional()
+});
+
+export const adminPaymentReconciliationResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  rows: z.array(
+    z.object({
+      businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      provider: z.literal("mtn_momo"),
+      providerReference: z.string().min(6),
+      paymentId: paymentIdSchema,
+      deliveryId: deliveryIdSchema,
+      quotedAmountGhs: z.number().int().nonnegative(),
+      chargedAmountGhs: z.number().int().nonnegative(),
+      refundedAmountGhs: z.number().int().nonnegative(),
+      internalPaymentStatus: paymentStatusSchema,
+      providerPaymentStatus: z.enum(["pending", "confirmed", "failed", "unknown"]),
+      mismatchType: z.enum([
+        "none",
+        "verification_unresolved_after_30_minutes",
+        "provider_verification_error"
+      ]),
+      reconciliationAttemptCount: z.number().int().nonnegative(),
+      initiatedAt: z.string().datetime(),
+      lastReconciliationAt: z.string().datetime().optional(),
+      reviewRequiredAt: z.string().datetime().optional(),
+      reviewedBy: userIdSchema.optional(),
+      reviewedAt: z.string().datetime().optional()
+    })
+  ),
+  csv: z.string()
 });
 
 export const adminOverviewResponseSchema = z.object({

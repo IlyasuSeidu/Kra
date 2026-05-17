@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createApiApp, type ApiAppDeps } from "../app";
 import type { DeliveryRecord } from "../deliveries";
 import type { OutboundNotificationRecord } from "../outbound-notifications";
+import type { PaymentRecord } from "../payments";
 
 const appsToClose: Array<ReturnType<typeof createApiApp>> = [];
 
@@ -57,6 +58,23 @@ function makeDelivery(overrides: Partial<DeliveryRecord> = {}): DeliveryRecord {
       occurredAt: "2026-05-16T14:00:00.000Z"
     },
     createdAt: "2026-05-16T10:00:00.000Z",
+    ...overrides
+  };
+}
+
+function makePayment(overrides: Partial<PaymentRecord> = {}): PaymentRecord {
+  return {
+    paymentId: "PAY-9401",
+    deliveryId: "DEL-9401",
+    provider: "mtn_momo",
+    providerReference: "MTN-REF-9401",
+    payerPhone: "+233240000000",
+    amountGhs: 35,
+    status: "pending",
+    initiatedAt: "2026-05-16T14:30:00.000Z",
+    checkoutMode: "ussd_push",
+    reconciliationAttemptCount: 0,
+    nextReconciliationAt: "2026-05-16T15:00:00.000Z",
     ...overrides
   };
 }
@@ -196,6 +214,18 @@ function makeAppDeps(): ApiAppDeps {
       },
       getByProviderReference() {
         return resolve(undefined);
+      },
+      listPendingReconciliationDue() {
+        return resolve([]);
+      },
+      markReconciliationPending() {
+        return resolveVoid();
+      },
+      markReconciliationReviewRequired() {
+        return resolveVoid();
+      },
+      listReconciliationReview() {
+        return resolve([]);
       },
       getById() {
         return resolve(undefined);
@@ -733,6 +763,126 @@ describe("api app", () => {
         code: "FORBIDDEN"
       }
     });
+  });
+
+  it("reconciles due payments over the secured internal task route", async () => {
+    const deps = makeAppDeps();
+    const updatedPayments: string[] = [];
+    const updatedDeliveries: string[] = [];
+    const createdNotifications: string[] = [];
+
+    deps.payments.listPendingReconciliationDue = (input) => {
+      expect(input).toEqual({
+        now: "2026-05-16T15:00:00.000Z",
+        limit: 5
+      });
+      return resolve([makePayment()]);
+    };
+    deps.payments.updateStatus = (paymentId, status) => {
+      updatedPayments.push(`${paymentId}:${status}`);
+      return resolveVoid();
+    };
+    deps.deliveries.updatePaymentStatus = (deliveryId, status) => {
+      updatedDeliveries.push(`${deliveryId}:${status}`);
+      return resolveVoid();
+    };
+    deps.notificationFeed.create = (notification) => {
+      createdNotifications.push(`${notification.deliveryId}:${notification.type}`);
+      return resolveVoid();
+    };
+    deps.gateway.verifyCharge = () =>
+      resolve({
+        status: "confirmed" as const,
+        verifiedAt: "2026-05-16T15:00:10.000Z"
+      });
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/internal/payments/reconcile-due",
+      headers: {
+        "x-kra-internal-task-secret": "internal-task-secret-123456"
+      },
+      payload: {
+        limit: 5
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      processed: 1,
+      confirmed: 1,
+      failed: 0,
+      results: [
+        {
+          paymentId: "PAY-9401",
+          action: "confirmed"
+        }
+      ]
+    });
+    expect(updatedPayments).toEqual(["PAY-9401:confirmed"]);
+    expect(updatedDeliveries).toEqual(["DEL-9401:confirmed"]);
+    expect(createdNotifications).toEqual(["DEL-9401:payment_confirmed"]);
+  });
+
+  it("lists payment reconciliation review rows for finance admins", async () => {
+    const deps = makeAppDeps();
+
+    deps.authVerifier.verifyBearerToken = () =>
+      resolve({
+        userId: "USR-FIN-001",
+        role: "finance_admin",
+        capabilities: ["review_reconciliation"],
+        authMethod: "firebase_id_token" as const
+      });
+    deps.payments.listReconciliationReview = (input) => {
+      expect(input).toEqual({
+        reviewReason: "verification_unresolved_after_30_minutes",
+        limit: 20
+      });
+      return resolve([
+        makePayment({
+          reconciliationAttemptCount: 3,
+          lastReconciliationAt: "2026-05-16T15:00:00.000Z",
+          reconciliationReviewRequiredAt: "2026-05-16T15:00:00.000Z",
+          reconciliationReviewReason: "verification_unresolved_after_30_minutes"
+        })
+      ]);
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/payment-reconciliation?reviewReason=verification_unresolved_after_30_minutes&limit=20",
+      headers: {
+        authorization: "Bearer token-finance"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    const responseBody: {
+      csv: string;
+      generatedAt: string;
+      rows: Array<{
+        paymentId: string;
+        mismatchType: string;
+      }>;
+    } = response.json();
+
+    expect(responseBody).toMatchObject({
+      generatedAt: "2026-05-16T15:00:00.000Z",
+      rows: [
+        {
+          paymentId: "PAY-9401",
+          mismatchType: "verification_unresolved_after_30_minutes"
+        }
+      ]
+    });
+    expect(responseBody.csv).toContain("businessDate,provider,providerReference");
   });
 
   it("lets a super admin create a managed user record", async () => {

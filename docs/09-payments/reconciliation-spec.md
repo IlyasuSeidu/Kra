@@ -24,6 +24,12 @@
 - Provider truth and internal truth must both be reviewed; neither alone is sufficient when they conflict.
 - Unmatched or conflicting payment events must be escalated within the next business day.
 - The v1 reconciliation output is a daily `CSV` export plus an admin queue for unmatched provider events.
+- The backend enforces the MTN MoMo missing-callback path through `POST /v1/internal/payments/reconcile-due`.
+- Pending charges are verified at the `5 minute`, `15 minute`, and `30 minute` checkpoints using the provider verification adapter.
+- A confirmed or failed provider verification finalizes both the `payments/{paymentId}` record and the delivery `paymentStatus`.
+- A still-pending charge after the `30 minute` checkpoint remains internally `pending` and is marked for finance review with `verification_unresolved_after_30_minutes`.
+- Provider verification failures are retried on the same checkpoint schedule and then marked for finance review with `provider_verification_error`.
+- Finance review data is exposed through `GET /v1/admin/payment-reconciliation` with both structured rows and fixed-column CSV text.
 - The CSV must include at least:
   - business date
   - provider

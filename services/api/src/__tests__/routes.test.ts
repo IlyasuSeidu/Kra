@@ -93,6 +93,14 @@ describe("api routes", () => {
     expect(getApiRoute("verify_payment")?.requestSchema).toBeDefined();
     expect(getApiRoute("verify_payment")?.responseSchema).toBeDefined();
 
+    expect(getApiRoute("reconcile_due_payments")).toMatchObject({
+      authScope: "internal",
+      path: "/v1/internal/payments/reconcile-due",
+      module: "payments"
+    });
+    expect(getApiRoute("reconcile_due_payments")?.requestSchema).toBeDefined();
+    expect(getApiRoute("reconcile_due_payments")?.responseSchema).toBeDefined();
+
     expect(getApiRoute("refund_payment")).toMatchObject({
       authScope: "admin",
       capability: "approve_refund"
@@ -119,6 +127,11 @@ describe("api routes", () => {
     expect(getApiRoute("admin_finance")).toMatchObject({
       authScope: "admin",
       path: "/v1/admin/finance"
+    });
+    expect(getApiRoute("admin_payment_reconciliation")).toMatchObject({
+      authScope: "admin",
+      path: "/v1/admin/payment-reconciliation",
+      capability: "review_reconciliation"
     });
     expect(getApiRoute("admin_users")).toMatchObject({
       authScope: "admin",

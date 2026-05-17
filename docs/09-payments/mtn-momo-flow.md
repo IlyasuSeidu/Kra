@@ -30,6 +30,9 @@ The delivery record should show whether the payment is `pending`, `confirmed`, o
 - If the callback is missing or delayed, the backend should verify payment status through the provider path before changing internal payment state.
 - If payment remains unresolved after verification attempts at `5 minutes`, `15 minutes`, and `30 minutes`, the payment remains `pending` and is pushed into reconciliation review.
 - Duplicate callbacks must be idempotent on provider reference plus event type.
+- The automated reconciliation worker is `POST /v1/internal/payments/reconcile-due`, protected by `X-Kra-Internal-Task-Secret`.
+- Each new pending MTN MoMo payment stores `nextReconciliationAt` for the `5 minute` checkpoint and increments `reconciliationAttemptCount` after each worker attempt.
+- Finance review reads unresolved records through `GET /v1/admin/payment-reconciliation`.
 
 ## Environment Prerequisites
 - Production credentials are environment configuration, not product-policy input.

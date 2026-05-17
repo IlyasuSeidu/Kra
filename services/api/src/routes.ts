@@ -6,6 +6,8 @@ import {
   adminUpdateStationStatusRequestSchema,
   adminUpdateStationStatusResponseSchema,
   adminUpdateUserAccessRequestSchema,
+  adminPaymentReconciliationQuerySchema,
+  adminPaymentReconciliationResponseSchema,
   adminOutboundNotificationListQuerySchema,
   adminOutboundNotificationListResponseSchema,
   adminUserListQuerySchema,
@@ -51,6 +53,8 @@ import {
   outboundNotificationDispatchResponseSchema,
   paymentInitializeRequestSchema,
   paymentInitializeResponseSchema,
+  paymentReconciliationDispatchRequestSchema,
+  paymentReconciliationDispatchResponseSchema,
   refundPaymentRequestSchema,
   refundPaymentResponseSchema,
   settleRefundRequestSchema,
@@ -216,6 +220,17 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: paymentVerifyRequestSchema,
     responseSchema: paymentVerifyResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "reconcile_due_payments",
+    method: "POST",
+    path: "/v1/internal/payments/reconcile-due",
+    module: "payments",
+    authScope: "internal",
+    idempotent: false,
+    requestSchema: paymentReconciliationDispatchRequestSchema,
+    responseSchema: paymentReconciliationDispatchResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
@@ -582,6 +597,18 @@ export const apiRoutes = [
     idempotent: true,
     requestSchema: adminOutboundNotificationListQuerySchema,
     responseSchema: adminOutboundNotificationListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_payment_reconciliation",
+    method: "GET",
+    path: "/v1/admin/payment-reconciliation",
+    module: "admin",
+    authScope: "admin",
+    capability: "review_reconciliation",
+    idempotent: true,
+    requestSchema: adminPaymentReconciliationQuerySchema,
+    responseSchema: adminPaymentReconciliationResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {
