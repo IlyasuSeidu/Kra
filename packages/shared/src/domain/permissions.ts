@@ -33,6 +33,7 @@ export type Capability =
   | "approve_refund"
   | "execute_refund"
   | "review_reconciliation"
+  | "manage_pricing_rules"
   | "manage_issue_thread"
   | "escalate_case"
   | "manage_users_and_roles";
@@ -69,7 +70,12 @@ const capabilityMatrix: Record<Role, Capability[]> = {
     "resolve_operational_issue",
     "escalate_case"
   ],
-  finance_admin: ["approve_refund", "execute_refund", "review_reconciliation"],
+  finance_admin: [
+    "approve_refund",
+    "execute_refund",
+    "review_reconciliation",
+    "manage_pricing_rules"
+  ],
   support_admin: ["manage_issue_thread", "escalate_case"],
   super_admin: [
     "cancel_eligible_delivery",
@@ -79,6 +85,7 @@ const capabilityMatrix: Record<Role, Capability[]> = {
     "approve_refund",
     "execute_refund",
     "review_reconciliation",
+    "manage_pricing_rules",
     "manage_issue_thread",
     "escalate_case",
     "manage_users_and_roles"

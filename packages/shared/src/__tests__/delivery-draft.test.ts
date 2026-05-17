@@ -101,6 +101,35 @@ describe("delivery draft", () => {
     ).toBe(106);
   });
 
+  it("locks a backend-provided quote amount when active pricing is database-backed", () => {
+    expect(
+      createDeliveryDraft(
+        {
+          senderId: "USR-SND-001",
+          originStationId: "ST-ACC-01",
+          destinationStationId: "ST-KMS-01",
+          receiver: {
+            name: "Kojo Asante",
+            phone: "+233240000000"
+          },
+          package: {
+            description: "Phone accessories",
+            weightKg: 1.8,
+            sizeTier: "standard",
+            isFragile: false,
+            declaredValueGhs: 300
+          },
+          serviceType: "standard",
+          doorstepRequested: false
+        },
+        {
+          ...refs,
+          quoteAmountGhs: 41
+        }
+      ).quote.amount
+    ).toBe(41);
+  });
+
   it("rejects same-station bookings", () => {
     expect(() =>
       createDeliveryDraft(

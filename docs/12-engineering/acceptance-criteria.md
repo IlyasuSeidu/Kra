@@ -14,6 +14,8 @@
 
 ## Admin Acceptance
 - Admin can search any delivery and view current state, payment state, and issue state.
+- Finance admin can update active route pricing without redeploying any app.
+- New deliveries quote from the active backend pricing rule, while existing deliveries keep their original locked quote.
 
 ## Non-Functional Acceptance
 - Core workflows work on common mobile device sizes.
@@ -38,6 +40,7 @@
 - station cannot intake or dispatch reliably
 - missing audit history on core transitions
 - broken sender tracking timeline
+- incomplete or directly client-writable active pricing rules
 - `GET /v1/admin/launch-readiness` returns `blocked`
 
 ## Baseline Status

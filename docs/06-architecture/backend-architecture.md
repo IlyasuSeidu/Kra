@@ -45,11 +45,19 @@ Business logic should live in application services, not in route handlers and no
 
 ## Persistence Strategy
 - Current materialized state lives on delivery, payment, issue, and user documents.
+- Active route pricing lives in `pricing_rules/active`; each admin update is also snapshotted as `pricing_rules/{pricingRuleId}`.
 - Immutable detail lives in:
   - `handoff_events`
   - `delivery_events`
   - `payment_events`
   - `audit_events`
+
+## Pricing Configuration Service
+- Delivery booking loads the active pricing rule from Firestore before calculating a quote.
+- Pricing changes are admin-mediated through `POST /v1/admin/pricing-rules/active` and require the `manage_pricing_rules` capability.
+- The route table validator requires every one-way launch corridor exactly once, preventing partial or ambiguous production pricing.
+- Existing delivery quotes remain immutable because the final `GHS` amount is persisted at booking time.
+- The shared default launch pricing table is only a first-deploy fallback when no active database rule exists.
 
 ## Failure And Retry Policy
 - state-changing commands are idempotent through `Idempotency-Key`

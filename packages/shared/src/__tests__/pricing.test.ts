@@ -23,6 +23,28 @@ describe("pricing", () => {
     ).toBe(35);
   });
 
+  it("allows backend-provided route base fees without changing surcharge policy", () => {
+    expect(
+      calculateDeliveryQuote(
+        {
+          originStationId: "ST-ACC-01",
+          destinationStationId: "ST-KMS-01",
+          weightKg: 3,
+          sizeTier: "standard",
+          serviceType: "express",
+          doorstepRequested: false,
+          isFragile: false,
+          declaredValueGhs: 300
+        },
+        {
+          routeBaseFees: {
+            "ST-ACC-01:ST-KMS-01": 40
+          }
+        }
+      )
+    ).toBe(64);
+  });
+
   it("adds weight and size surcharges", () => {
     expect(
       calculateDeliveryQuote({

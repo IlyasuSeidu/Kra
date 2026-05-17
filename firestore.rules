@@ -81,6 +81,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /pricing_rules/{pricingRuleId} {
+      allow read: if isAuthenticated() && isFinanceAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /proof_assets/{proofAssetId} {
       allow read, write: if false;
     }

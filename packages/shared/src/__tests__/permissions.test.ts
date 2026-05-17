@@ -23,12 +23,14 @@ describe("permissions", () => {
   it("allows finance admins to execute finance actions only", () => {
     expect(canPerform("finance_admin", "approve_refund")).toBe(true);
     expect(canPerform("finance_admin", "execute_refund")).toBe(true);
+    expect(canPerform("finance_admin", "manage_pricing_rules")).toBe(true);
     expect(canPerform("finance_admin", "confirm_dispatch")).toBe(false);
   });
 
   it("gives super admins all privileged governance capabilities", () => {
     expect(getCapabilities("super_admin")).toContain("manage_users_and_roles");
     expect(getCapabilities("super_admin")).toContain("approve_refund");
+    expect(getCapabilities("super_admin")).toContain("manage_pricing_rules");
     expect(getCapabilities("super_admin")).toContain("reassign_delivery");
     expect(getCapabilities("super_admin")).toContain("cancel_eligible_delivery");
   });

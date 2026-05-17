@@ -37,6 +37,9 @@ export function createApiIdentityFactory() {
     nextProofAssetId() {
       return buildPrefixedId("PFA");
     },
+    nextPricingRuleId() {
+      return buildPrefixedId("PRC");
+    },
     nextChallengeId() {
       return buildPrefixedId("CHL");
     },

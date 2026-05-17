@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { adminPricingRulesResponseSchema } from "@kra/shared";
 
 import { createApiApp, type ApiAppDeps } from "../app";
 import type { DeliveryRecord } from "../deliveries";
 import type { OutboundNotificationRecord } from "../outbound-notifications";
 import type { PaymentRecord } from "../payments";
+import type { PricingRuleRecord, PricingRouteBaseFee } from "../pricing-rules";
 import type { ProofAssetRecord } from "../proof-assets";
 
 const appsToClose: Array<ReturnType<typeof createApiApp>> = [];
@@ -95,6 +97,30 @@ function makeProofAsset(overrides: Partial<ProofAssetRecord> = {}): ProofAssetRe
     createdAt: "2026-05-16T15:00:00.000Z",
     uploadExpiresAt: "2026-05-16T15:15:00.000Z",
     updatedAt: "2026-05-16T15:00:00.000Z",
+    ...overrides
+  };
+}
+
+const defaultRouteBaseFees: PricingRouteBaseFee[] = [
+  { originStationId: "ST-ACC-01", destinationStationId: "ST-KMS-01", baseFeeGhs: 35 },
+  { originStationId: "ST-ACC-01", destinationStationId: "ST-TML-01", baseFeeGhs: 65 },
+  { originStationId: "ST-KMS-01", destinationStationId: "ST-ACC-01", baseFeeGhs: 35 },
+  { originStationId: "ST-KMS-01", destinationStationId: "ST-TML-01", baseFeeGhs: 50 },
+  { originStationId: "ST-TML-01", destinationStationId: "ST-ACC-01", baseFeeGhs: 65 },
+  { originStationId: "ST-TML-01", destinationStationId: "ST-KMS-01", baseFeeGhs: 50 }
+];
+
+function makePricingRule(
+  overrides: Partial<PricingRuleRecord> = {}
+): PricingRuleRecord {
+  return {
+    pricingRuleId: "PRC-9401",
+    status: "active",
+    currency: "GHS",
+    routeBaseFees: defaultRouteBaseFees,
+    effectiveAt: "2026-05-16T15:00:00.000Z",
+    updatedAt: "2026-05-16T15:00:00.000Z",
+    updatedByUserId: "USR-FIN-001",
     ...overrides
   };
 }
@@ -269,6 +295,14 @@ function makeAppDeps(): ApiAppDeps {
         return resolve(0);
       }
     },
+    pricingRules: {
+      getActive() {
+        return resolve(undefined);
+      },
+      saveActive() {
+        return resolveVoid();
+      }
+    },
     proofAssets: {
       create() {
         return resolveVoid();
@@ -403,6 +437,7 @@ function makeAppDeps(): ApiAppDeps {
       nextNotificationId: () => "NTF-9401",
       nextOutboundNotificationId: () => "ONF-9401",
       nextProofAssetId: () => "PFA-9401",
+      nextPricingRuleId: () => "PRC-9401",
       nextChallengeId: () => "CHL-9401",
       nextDeliveryEventId: () => "EVT-DEL-9401",
       nextHandoffEventId: () => "EVT-HOF-9401",
@@ -472,6 +507,66 @@ describe("api app", () => {
       deliveryId: "DEL-9401",
       trackingCode: "KRA-9401",
       status: "created"
+    });
+  });
+
+  it("quotes new deliveries from the active database-backed pricing rule", async () => {
+    const deps = makeAppDeps();
+    let savedDelivery: DeliveryRecord | undefined;
+
+    deps.pricingRules.getActive = () =>
+      resolve(
+        makePricingRule({
+          routeBaseFees: defaultRouteBaseFees.map((fee) =>
+            fee.originStationId === "ST-ACC-01" && fee.destinationStationId === "ST-KMS-01"
+              ? { ...fee, baseFeeGhs: 41 }
+              : fee
+          )
+        })
+      );
+    deps.deliveries.create = (delivery) => {
+      savedDelivery = delivery;
+      return resolveVoid();
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries",
+      headers: {
+        authorization: "Bearer token-123"
+      },
+      payload: {
+        originStationId: "ST-ACC-01",
+        destinationStationId: "ST-KMS-01",
+        receiver: {
+          name: "Kojo Asante",
+          phone: "+233240000000"
+        },
+        package: {
+          description: "Phone accessories",
+          weightKg: 1.8,
+          sizeTier: "standard",
+          isFragile: false,
+          declaredValueGhs: 300
+        },
+        serviceType: "standard",
+        doorstepRequested: false
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      quote: {
+        currency: "GHS",
+        amount: 41
+      }
+    });
+    expect(savedDelivery?.quote).toEqual({
+      currency: "GHS",
+      amount: 41
     });
   });
 
@@ -1262,6 +1357,78 @@ describe("api app", () => {
         "dead_letter_receiver_sms"
       ])
     );
+  });
+
+  it("lets finance admins read and update active route pricing", async () => {
+    const deps = makeAppDeps();
+    let activePricingRule: PricingRuleRecord | undefined;
+
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-FIN-001",
+          role: "finance_admin",
+          capabilities: ["manage_pricing_rules"],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.pricingRules.getActive = () => resolve(activePricingRule);
+    deps.pricingRules.saveActive = (record) => {
+      activePricingRule = record;
+      return resolveVoid();
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const updateResponse = await app.inject({
+      method: "POST",
+      url: "/v1/admin/pricing-rules/active",
+      headers: {
+        authorization: "Bearer token-finance-admin"
+      },
+      payload: {
+        routeBaseFees: defaultRouteBaseFees.map((fee) =>
+          fee.originStationId === "ST-ACC-01" && fee.destinationStationId === "ST-KMS-01"
+            ? { ...fee, baseFeeGhs: 42 }
+            : fee
+        ),
+        note: "Launch corridor finance approval"
+      }
+    });
+    const readResponse = await app.inject({
+      method: "GET",
+      url: "/v1/admin/pricing-rules",
+      headers: {
+        authorization: "Bearer token-finance-admin"
+      }
+    });
+
+    expect(updateResponse.statusCode).toBe(200);
+    const updateBody = adminPricingRulesResponseSchema.parse(updateResponse.json());
+    expect(updateBody.pricingRuleId).toBe("PRC-9401");
+    expect(updateBody.updatedByUserId).toBe("USR-FIN-001");
+    expect(
+      updateBody.routeBaseFees.some(
+        (fee) =>
+          fee.originStationId === "ST-ACC-01" &&
+          fee.destinationStationId === "ST-KMS-01" &&
+          fee.baseFeeGhs === 42
+      )
+    ).toBe(true);
+
+    expect(readResponse.statusCode).toBe(200);
+    const readBody = adminPricingRulesResponseSchema.parse(readResponse.json());
+    expect(readBody.pricingRuleId).toBe("PRC-9401");
+    expect(
+      readBody.routeBaseFees.some(
+        (fee) =>
+          fee.originStationId === "ST-ACC-01" &&
+          fee.destinationStationId === "ST-KMS-01" &&
+          fee.baseFeeGhs === 42
+      )
+    ).toBe(true);
   });
 
   it("lists accessible deliveries over the authenticated route surface", async () => {

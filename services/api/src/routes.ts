@@ -5,9 +5,11 @@ import {
   adminUpdateStationValidationResponseSchema,
   adminUpdateStationStatusRequestSchema,
   adminUpdateStationStatusResponseSchema,
+  adminUpdatePricingRulesRequestSchema,
   adminUpdateUserAccessRequestSchema,
   adminPaymentReconciliationQuerySchema,
   adminPaymentReconciliationResponseSchema,
+  adminPricingRulesResponseSchema,
   adminLaunchReadinessResponseSchema,
   adminOutboundNotificationListQuerySchema,
   adminOutboundNotificationListResponseSchema,
@@ -554,6 +556,29 @@ export const apiRoutes = [
     authScope: "admin",
     idempotent: true,
     responseSchema: adminFinanceResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_pricing_rules",
+    method: "GET",
+    path: "/v1/admin/pricing-rules",
+    module: "admin",
+    authScope: "admin",
+    capability: "manage_pricing_rules",
+    idempotent: true,
+    responseSchema: adminPricingRulesResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_update_pricing_rules",
+    method: "POST",
+    path: "/v1/admin/pricing-rules/active",
+    module: "admin",
+    authScope: "admin",
+    capability: "manage_pricing_rules",
+    idempotent: true,
+    requestSchema: adminUpdatePricingRulesRequestSchema,
+    responseSchema: adminPricingRulesResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

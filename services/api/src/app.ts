@@ -7,6 +7,7 @@ import {
   acceptRunRequestSchema,
   adminUpdateStationValidationRequestSchema,
   adminUpdateStationStatusRequestSchema,
+  adminUpdatePricingRulesRequestSchema,
   adminUpdateUserAccessRequestSchema,
   adminUpsertUserRequestSchema,
   assignDriverRequestSchema,
@@ -160,6 +161,11 @@ import {
   type PaymentIdentityFactory,
   type PaymentRepository
 } from "./payments";
+import {
+  getActivePricingRulesResponse,
+  updateActivePricingRules,
+  type PricingRuleRepository
+} from "./pricing-rules";
 import { getPublicTracking } from "./public-tracking";
 import {
   requestPublicTrackingPhoneChallenge,
@@ -206,6 +212,7 @@ type SharedIdentityFactory = PaymentIdentityFactory &
   AuditIdentityFactory &
   SupportIssueIdentityFactory &
   ProofAssetIdentityFactory & {
+    nextPricingRuleId(): string;
     nextRequestId(): string;
     nextDeliveryId(): string;
     nextTrackingCode(): string;
@@ -230,6 +237,7 @@ export interface ApiAppDeps {
     PaymentReconciliationRepository &
     RefundPaymentRepository &
     AdminPaymentMetricsRepository;
+  pricingRules: PricingRuleRepository;
   proofAssets: ProofAssetRepository;
   issues: SupportIssueRepository & AdminIssueMetricsRepository & DeliveryIssueReadRepository;
   verification: PublicTrackingVerificationRepository;
@@ -762,6 +770,7 @@ function buildRuntimeAppDeps(config = loadApiRuntimeConfig()): ApiAppDeps {
     deliveryEvents: repositories.deliveryEvents,
     handoffEvents: repositories.handoffEvents,
     payments: repositories.payments,
+    pricingRules: repositories.pricingRules,
     proofAssets: repositories.proofAssets,
     issues: repositories.issues,
     verification: repositories.verification,
@@ -1143,6 +1152,7 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
           },
           {
             deliveries: deps.deliveries,
+            pricingRules: deps.pricingRules,
             identityFactory: deps.identityFactory,
             now: deps.now
           }
@@ -2173,6 +2183,33 @@ export function createApiApp(deps: ApiAppDeps): FastifyInstance {
         payments: deps.payments,
         now: deps.now
       });
+    });
+
+    rateLimitedApp.get("/v1/admin/pricing-rules", { preHandler: [authenticatedReadPreHandler, requireAdminCapability("manage_pricing_rules")] }, async (_request: FastifyRequest, reply: FastifyReply) => {
+      setNoStore(reply);
+      return getActivePricingRulesResponse({
+        pricingRules: deps.pricingRules,
+        now: deps.now
+      });
+    });
+
+    rateLimitedApp.post("/v1/admin/pricing-rules/active", { preHandler: [adminMutationPreHandler, requireAdminCapability("manage_pricing_rules")] }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const principal = getAuthenticatedPrincipal(request);
+      const input = adminUpdatePricingRulesRequestSchema.parse(request.body);
+
+      return runIdempotentMutation(request, reply, deps, {
+        routeKey: "admin_update_pricing_rules",
+        fingerprint: {
+          body: input
+        }
+      }, async () => ({
+        statusCode: 200,
+        responseBody: await updateActivePricingRules(principal, input, {
+          pricingRules: deps.pricingRules,
+          identityFactory: deps.identityFactory,
+          now: deps.now
+        })
+      }));
     });
 
     rateLimitedApp.get("/v1/admin/users", { preHandler: [authenticatedReadPreHandler, requireAdminCapability("manage_users_and_roles")] }, async (request: FastifyRequest, reply: FastifyReply) => {
