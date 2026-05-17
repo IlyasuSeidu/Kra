@@ -31,6 +31,7 @@ import type {
   PaymentRepository
 } from "../payments";
 import type { PaymentReconciliationRepository } from "../payment-reconciliation";
+import type { ProofAssetRepository } from "../proof-assets";
 import type {
   PaymentLookupRepository,
   WebhookEventRecord,
@@ -54,6 +55,7 @@ import {
   notificationConverter,
   outboundNotificationConverter,
   paymentConverter,
+  proofAssetConverter,
   publicTrackingPhoneChallengeConverter,
   publicTrackingVerificationAttemptConverter,
   publicTrackingVerificationGrantConverter,
@@ -764,6 +766,56 @@ export function createFirestorePaymentRepository(
   };
 }
 
+export function createFirestoreProofAssetRepository(
+  firestore: Firestore,
+  now: () => string
+): ProofAssetRepository {
+  const proofAssetsCollection = firestore
+    .collection(firestoreCollections.proofAssets)
+    .withConverter(proofAssetConverter);
+
+  return {
+    async create(record) {
+      await proofAssetsCollection.doc(record.proofAssetId).set(record);
+    },
+    async getById(proofAssetId) {
+      const snapshot = await proofAssetsCollection.doc(proofAssetId).get();
+
+      if (!snapshot.exists) {
+        return undefined;
+      }
+
+      return snapshot.data();
+    },
+    async markUploaded(input) {
+      await proofAssetsCollection.doc(input.proofAssetId).set(
+        {
+          status: "uploaded",
+          uploadedAt: input.uploadedAt,
+          byteSize: input.byteSize,
+          sha256: input.sha256,
+          ...(input.storageGeneration === undefined
+            ? {}
+            : { storageGeneration: input.storageGeneration }),
+          updatedAt: now()
+        },
+        { merge: true }
+      );
+    },
+    async markAttached(input) {
+      await proofAssetsCollection.doc(input.proofAssetId).set(
+        {
+          status: "attached",
+          attachedAt: input.attachedAt,
+          attachedByUserId: input.attachedByUserId,
+          updatedAt: now()
+        },
+        { merge: true }
+      );
+    }
+  };
+}
+
 export function createFirestorePublicTrackingVerificationRepository(
   firestore: Firestore
 ): PublicTrackingVerificationRepository {
@@ -1177,6 +1229,7 @@ export function createFirestoreApiRepositories(
     outboundNotifications: createFirestoreOutboundNotificationRepository(firestore),
     deliveries: createFirestoreDeliveryRepository(firestore, now),
     payments: createFirestorePaymentRepository(firestore, now),
+    proofAssets: createFirestoreProofAssetRepository(firestore, now),
     issues: createFirestoreSupportIssueRepository(firestore, now),
     verification: createFirestorePublicTrackingVerificationRepository(firestore),
     webhookEvents: createFirestoreWebhookEventRepository(firestore),

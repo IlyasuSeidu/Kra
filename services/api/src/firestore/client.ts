@@ -25,7 +25,10 @@ export function getFirebaseAdminApp(config: ApiRuntimeConfig = loadApiRuntimeCon
 
   return initializeApp({
     credential: buildFirebaseCredential(config),
-    projectId: config.firebaseProjectId
+    projectId: config.firebaseProjectId,
+    ...(config.firebaseStorageBucket === undefined
+      ? {}
+      : { storageBucket: config.firebaseStorageBucket })
   });
 }
 

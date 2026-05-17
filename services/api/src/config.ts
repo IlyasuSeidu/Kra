@@ -5,6 +5,7 @@ const apiRuntimeEnvSchema = z
     FIREBASE_PROJECT_ID: z.string().trim().min(1),
     FIREBASE_CLIENT_EMAIL: z.string().trim().min(3).optional(),
     FIREBASE_PRIVATE_KEY: z.string().trim().min(1).optional(),
+    FIREBASE_STORAGE_BUCKET: z.string().trim().min(3).optional(),
     FIRESTORE_EMULATOR_HOST: z.string().trim().min(1).optional(),
     API_PORT: z.coerce.number().int().positive().max(65535).optional(),
     INTERNAL_TASK_SHARED_SECRET: z.string().trim().min(16).optional(),
@@ -77,6 +78,7 @@ export interface ApiRuntimeConfig {
   firebaseProjectId: string;
   firebaseClientEmail?: string;
   firebasePrivateKey?: string;
+  firebaseStorageBucket?: string;
   firestoreEmulatorHost?: string;
   apiPort: number;
   internalTaskSharedSecret?: string;
@@ -104,6 +106,7 @@ export function loadApiRuntimeConfig(
     FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID,
     FIREBASE_CLIENT_EMAIL: env.FIREBASE_CLIENT_EMAIL,
     FIREBASE_PRIVATE_KEY: env.FIREBASE_PRIVATE_KEY,
+    FIREBASE_STORAGE_BUCKET: env.FIREBASE_STORAGE_BUCKET,
     FIRESTORE_EMULATOR_HOST: env.FIRESTORE_EMULATOR_HOST,
     API_PORT: env.API_PORT,
     INTERNAL_TASK_SHARED_SECRET: env.INTERNAL_TASK_SHARED_SECRET,
@@ -129,6 +132,9 @@ export function loadApiRuntimeConfig(
     ...(parsed.FIREBASE_PRIVATE_KEY === undefined
       ? {}
       : { firebasePrivateKey: parsed.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n") }),
+    ...(parsed.FIREBASE_STORAGE_BUCKET === undefined
+      ? {}
+      : { firebaseStorageBucket: parsed.FIREBASE_STORAGE_BUCKET }),
     ...(parsed.FIRESTORE_EMULATOR_HOST === undefined
       ? {}
       : { firestoreEmulatorHost: parsed.FIRESTORE_EMULATOR_HOST }),

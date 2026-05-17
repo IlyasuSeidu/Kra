@@ -4,6 +4,7 @@ import { createApiApp, type ApiAppDeps } from "../app";
 import type { DeliveryRecord } from "../deliveries";
 import type { OutboundNotificationRecord } from "../outbound-notifications";
 import type { PaymentRecord } from "../payments";
+import type { ProofAssetRecord } from "../proof-assets";
 
 const appsToClose: Array<ReturnType<typeof createApiApp>> = [];
 
@@ -75,6 +76,25 @@ function makePayment(overrides: Partial<PaymentRecord> = {}): PaymentRecord {
     checkoutMode: "ussd_push",
     reconciliationAttemptCount: 0,
     nextReconciliationAt: "2026-05-16T15:00:00.000Z",
+    ...overrides
+  };
+}
+
+function makeProofAsset(overrides: Partial<ProofAssetRecord> = {}): ProofAssetRecord {
+  return {
+    proofAssetId: "PFA-9401",
+    deliveryId: "DEL-9401",
+    proofType: "delivery_photo",
+    status: "pending_upload",
+    contentType: "image/jpeg",
+    byteSize: 512_000,
+    storageBucket: "kra-proof-assets",
+    storageObjectPath: "proof-assets/DEL-9401/PFA-9401.jpg",
+    requestedByUserId: "USR-COR-001",
+    requestedByRole: "final_mile_courier",
+    createdAt: "2026-05-16T15:00:00.000Z",
+    uploadExpiresAt: "2026-05-16T15:15:00.000Z",
+    updatedAt: "2026-05-16T15:00:00.000Z",
     ...overrides
   };
 }
@@ -243,6 +263,20 @@ function makeAppDeps(): ApiAppDeps {
         return resolve([]);
       }
     },
+    proofAssets: {
+      create() {
+        return resolveVoid();
+      },
+      getById() {
+        return resolve(undefined);
+      },
+      markUploaded() {
+        return resolveVoid();
+      },
+      markAttached() {
+        return resolveVoid();
+      }
+    },
     issues: {
       create() {
         return resolveVoid();
@@ -342,6 +376,12 @@ function makeAppDeps(): ApiAppDeps {
         });
       }
     },
+    proofStorage: {
+      bucketName: "kra-proof-assets",
+      createUploadUrl() {
+        return resolve("https://storage.example.test/signed-upload-url");
+      }
+    },
     identityFactory: {
       nextRequestId: () => "REQ-9401",
       nextDeliveryId: () => "DEL-9401",
@@ -353,6 +393,7 @@ function makeAppDeps(): ApiAppDeps {
       nextIssueId: () => "ISS-9401",
       nextNotificationId: () => "NTF-9401",
       nextOutboundNotificationId: () => "ONF-9401",
+      nextProofAssetId: () => "PFA-9401",
       nextChallengeId: () => "CHL-9401",
       nextDeliveryEventId: () => "EVT-DEL-9401",
       nextHandoffEventId: () => "EVT-HOF-9401",
@@ -883,6 +924,163 @@ describe("api app", () => {
       ]
     });
     expect(responseBody.csv).toContain("businessDate,provider,providerReference");
+  });
+
+  it("creates and confirms delivery proof asset upload intents", async () => {
+    const deps = makeAppDeps();
+    const createdProofAssets: ProofAssetRecord[] = [];
+    const uploadedProofAssets: string[] = [];
+    const signedUploadRequests: string[] = [];
+
+    deps.authVerifier.verifyBearerToken = () =>
+      resolve({
+        userId: "USR-COR-001",
+        role: "final_mile_courier",
+        capabilities: ["complete_delivery_with_proof"],
+        authMethod: "firebase_id_token" as const
+      });
+    deps.deliveries.getById = () =>
+      resolve(
+        makeDelivery({
+          currentStatus: "out_for_delivery",
+          assignedFinalMileCourierId: "USR-COR-001",
+          currentCustodyRole: "final_mile_courier",
+          currentCustodyActorId: "USR-COR-001"
+        })
+      );
+    deps.proofStorage = {
+      bucketName: "kra-proof-assets",
+      createUploadUrl(input) {
+        signedUploadRequests.push(`${input.objectPath}:${input.contentType}:${input.expiresAt}`);
+        return resolve("https://storage.example.test/signed-upload-url");
+      }
+    };
+    deps.proofAssets.create = (record) => {
+      createdProofAssets.push(record);
+      return resolveVoid();
+    };
+    deps.proofAssets.getById = () => resolve(createdProofAssets[0]);
+    deps.proofAssets.markUploaded = (input) => {
+      uploadedProofAssets.push(`${input.proofAssetId}:${input.sha256}`);
+      return resolveVoid();
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries/DEL-9401/proof-assets",
+      headers: {
+        authorization: "Bearer token-courier",
+        "idempotency-key": "proof-upload-intent-1"
+      },
+      payload: {
+        proofType: "delivery_photo",
+        contentType: "image/jpeg",
+        byteSize: 512_000,
+        sha256: "a".repeat(64)
+      }
+    });
+    const confirmResponse = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries/DEL-9401/proof-assets/PFA-9401/confirm-upload",
+      headers: {
+        authorization: "Bearer token-courier",
+        "idempotency-key": "proof-upload-confirm-1"
+      },
+      payload: {
+        byteSize: 512_000,
+        sha256: "a".repeat(64),
+        storageGeneration: "generation-1"
+      }
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+    expect(createResponse.json()).toMatchObject({
+      proofAssetId: "PFA-9401",
+      proofReference: "PFA-9401",
+      status: "pending_upload",
+      upload: {
+        method: "PUT",
+        bucket: "kra-proof-assets",
+        objectPath: "proof-assets/DEL-9401/PFA-9401.jpg"
+      }
+    });
+    expect(confirmResponse.statusCode).toBe(200);
+    expect(confirmResponse.json()).toMatchObject({
+      proofAssetId: "PFA-9401",
+      status: "uploaded",
+      sha256: "a".repeat(64)
+    });
+    expect(signedUploadRequests).toEqual([
+      "proof-assets/DEL-9401/PFA-9401.jpg:image/jpeg:2026-05-16T15:15:00.000Z"
+    ]);
+    expect(uploadedProofAssets).toEqual([`PFA-9401:${"a".repeat(64)}`]);
+  });
+
+  it("requires uploaded fallback proof assets before photo delivery completion", async () => {
+    const deps = makeAppDeps();
+    const attachedProofAssets: string[] = [];
+    let currentDelivery = makeDelivery({
+      currentStatus: "out_for_delivery",
+      assignedFinalMileCourierId: "USR-COR-001",
+      currentCustodyRole: "final_mile_courier",
+      currentCustodyActorId: "USR-COR-001"
+    });
+
+    deps.authVerifier.verifyBearerToken = () =>
+      resolve({
+        userId: "USR-COR-001",
+        role: "final_mile_courier",
+        capabilities: ["complete_delivery_with_proof"],
+        authMethod: "firebase_id_token" as const
+      });
+    deps.deliveries.getById = () => resolve(currentDelivery);
+    deps.deliveries.save = (delivery) => {
+      currentDelivery = delivery;
+      return resolveVoid();
+    };
+    deps.proofAssets.getById = () =>
+      resolve(
+        makeProofAsset({
+          status: "uploaded",
+          uploadedAt: "2026-05-16T15:02:00.000Z",
+          sha256: "b".repeat(64)
+        })
+      );
+    deps.proofAssets.markAttached = (input) => {
+      attachedProofAssets.push(`${input.proofAssetId}:${input.attachedByUserId}`);
+      return resolveVoid();
+    };
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/deliveries/DEL-9401/complete",
+      headers: {
+        authorization: "Bearer token-courier",
+        "idempotency-key": "complete-with-photo-1"
+      },
+      payload: {
+        proofType: "delivery_photo",
+        proofReference: "PFA-9401",
+        receivedByName: "Kojo Asante"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      deliveryId: "DEL-9401",
+      status: "delivered"
+    });
+    expect(currentDelivery.finalProof).toMatchObject({
+      type: "delivery_photo",
+      reference: "PFA-9401"
+    });
+    expect(attachedProofAssets).toEqual(["PFA-9401:USR-COR-001"]);
   });
 
   it("lets a super admin create a managed user record", async () => {

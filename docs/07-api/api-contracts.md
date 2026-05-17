@@ -24,6 +24,8 @@
 - `POST /v1/deliveries/:id/accept-final-mile-assignment`
 - `POST /v1/deliveries/:id/out-for-delivery`
 - `POST /v1/deliveries/:id/final-mile-failed-attempt`
+- `POST /v1/deliveries/:id/proof-assets`
+- `POST /v1/deliveries/:id/proof-assets/:proofAssetId/confirm-upload`
 - `POST /v1/deliveries/:id/complete`
 
 ## Payment APIs
@@ -285,6 +287,70 @@ Request:
   "receivedByName": "Kojo Asante"
 }
 ```
+
+### `POST /v1/deliveries/:id/proof-assets`
+Request:
+```json
+{
+  "proofType": "delivery_photo",
+  "contentType": "image/jpeg",
+  "byteSize": 512000,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+```
+
+Response:
+```json
+{
+  "proofAssetId": "PFA-0001",
+  "deliveryId": "DEL-0001",
+  "proofReference": "PFA-0001",
+  "proofType": "delivery_photo",
+  "status": "pending_upload",
+  "upload": {
+    "method": "PUT",
+    "url": "https://storage.example.test/signed-upload-url",
+    "bucket": "kra-proof-assets",
+    "objectPath": "proof-assets/DEL-0001/PFA-0001.jpg",
+    "contentType": "image/jpeg",
+    "expiresAt": "2026-05-16T15:15:00.000Z"
+  }
+}
+```
+
+### `POST /v1/deliveries/:id/proof-assets/:proofAssetId/confirm-upload`
+Request:
+```json
+{
+  "byteSize": 512000,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "storageGeneration": "generation-1"
+}
+```
+
+Response:
+```json
+{
+  "proofAssetId": "PFA-0001",
+  "deliveryId": "DEL-0001",
+  "proofReference": "PFA-0001",
+  "proofType": "delivery_photo",
+  "status": "uploaded",
+  "contentType": "image/jpeg",
+  "byteSize": 512000,
+  "storageBucket": "kra-proof-assets",
+  "storageObjectPath": "proof-assets/DEL-0001/PFA-0001.jpg",
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "storageGeneration": "generation-1",
+  "createdAt": "2026-05-16T15:00:00.000Z",
+  "uploadExpiresAt": "2026-05-16T15:15:00.000Z",
+  "uploadedAt": "2026-05-16T15:02:00.000Z"
+}
+```
+
+Completion rule:
+- `otp` proof uses an OTP proof reference.
+- `signature` and `delivery_photo` proof references must be uploaded `PFA-*` proof asset IDs before `/complete` succeeds.
 
 ### `GET /v1/public/track/:trackingCode`
 Response:

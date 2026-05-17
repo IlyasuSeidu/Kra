@@ -24,8 +24,11 @@ import {
   cancelDeliveryRequestSchema,
   cancelDeliveryResponseSchema,
   completeDeliveryRequestSchema,
+  confirmProofAssetUploadRequestSchema,
   confirmDriverPickupRequestSchema,
   confirmIntakeRequestSchema,
+  createProofAssetUploadRequestSchema,
+  createProofAssetUploadResponseSchema,
   createDeliveryRequestSchema,
   deliveryListResponseSchema,
   deliveryLifecycleResponseSchema,
@@ -40,6 +43,7 @@ import {
   outboundNotificationDispatchResponseSchema,
   paymentVerifyRequestSchema,
   paymentVerifyResponseSchema,
+  proofAssetResponseSchema,
   publicTrackingResponseSchema,
   requestPhoneVerificationChallengeRequestSchema,
   requestPhoneVerificationChallengeResponseSchema,
@@ -597,6 +601,70 @@ describe("api contracts", () => {
       })
     ).toMatchObject({
       proofType: "otp"
+    });
+
+    expect(
+      createProofAssetUploadRequestSchema.parse({
+        proofType: "delivery_photo",
+        contentType: "image/jpeg",
+        byteSize: 512_000,
+        sha256: "a".repeat(64)
+      })
+    ).toMatchObject({
+      proofType: "delivery_photo",
+      contentType: "image/jpeg"
+    });
+
+    expect(
+      createProofAssetUploadResponseSchema.parse({
+        proofAssetId: "PFA-0001",
+        deliveryId: "DEL-0001",
+        proofReference: "PFA-0001",
+        proofType: "delivery_photo",
+        status: "pending_upload",
+        upload: {
+          method: "PUT",
+          url: "https://storage.example.test/upload",
+          bucket: "kra-proof-assets",
+          objectPath: "proof-assets/DEL-0001/PFA-0001.jpg",
+          contentType: "image/jpeg",
+          expiresAt: "2026-05-16T10:45:00.000Z"
+        }
+      })
+    ).toMatchObject({
+      proofAssetId: "PFA-0001",
+      status: "pending_upload"
+    });
+
+    expect(
+      confirmProofAssetUploadRequestSchema.parse({
+        byteSize: 512_000,
+        sha256: "a".repeat(64),
+        storageGeneration: "generation-1"
+      })
+    ).toMatchObject({
+      sha256: "a".repeat(64)
+    });
+
+    expect(
+      proofAssetResponseSchema.parse({
+        proofAssetId: "PFA-0001",
+        deliveryId: "DEL-0001",
+        proofReference: "PFA-0001",
+        proofType: "delivery_photo",
+        status: "uploaded",
+        contentType: "image/jpeg",
+        byteSize: 512_000,
+        storageBucket: "kra-proof-assets",
+        storageObjectPath: "proof-assets/DEL-0001/PFA-0001.jpg",
+        sha256: "a".repeat(64),
+        createdAt: "2026-05-16T10:30:00.000Z",
+        uploadExpiresAt: "2026-05-16T10:45:00.000Z",
+        uploadedAt: "2026-05-16T10:33:00.000Z"
+      })
+    ).toMatchObject({
+      proofAssetId: "PFA-0001",
+      status: "uploaded"
     });
 
     expect(

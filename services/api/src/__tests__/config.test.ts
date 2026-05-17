@@ -60,6 +60,19 @@ describe("api runtime config", () => {
     });
   });
 
+  it("loads the Firebase Storage bucket when configured", () => {
+    expect(
+      loadApiRuntimeConfig({
+        FIREBASE_PROJECT_ID: "kra-prod",
+        FIREBASE_STORAGE_BUCKET: "kra-prod-proof-assets"
+      })
+    ).toEqual({
+      firebaseProjectId: "kra-prod",
+      apiPort: 8080,
+      firebaseStorageBucket: "kra-prod-proof-assets"
+    });
+  });
+
   it("loads and validates Hubtel SMS runtime configuration", () => {
     expect(
       loadApiRuntimeConfig({

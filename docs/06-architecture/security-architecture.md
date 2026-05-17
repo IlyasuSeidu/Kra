@@ -33,6 +33,13 @@
 - `Restricted`: names, phone numbers, addresses, payment references
 - `Highly Restricted`: proof photos, signatures, admin override notes, credentials
 
+## Proof Asset Controls
+- Proof photos and signatures are stored under controlled Cloud Storage object paths created by the backend.
+- Clients receive short-lived signed upload URLs only after role, assignment, and delivery-state checks pass.
+- Firestore `proof_assets` metadata and Storage objects are not directly readable by client SDK rules.
+- Delivery completion may reference fallback proof only through a backend-validated `PFA-*` proof asset ID.
+- Support and public views must show proof metadata only; raw asset access requires a separate audited backend flow.
+
 ## Logging And Alerting
 - All privileged actions generate audit logs.
 - Authentication anomalies, webhook signature failures, repeated duplicate scans, and proof-access anomalies generate alerts.

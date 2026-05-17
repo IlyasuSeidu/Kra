@@ -9,6 +9,7 @@ import {
   notificationDocumentPath,
   outboundNotificationDocumentPath,
   paymentDocumentPath,
+  proofAssetDocumentPath,
   publicTrackingPhoneChallengeDocumentPath,
   publicTrackingVerificationAttemptDocumentPath,
   publicTrackingVerificationGrantDocumentPath,
@@ -28,6 +29,7 @@ describe("firestore schema helpers", () => {
       deliveries: "deliveries",
       deliveryEvents: "events",
       payments: "payments",
+      proofAssets: "proof_assets",
       handoffEvents: "handoff_events",
       webhookEvents: "provider_webhook_events",
       supportIssues: "support_issues",
@@ -51,6 +53,7 @@ describe("firestore schema helpers", () => {
       "deliveries/DEL-1001/events/EVT-DEL-1001"
     );
     expect(paymentDocumentPath("PAY-1001")).toBe("payments/PAY-1001");
+    expect(proofAssetDocumentPath("PFA-1001")).toBe("proof_assets/PFA-1001");
     expect(handoffEventDocumentPath("EVT-HO-1001")).toBe("handoff_events/EVT-HO-1001");
     expect(webhookEventDocumentPath("EVT-WEB-1001")).toBe(
       "provider_webhook_events/EVT-WEB-1001"
