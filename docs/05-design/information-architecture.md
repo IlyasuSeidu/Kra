@@ -45,6 +45,7 @@ Navigation should reflect the user's job to be done, not the backend service bou
 ## IA Validation Rule
 - Every top-level area must map directly to a job-to-be-done for that role.
 - No role should need more than `2` navigation hops to reach its primary action surface.
+- Implementation screen coverage is governed by `docs/05-design/frontend-screen-inventory.md`.
 
 ## Baseline Status
 This file is now concrete enough to drive navigation and app-shell boundaries.

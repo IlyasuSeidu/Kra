@@ -1,5 +1,10 @@
 # Screen List
 
+## Canonical Source
+The implementation-ready frontend checklist now lives in `docs/05-design/frontend-screen-inventory.md`.
+
+This file remains as the compact legacy screen summary. Claude Code should build from `frontend-screen-inventory.md` because it includes required states, modals, shared infrastructure, backend route coverage, and launch completeness rules.
+
 ## Sender
 - Onboarding
 - Sign In
