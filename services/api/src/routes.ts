@@ -8,6 +8,7 @@ import {
   adminUpdateUserAccessRequestSchema,
   adminPaymentReconciliationQuerySchema,
   adminPaymentReconciliationResponseSchema,
+  adminLaunchReadinessResponseSchema,
   adminOutboundNotificationListQuerySchema,
   adminOutboundNotificationListResponseSchema,
   adminUserListQuerySchema,
@@ -533,6 +534,16 @@ export const apiRoutes = [
     authScope: "admin",
     idempotent: true,
     responseSchema: adminStationListResponseSchema,
+    errorSchema: apiErrorResponseSchema
+  },
+  {
+    operationId: "admin_launch_readiness",
+    method: "GET",
+    path: "/v1/admin/launch-readiness",
+    module: "admin",
+    authScope: "admin",
+    idempotent: true,
+    responseSchema: adminLaunchReadinessResponseSchema,
     errorSchema: apiErrorResponseSchema
   },
   {

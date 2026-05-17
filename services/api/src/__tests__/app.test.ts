@@ -175,6 +175,9 @@ function makeAppDeps(): ApiAppDeps {
       },
       listRecent() {
         return resolve([]);
+      },
+      countByStatus() {
+        return resolve(0);
       }
     },
     deliveries: {
@@ -261,6 +264,9 @@ function makeAppDeps(): ApiAppDeps {
       },
       listRecent() {
         return resolve([]);
+      },
+      countReconciliationReviewRequired() {
+        return resolve(0);
       }
     },
     proofAssets: {
@@ -297,6 +303,9 @@ function makeAppDeps(): ApiAppDeps {
         return resolve([]);
       },
       countOpenByStation() {
+        return resolve(0);
+      },
+      countOpenP1ByStation() {
         return resolve(0);
       }
     },
@@ -634,6 +643,9 @@ describe("api app", () => {
       },
       listRecent() {
         return resolve([]);
+      },
+      countByStatus() {
+        return resolve(0);
       }
     };
     deps.deliveries.getById = () =>
@@ -752,6 +764,9 @@ describe("api app", () => {
       },
       listRecent() {
         return resolve([]);
+      },
+      countByStatus() {
+        return resolve(0);
       }
     };
 
@@ -1187,6 +1202,66 @@ describe("api app", () => {
         status: "ready"
       }
     });
+  });
+
+  it("returns launch readiness blockers for admin go-live review", async () => {
+    const deps = makeAppDeps();
+
+    deps.authVerifier = {
+      verifyBearerToken() {
+        return resolve({
+          userId: "USR-SUP-001",
+          role: "super_admin",
+          capabilities: [],
+          authMethod: "firebase_id_token" as const
+        });
+      }
+    };
+    deps.issues.countOpenP1ByStation = (stationId) =>
+      resolve(stationId === "ST-ACC-01" ? 1 : 0);
+    deps.payments.countReconciliationReviewRequired = () => resolve(1);
+    deps.outboundNotifications.countByStatus = (status) =>
+      resolve(status === "dead_letter" ? 1 : 0);
+
+    const app = createApiApp(deps);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/launch-readiness",
+      headers: {
+        authorization: "Bearer token-super-admin"
+      }
+    });
+
+    const responseBody = response.json<{
+      blockers: Array<{ code: string }>;
+    }>();
+
+    expect(response.statusCode).toBe(200);
+    expect(responseBody).toMatchObject({
+      status: "blocked",
+      goLiveEligible: false,
+      systemChecks: {
+        unresolvedP1Issues: {
+          count: 1
+        },
+        paymentReconciliation: {
+          reviewRequiredCount: 1
+        },
+        receiverSms: {
+          deadLetterCount: 1
+        }
+      }
+    });
+    expect(responseBody.blockers.map((blocker) => blocker.code)).toEqual(
+      expect.arrayContaining([
+        "station_validation_incomplete",
+        "unresolved_p1_issue",
+        "payment_reconciliation_review",
+        "dead_letter_receiver_sms"
+      ])
+    );
   });
 
   it("lists accessible deliveries over the authenticated route surface", async () => {

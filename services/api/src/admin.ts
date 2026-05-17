@@ -1,6 +1,7 @@
 import {
   adminDeliveryListResponseSchema,
   adminFinanceResponseSchema,
+  adminLaunchReadinessResponseSchema,
   adminOutboundNotificationListQuerySchema,
   adminOutboundNotificationListResponseSchema,
   adminOverviewResponseSchema,
@@ -32,6 +33,7 @@ export interface AdminPaymentMetricsRepository {
     count: number;
   }>>;
   listRecent(limit: number): Promise<PaymentRecord[]>;
+  countReconciliationReviewRequired(): Promise<number>;
 }
 
 export interface AdminWebhookMetricsRepository {
@@ -46,10 +48,12 @@ export interface AdminOutboundNotificationRepository {
     status?: OutboundNotificationRecord["status"];
     limit: number;
   }): Promise<OutboundNotificationRecord[]>;
+  countByStatus(status: OutboundNotificationRecord["status"]): Promise<number>;
 }
 
 export interface AdminIssueMetricsRepository {
   countOpenByStation(stationId: DeliveryRecord["originStationId"]): Promise<number>;
+  countOpenP1ByStation(stationId: DeliveryRecord["originStationId"]): Promise<number>;
 }
 
 export interface GetAdminOverviewDeps {
@@ -66,6 +70,7 @@ export type AdminFinanceResponse = z.infer<typeof adminFinanceResponseSchema>;
 export type AdminOutboundNotificationListResponse = z.infer<
   typeof adminOutboundNotificationListResponseSchema
 >;
+export type AdminLaunchReadinessResponse = z.infer<typeof adminLaunchReadinessResponseSchema>;
 
 export async function getAdminOverview(
   deps: GetAdminOverviewDeps
@@ -158,6 +163,147 @@ export async function listAdminStations(
   return adminStationListResponseSchema.parse({
     generatedAt: deps.now(),
     stations
+  });
+}
+
+export async function getAdminLaunchReadiness(
+  deps: {
+    deliveries: AdminDeliveryMetricsRepository;
+    issues: AdminIssueMetricsRepository;
+    outboundNotifications: AdminOutboundNotificationRepository;
+    payments: AdminPaymentMetricsRepository;
+    stations: StationRepository;
+    now: () => string;
+  }
+): Promise<AdminLaunchReadinessResponse> {
+  const generatedAt = deps.now();
+  const [configuredStations, activeQueueCounts, paymentReviewCount, receiverSmsDeadLetterCount] =
+    await Promise.all([
+      listConfiguredStations({
+        stations: deps.stations,
+        now: deps.now
+      }),
+      deps.deliveries.countActiveQueuesByStation(),
+      deps.payments.countReconciliationReviewRequired(),
+      deps.outboundNotifications.countByStatus("dead_letter")
+    ]);
+  const activeQueueMap = new Map(
+    activeQueueCounts.map((entry) => [entry.stationId, entry.count] as const)
+  );
+
+  const stations = await Promise.all(
+    configuredStations.map(async (station) => {
+      const unresolvedP1IssueCount = await deps.issues.countOpenP1ByStation(station.stationId);
+
+      return {
+        stationId: station.stationId,
+        name: station.name,
+        city: station.city,
+        operatingStatus: station.operatingStatus,
+        intakeStatus: station.intakeStatus,
+        serviceAvailability: station.serviceAvailability,
+        validationStatus: station.validation.status,
+        goLiveEligible: station.validation.goLiveEligible,
+        validationBlockerCount: station.validation.blockers.length,
+        activeQueueCount: activeQueueMap.get(station.stationId) ?? 0,
+        unresolvedP1IssueCount,
+        updatedAt: station.updatedAt
+      };
+    })
+  );
+
+  const blockers: z.infer<typeof adminLaunchReadinessResponseSchema>["blockers"] = [];
+
+  for (const station of stations) {
+    if (!station.goLiveEligible) {
+      blockers.push({
+        code: "station_validation_incomplete",
+        severity: "p1",
+        stationId: station.stationId,
+        count: station.validationBlockerCount,
+        message: `${station.name} is not go-live eligible.`
+      });
+    }
+
+    if (station.operatingStatus !== "active" || station.intakeStatus !== "open") {
+      blockers.push({
+        code: "station_operationally_paused",
+        severity: "p1",
+        stationId: station.stationId,
+        message: `${station.name} must be active and open for intake before launch.`
+      });
+    }
+
+    if (
+      !station.serviceAvailability.standard ||
+      !station.serviceAvailability.express ||
+      !station.serviceAvailability.doorstep
+    ) {
+      blockers.push({
+        code: "station_service_unavailable",
+        severity: "p2",
+        stationId: station.stationId,
+        message: `${station.name} does not have all launch services enabled.`
+      });
+    }
+
+    if (station.unresolvedP1IssueCount > 0) {
+      blockers.push({
+        code: "unresolved_p1_issue",
+        severity: "p1",
+        stationId: station.stationId,
+        count: station.unresolvedP1IssueCount,
+        message: `${station.name} has unresolved P1 issues.`
+      });
+    }
+  }
+
+  if (paymentReviewCount > 0) {
+    blockers.push({
+      code: "payment_reconciliation_review",
+      severity: "p1",
+      count: paymentReviewCount,
+      message: "Payment reconciliation review queue must be cleared before launch."
+    });
+  }
+
+  if (receiverSmsDeadLetterCount > 0) {
+    blockers.push({
+      code: "dead_letter_receiver_sms",
+      severity: "p1",
+      count: receiverSmsDeadLetterCount,
+      message: "Receiver SMS dead-letter queue must be cleared before launch."
+    });
+  }
+
+  const unresolvedP1Count = stations.reduce(
+    (total, station) => total + station.unresolvedP1IssueCount,
+    0
+  );
+  const readyStations = stations.filter((station) => station.goLiveEligible).length;
+  const goLiveEligible = blockers.length === 0;
+
+  return adminLaunchReadinessResponseSchema.parse({
+    generatedAt,
+    goLiveEligible,
+    status: goLiveEligible ? "ready" : "blocked",
+    blockers,
+    stations,
+    systemChecks: {
+      stationValidation: {
+        readyStations,
+        totalStations: stations.length
+      },
+      unresolvedP1Issues: {
+        count: unresolvedP1Count
+      },
+      paymentReconciliation: {
+        reviewRequiredCount: paymentReviewCount
+      },
+      receiverSms: {
+        deadLetterCount: receiverSmsDeadLetterCount
+      }
+    }
   });
 }
 

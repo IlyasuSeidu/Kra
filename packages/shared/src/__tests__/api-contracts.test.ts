@@ -4,6 +4,7 @@ import {
   acceptFinalMileAssignmentRequestSchema,
   acceptRunRequestSchema,
   adminStationListResponseSchema,
+  adminLaunchReadinessResponseSchema,
   adminOutboundNotificationListQuerySchema,
   adminOutboundNotificationListResponseSchema,
   adminUpdateStationStatusRequestSchema,
@@ -953,6 +954,65 @@ describe("api contracts", () => {
           validation: {
             status: "ready"
           }
+        }
+      ]
+    });
+
+    expect(
+      adminLaunchReadinessResponseSchema.parse({
+        generatedAt: "2026-05-16T12:25:00.000Z",
+        goLiveEligible: false,
+        status: "blocked",
+        blockers: [
+          {
+            code: "unresolved_p1_issue",
+            severity: "p1",
+            stationId: "ST-ACC-01",
+            count: 1,
+            message: "Accra Central has unresolved P1 issues."
+          }
+        ],
+        stations: [
+          {
+            stationId: "ST-ACC-01",
+            name: "Accra Central",
+            city: "Accra",
+            operatingStatus: "active",
+            intakeStatus: "open",
+            serviceAvailability: {
+              standard: true,
+              express: true,
+              doorstep: true
+            },
+            validationStatus: "ready",
+            goLiveEligible: true,
+            validationBlockerCount: 0,
+            activeQueueCount: 0,
+            unresolvedP1IssueCount: 1,
+            updatedAt: "2026-05-16T12:15:00.000Z"
+          }
+        ],
+        systemChecks: {
+          stationValidation: {
+            readyStations: 1,
+            totalStations: 3
+          },
+          unresolvedP1Issues: {
+            count: 1
+          },
+          paymentReconciliation: {
+            reviewRequiredCount: 0
+          },
+          receiverSms: {
+            deadLetterCount: 0
+          }
+        }
+      })
+    ).toMatchObject({
+      status: "blocked",
+      blockers: [
+        {
+          code: "unresolved_p1_issue"
         }
       ]
     });

@@ -38,6 +38,7 @@
 - payment callback path verified
 - delivery timeline updates visible
 - admin issue queue accessible
+- `GET /v1/admin/launch-readiness` returns `ready` before opening public pilot volume
 
 ## Rollback Rule
 - rules rollback to previous tagged ruleset

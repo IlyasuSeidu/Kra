@@ -81,5 +81,12 @@ Business logic should live in application services, not in route handlers and no
 - `/v1/deliveries/:id/complete` accepts fallback proof only when `proofReference` is an uploaded `PFA-*` asset for the same delivery and proof type.
 - Raw proof URLs are not exposed in delivery summaries, timelines, or public tracking responses.
 
+## Launch Readiness Gate
+- `GET /v1/admin/launch-readiness` is the backend source of truth for pilot go-live gating.
+- The gate aggregates station validation, station operating status, active queue counts, unresolved `P1` issues, payment reconciliation review backlog, and receiver SMS dead-letter backlog.
+- Launch remains blocked when any station is not go-live eligible, paused, restricted, missing launch services, or has unresolved `P1` issues.
+- Launch also remains blocked when pending payment reconciliation review or receiver SMS dead-letter records exist.
+- Frontend dashboards may render this output, but they must not invent separate launch-readiness rules.
+
 ## Baseline Status
 This file is now concrete enough to guide backend scaffolding and async workflow design.

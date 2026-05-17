@@ -928,6 +928,61 @@ export const adminStationListResponseSchema = z.object({
   )
 });
 
+export const launchReadinessBlockerCodeSchema = z.enum([
+  "station_validation_incomplete",
+  "station_operationally_paused",
+  "station_service_unavailable",
+  "unresolved_p1_issue",
+  "payment_reconciliation_review",
+  "dead_letter_receiver_sms"
+]);
+
+export const adminLaunchReadinessResponseSchema = z.object({
+  generatedAt: z.string().datetime(),
+  goLiveEligible: z.boolean(),
+  status: z.enum(["ready", "blocked"]),
+  blockers: z.array(
+    z.object({
+      code: launchReadinessBlockerCodeSchema,
+      severity: z.enum(["p1", "p2"]),
+      message: z.string().trim().min(3).max(240),
+      stationId: stationIdSchema.optional(),
+      count: z.number().int().nonnegative().optional()
+    })
+  ),
+  stations: z.array(
+    z.object({
+      stationId: stationIdSchema,
+      name: z.string().trim().min(3).max(120),
+      city: z.string().trim().min(2).max(120),
+      operatingStatus: stationOperatingStatusSchema,
+      intakeStatus: stationIntakeStatusSchema,
+      serviceAvailability: adminStationServiceAvailabilitySchema,
+      validationStatus: stationValidationStatusSchema,
+      goLiveEligible: z.boolean(),
+      validationBlockerCount: z.number().int().nonnegative(),
+      activeQueueCount: z.number().int().nonnegative(),
+      unresolvedP1IssueCount: z.number().int().nonnegative(),
+      updatedAt: z.string().datetime()
+    })
+  ),
+  systemChecks: z.object({
+    stationValidation: z.object({
+      readyStations: z.number().int().nonnegative(),
+      totalStations: z.number().int().positive()
+    }),
+    unresolvedP1Issues: z.object({
+      count: z.number().int().nonnegative()
+    }),
+    paymentReconciliation: z.object({
+      reviewRequiredCount: z.number().int().nonnegative()
+    }),
+    receiverSms: z.object({
+      deadLetterCount: z.number().int().nonnegative()
+    })
+  })
+});
+
 export const adminUserListQuerySchema = z.object({
   role: roleSchema.optional(),
   status: userStatusSchema.optional(),

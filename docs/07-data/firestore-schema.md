@@ -92,6 +92,7 @@ Store current delivery summary on the delivery document and keep detailed histor
   - `outbound_notifications` by `dedupeKey`
   - `outbound_notifications` by `status + nextAttemptAt`
 - station queues query only current delivery summary, not full event collections
+- launch readiness aggregates station documents, active delivery queues, unresolved `P1` support issues, payment reconciliation review counts, and receiver SMS dead-letter counts through backend repositories
 
 ## Partition And Archive Rule
 - Active delivery documents stay in primary collections.
