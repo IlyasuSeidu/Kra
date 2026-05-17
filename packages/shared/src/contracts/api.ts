@@ -428,6 +428,9 @@ export const assignFinalMileRequestSchema = z.object({
 });
 
 export const acceptFinalMileAssignmentRequestSchema = z.object({
+  packageScanCode: z.string().trim().min(4).max(80),
+  fallbackUsed: z.boolean().optional(),
+  supervisorOverrideActorId: userIdSchema.optional(),
   note: z.string().trim().min(3).max(240).optional()
 });
 
@@ -1198,6 +1201,7 @@ export const apiErrorCodeSchema = z.enum([
   "PAYMENT_REQUIRED",
   "INVALID_STATUS_TRANSITION",
   "PHONE_VERIFICATION_REQUIRED",
+  "PACKAGE_SCAN_MISMATCH",
   "RATE_LIMITED",
   "INTERNAL_ERROR"
 ]);

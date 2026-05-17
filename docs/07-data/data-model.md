@@ -6,6 +6,7 @@
 - `Station`
 - `Delivery`
 - `Package`
+- `PackageLabel`
 - `HandoffEvent`
 - `Payment`
 - `SupportIssue`
@@ -57,6 +58,15 @@ The package can be modeled as part of the delivery in early versions if one deli
 - `isFragile`
 - `declaredValueGhs`
 
+### PackageLabel
+- `scanCode`
+- `deliveryId`
+- `trackingCode`
+- `originStationId`
+- `destinationStationId`
+- `createdAt`
+- `createdByUserId`
+
 ### Payment
 - `paymentId`
 - `deliveryId`
@@ -96,6 +106,7 @@ The package can be modeled as part of the delivery in early versions if one deli
 
 ## Source Of Truth Rule
 - `currentStatus`, `paymentStatus`, and `currentCustodyActorId` on the delivery are materialized current state.
+- `PackageLabel` is immutable after origin intake and is the source of truth for whether a scan belongs to a delivery.
 - Event collections remain the source of truth for how the state changed.
 
 ## Baseline Status

@@ -31,6 +31,10 @@ import type {
   PaymentRecord,
   PaymentRepository
 } from "../payments";
+import type {
+  PackageLabelRecord,
+  PackageLabelRepository
+} from "../package-labels";
 import type { PaymentReconciliationRepository } from "../payment-reconciliation";
 import type { PricingRuleRepository } from "../pricing-rules";
 import type { ProofAssetRepository } from "../proof-assets";
@@ -57,6 +61,8 @@ import {
   notificationConverter,
   outboundNotificationConverter,
   paymentConverter,
+  packageLabelConverter,
+  packageLabelDocumentPath,
   pricingRuleConverter,
   proofAssetConverter,
   publicTrackingPhoneChallengeConverter,
@@ -584,6 +590,43 @@ export function createFirestoreDeliveryRepository(
       );
 
       return counts.filter((entry) => entry.count > 0);
+    }
+  };
+}
+
+export function createFirestorePackageLabelRepository(
+  firestore: Firestore
+): PackageLabelRepository {
+  const packageLabelsCollection = firestore
+    .collection(firestoreCollections.packageLabels)
+    .withConverter(packageLabelConverter);
+
+  return {
+    async getByScanCode(scanCode) {
+      const snapshot = await firestore
+        .doc(packageLabelDocumentPath(scanCode))
+        .withConverter(packageLabelConverter)
+        .get();
+
+      if (!snapshot.exists) {
+        return undefined;
+      }
+
+      return snapshot.data();
+    },
+    async reserveForDelivery(label) {
+      return firestore.runTransaction(async (transaction) => {
+        const labelRef = packageLabelsCollection.doc(encodeURIComponent(label.scanCode));
+        const snapshot = await transaction.get(labelRef);
+
+        if (snapshot.exists) {
+          return snapshot.data() as PackageLabelRecord;
+        }
+
+        transaction.create(labelRef, label);
+
+        return label;
+      });
     }
   };
 }
@@ -1320,6 +1363,7 @@ export function createFirestoreApiRepositories(
     notificationFeed: createFirestoreNotificationRepository(firestore),
     outboundNotifications: createFirestoreOutboundNotificationRepository(firestore),
     deliveries: createFirestoreDeliveryRepository(firestore, now),
+    packageLabels: createFirestorePackageLabelRepository(firestore),
     payments: createFirestorePaymentRepository(firestore, now),
     pricingRules: createFirestorePricingRuleRepository(firestore),
     proofAssets: createFirestoreProofAssetRepository(firestore, now),

@@ -6,6 +6,7 @@
 - `routes`
 - `deliveries`
 - `packages`
+- `package_labels`
 - `handoff_events`
 - `payments`
 - `pricing_rules`
@@ -46,6 +47,12 @@ Store current delivery summary on the delivery document and keep detailed histor
 
 ### `packages/{packageId}`
 - package detail keyed by delivery
+
+### `package_labels/{encodedScanCode}`
+- immutable binding between a physical package scan code and one delivery
+- delivery ID, tracking code, origin station, destination station, creator actor, and creation timestamp
+- created during origin intake; never reassigned to another delivery
+- used to validate all later package scans before dispatch, driver pickup, destination receipt, and final-mile handoff
 
 ### `payments/{paymentId}`
 - payment summary and provider mapping
@@ -92,6 +99,7 @@ Store current delivery summary on the delivery document and keep detailed histor
   - `deliveries` by `senderId + createdAt`
   - `deliveries` by `originStationId + currentStatus`
   - `deliveries` by `destinationStationId + currentStatus`
+  - `package_labels` by `deliveryId` if reverse lookup is needed outside the hot delivery detail path
   - `payments` by `providerReference`
   - `payments` by `status + nextReconciliationAt`
   - `payments` by `status + reconciliationReviewRequiredAt`
@@ -109,7 +117,7 @@ Store current delivery summary on the delivery document and keep detailed histor
 - Event collections remain immutable and may be retained longer than hot query windows.
 
 ## Security Alignment Rule
-- Client writes to `events`, `payments`, `pricing_rules`, `outbound_notifications`, and `audit_events` are blocked.
+- Client writes to `events`, `payments`, `package_labels`, `pricing_rules`, `outbound_notifications`, and `audit_events` are blocked.
 - Client reads are limited by sender ownership, assignment scope, or station scope.
 
 ## Baseline Status

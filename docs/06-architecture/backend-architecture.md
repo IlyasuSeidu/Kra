@@ -49,8 +49,14 @@ Business logic should live in application services, not in route handlers and no
 - Immutable detail lives in:
   - `handoff_events`
   - `delivery_events`
+  - `package_labels`
   - `payment_events`
   - `audit_events`
+
+## Custody Enforcement
+- Origin intake creates the immutable `package_labels/{encodedScanCode}` binding before later scans are accepted.
+- Station dispatch and final-mile assignment do not move custody by themselves; the receiving driver or courier must confirm with the registered scan code.
+- Handoff timelines are reconstructed from delivery events, handoff events, issue records, and proof metadata.
 
 ## Pricing Configuration Service
 - Delivery booking loads the active pricing rule from Firestore before calculating a quote.
@@ -87,6 +93,7 @@ Business logic should live in application services, not in route handlers and no
 - Direct Firebase Storage client SDK access is denied by default storage rules; app clients use backend-issued signed URLs.
 - Upload confirmation records byte size, SHA-256 hash, and storage generation before the asset can be used as final proof.
 - `/v1/deliveries/:id/complete` accepts fallback proof only when `proofReference` is an uploaded `PFA-*` asset for the same delivery and proof type.
+- `/v1/deliveries/:id/complete` accepts OTP proof only when `proofReference` is the active receiver phone-verification token for that delivery.
 - Raw proof URLs are not exposed in delivery summaries, timelines, or public tracking responses.
 
 ## Launch Readiness Gate

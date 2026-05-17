@@ -6,6 +6,7 @@ import type { IdempotencyRecord } from "../idempotency";
 import type { SupportIssueRecord } from "../issues";
 import type { WebhookEventRecord } from "../payment-webhooks";
 import type { PaymentRecord } from "../payments";
+import type { PackageLabelRecord } from "../package-labels";
 import type { PricingRuleRecord } from "../pricing-rules";
 import type { ProofAssetRecord } from "../proof-assets";
 import type { NotificationRecord } from "../notification-feed";
@@ -29,6 +30,7 @@ export const firestoreCollections = {
   payments: "payments",
   pricingRules: "pricing_rules",
   proofAssets: "proof_assets",
+  packageLabels: "package_labels",
   handoffEvents: "handoff_events",
   webhookEvents: "provider_webhook_events",
   supportIssues: "support_issues",
@@ -55,6 +57,7 @@ export interface PaymentDocument extends PaymentRecord {
 }
 
 export type ProofAssetDocument = ProofAssetRecord;
+export type PackageLabelDocument = PackageLabelRecord;
 export type PricingRuleDocument = PricingRuleRecord;
 export type DeliveryEventDocument = DeliveryEventRecord;
 export type HandoffEventDocument = HandoffEventRecord;
@@ -87,6 +90,7 @@ export const deliveryConverter = createPassThroughConverter<DeliveryDocument>();
 export const paymentConverter = createPassThroughConverter<PaymentDocument>();
 export const pricingRuleConverter = createPassThroughConverter<PricingRuleDocument>();
 export const proofAssetConverter = createPassThroughConverter<ProofAssetDocument>();
+export const packageLabelConverter = createPassThroughConverter<PackageLabelDocument>();
 export const deliveryEventConverter = createPassThroughConverter<DeliveryEventDocument>();
 export const handoffEventConverter = createPassThroughConverter<HandoffEventDocument>();
 export const webhookEventConverter = createPassThroughConverter<WebhookEventDocument>();
@@ -134,6 +138,10 @@ export function pricingRuleDocumentPath(pricingRuleId: string): string {
 
 export function proofAssetDocumentPath(proofAssetId: string): string {
   return `${firestoreCollections.proofAssets}/${proofAssetId}`;
+}
+
+export function packageLabelDocumentPath(scanCode: string): string {
+  return `${firestoreCollections.packageLabels}/${encodeURIComponent(scanCode)}`;
 }
 
 export function handoffEventDocumentPath(handoffEventId: string): string {

@@ -10,6 +10,15 @@ import {
 import type { z } from "zod";
 
 import type { DeliveryRecord } from "./deliveries";
+import {
+  assertPackageScanMatchesDelivery,
+  reservePackageLabelForDelivery,
+  type PackageLabelRepository
+} from "./package-labels";
+import {
+  assertActiveReceiverVerificationToken,
+  type PublicTrackingVerificationRepository
+} from "./public-tracking-verification";
 import { ApiServiceError } from "./service-errors";
 
 type StaffDeliveryRole = Exclude<Role, "sender" | "finance_admin" | "support_admin">;
@@ -100,6 +109,8 @@ export interface DeliveryLifecycleDeps {
   deliveries: DeliveryLifecycleRepository;
   deliveryEvents: DeliveryEventRepository;
   handoffEvents: HandoffEventRepository;
+  packageLabels?: PackageLabelRepository;
+  verification?: PublicTrackingVerificationRepository;
   identityFactory: DeliveryLifecycleIdentityFactory;
   now: () => string;
 }
@@ -161,6 +172,29 @@ function assertPaymentConfirmed(
   }
 }
 
+function assertFinalMileCustody(
+  delivery: DeliveryRecord,
+  actor: OperationalActor,
+  action: string
+): void {
+  if (
+    delivery.currentCustodyRole !== "final_mile_courier" ||
+    delivery.currentCustodyActorId !== actor.actorId
+  ) {
+    throw new ApiServiceError(
+      "INVALID_STATUS_TRANSITION",
+      "Final-mile action requires confirmed courier custody first.",
+      {
+        deliveryId: delivery.deliveryId,
+        actorId: actor.actorId,
+        action,
+        currentCustodyRole: delivery.currentCustodyRole,
+        currentCustodyActorId: delivery.currentCustodyActorId
+      }
+    );
+  }
+}
+
 function buildLifecycleResponse(
   eventId: string,
   delivery: DeliveryRecord,
@@ -183,6 +217,8 @@ async function recordCheckpoint(
     occurredAt: string;
     stationId?: StationId;
     metadata?: Record<string, unknown>;
+    currentCustodyRole?: DeliveryCustodyRole | null;
+    currentCustodyActorId?: string | null;
   },
   deps: DeliveryLifecycleDeps
 ): Promise<{
@@ -204,10 +240,29 @@ async function recordCheckpoint(
 
   const nextDelivery: DeliveryRecord = {
     ...input.delivery,
+    currentCustodyRole:
+      input.currentCustodyRole === undefined
+        ? input.delivery.currentCustodyRole
+        : input.currentCustodyRole,
+    currentCustodyActorId:
+      input.currentCustodyActorId === undefined
+        ? input.delivery.currentCustodyActorId
+        : input.currentCustodyActorId,
     latestEvent: {
       type: input.eventType,
       occurredAt: input.occurredAt
-    }
+    },
+    latestTouchpoint:
+      input.currentCustodyRole === undefined && input.stationId === undefined
+        ? input.delivery.latestTouchpoint
+        : {
+            role:
+              input.currentCustodyRole === null || input.currentCustodyRole === undefined
+                ? input.delivery.latestTouchpoint.role
+                : input.currentCustodyRole,
+            occurredAt: input.occurredAt,
+            ...(input.stationId === undefined ? {} : { stationId: input.stationId })
+          }
   };
 
   await deps.deliveries.save(nextDelivery);
@@ -326,6 +381,36 @@ async function createHandoffEvent(
   return handoffEvent;
 }
 
+async function reservePackageLabelIfConfigured(
+  input: {
+    delivery: DeliveryRecord;
+    scanCode: string;
+    actor: OperationalActor;
+    occurredAt: string;
+  },
+  deps: DeliveryLifecycleDeps
+): Promise<void> {
+  if (!deps.packageLabels) {
+    return;
+  }
+
+  await reservePackageLabelForDelivery(input, deps.packageLabels);
+}
+
+async function assertPackageScanIfConfigured(
+  input: {
+    delivery: DeliveryRecord;
+    scanCode: string;
+  },
+  deps: DeliveryLifecycleDeps
+): Promise<void> {
+  if (!deps.packageLabels) {
+    return;
+  }
+
+  await assertPackageScanMatchesDelivery(input, deps.packageLabels);
+}
+
 export async function confirmOriginIntake(
   input: {
     deliveryId: string;
@@ -355,6 +440,16 @@ export async function confirmOriginIntake(
   assertStationScope(actor, delivery.originStationId, "confirm_intake");
 
   const occurredAt = deps.now();
+  await reservePackageLabelIfConfigured(
+    {
+      delivery,
+      scanCode: input.labelScanCode,
+      actor,
+      occurredAt
+    },
+    deps
+  );
+
   const { delivery: updatedDelivery, event } = await applyTransition(
     {
       delivery: {
@@ -505,43 +600,38 @@ export async function dispatchDelivery(
     });
   }
 
+  if (delivery.currentStatus !== "assigned_to_driver") {
+    throw new ApiServiceError(
+      "INVALID_STATUS_TRANSITION",
+      "Station dispatch can only be prepared for an assigned driver run.",
+      {
+        deliveryId: delivery.deliveryId,
+        currentStatus: delivery.currentStatus
+      }
+    );
+  }
+
   const occurredAt = deps.now();
-  const { delivery: updatedDelivery, event } = await applyTransition(
+  await assertPackageScanIfConfigured(
     {
       delivery,
-      nextStatus: "dispatched_from_origin",
-      eventType: "delivery_dispatched_from_origin",
-      actor,
-      occurredAt,
-      stationId: delivery.originStationId,
-      currentCustodyRole: "driver",
-      currentCustodyActorId: delivery.assignedDriverId,
-      metadata: {
-        packageScanCode: input.packageScanCode,
-        fallbackUsed: input.fallbackUsed ?? false,
-        supervisorOverrideActorId: input.supervisorOverrideActorId
-      }
+      scanCode: input.packageScanCode
     },
     deps
   );
 
-  await createHandoffEvent(
+  const { delivery: updatedDelivery, event } = await recordCheckpoint(
     {
-      deliveryId: delivery.deliveryId,
-      handoffType: "origin_station_to_driver",
-      fromRole: "station_operator",
-      fromActorId: actor.actorId,
-      toRole: "driver",
-      toActorId: delivery.assignedDriverId,
-      stationId: delivery.originStationId,
+      delivery,
+      eventType: "delivery_dispatched_from_origin",
+      actor,
       occurredAt,
-      proof: {
-        reference: input.packageScanCode,
-        type: "package_scan",
+      stationId: delivery.originStationId,
+      metadata: {
+        packageScanCode: input.packageScanCode,
         fallbackUsed: input.fallbackUsed ?? false,
-        ...(input.supervisorOverrideActorId === undefined
-          ? {}
-          : { supervisorOverrideActorId: input.supervisorOverrideActorId })
+        supervisorOverrideActorId: input.supervisorOverrideActorId,
+        handoffConfirmationStatus: "awaiting_driver_pickup_confirmation"
       }
     },
     deps
@@ -656,13 +746,10 @@ export async function confirmDriverPickup(
     });
   }
 
-  if (
-    delivery.currentStatus !== "assigned_to_driver" &&
-    delivery.currentStatus !== "dispatched_from_origin"
-  ) {
+  if (delivery.currentStatus !== "assigned_to_driver") {
     throw new ApiServiceError(
       "INVALID_STATUS_TRANSITION",
-      "Driver pickup confirmation is only allowed after assignment and before in-transit progression.",
+      "Driver pickup confirmation is only allowed before custody leaves the origin station.",
       {
         deliveryId: input.deliveryId,
         currentStatus: delivery.currentStatus
@@ -671,17 +758,52 @@ export async function confirmDriverPickup(
   }
 
   const occurredAt = deps.now();
-  const { delivery: updatedDelivery, event } = await recordCheckpoint(
+  await assertPackageScanIfConfigured(
     {
       delivery,
+      scanCode: input.packageScanCode
+    },
+    deps
+  );
+
+  const { delivery: updatedDelivery, event } = await applyTransition(
+    {
+      delivery,
+      nextStatus: "dispatched_from_origin",
       eventType: "driver_pickup_confirmed",
       actor,
       occurredAt,
       stationId: delivery.originStationId,
+      currentCustodyRole: "driver",
+      currentCustodyActorId: actor.actorId,
       metadata: {
         packageScanCode: input.packageScanCode,
         fallbackUsed: input.fallbackUsed ?? false,
         supervisorOverrideActorId: input.supervisorOverrideActorId
+      }
+    },
+    deps
+  );
+
+  await createHandoffEvent(
+    {
+      deliveryId: delivery.deliveryId,
+      handoffType: "origin_station_to_driver",
+      fromRole: "station_operator",
+      ...(delivery.currentCustodyActorId === null
+        ? {}
+        : { fromActorId: delivery.currentCustodyActorId }),
+      toRole: "driver",
+      toActorId: actor.actorId,
+      stationId: delivery.originStationId,
+      occurredAt,
+      proof: {
+        reference: input.packageScanCode,
+        type: "package_scan",
+        fallbackUsed: input.fallbackUsed ?? false,
+        ...(input.supervisorOverrideActorId === undefined
+          ? {}
+          : { supervisorOverrideActorId: input.supervisorOverrideActorId })
       }
     },
     deps
@@ -793,6 +915,31 @@ export async function receiveDestination(
 
   const occurredAt = deps.now();
   let workingDelivery = delivery;
+
+  await assertPackageScanIfConfigured(
+    {
+      delivery,
+      scanCode: input.packageScanCode
+    },
+    deps
+  );
+
+  if (
+    delivery.currentCustodyRole !== "driver" ||
+    !delivery.currentCustodyActorId ||
+    delivery.currentCustodyActorId !== delivery.assignedDriverId
+  ) {
+    throw new ApiServiceError(
+      "INVALID_STATUS_TRANSITION",
+      "Destination receipt requires confirmed driver custody first.",
+      {
+        deliveryId: delivery.deliveryId,
+        currentStatus: delivery.currentStatus,
+        currentCustodyRole: delivery.currentCustodyRole,
+        currentCustodyActorId: delivery.currentCustodyActorId
+      }
+    );
+  }
 
   if (workingDelivery.currentStatus === "dispatched_from_origin") {
     workingDelivery = (
@@ -923,27 +1070,7 @@ export async function assignFinalMileCourier(
       actor,
       occurredAt,
       stationId: delivery.destinationStationId,
-      currentCustodyRole: "final_mile_courier",
-      currentCustodyActorId: input.courierUserId,
       assignedFinalMileCourierId: input.courierUserId
-    },
-    deps
-  );
-
-  await createHandoffEvent(
-    {
-      deliveryId: delivery.deliveryId,
-      handoffType: "destination_station_to_final_mile_courier",
-      fromRole: "station_operator",
-      fromActorId: actor.actorId,
-      toRole: "final_mile_courier",
-      toActorId: input.courierUserId,
-      stationId: delivery.destinationStationId,
-      occurredAt,
-      proof: {
-        reference: `${delivery.deliveryId}:${input.courierUserId}`,
-        type: "package_scan"
-      }
     },
     deps
   );
@@ -957,6 +1084,9 @@ export async function assignFinalMileCourier(
 export async function acceptFinalMileAssignment(
   input: {
     deliveryId: string;
+    packageScanCode: string;
+    fallbackUsed?: boolean;
+    supervisorOverrideActorId?: string;
     note?: string;
   },
   actor: OperationalActor,
@@ -1003,6 +1133,14 @@ export async function acceptFinalMileAssignment(
   }
 
   const occurredAt = deps.now();
+  await assertPackageScanIfConfigured(
+    {
+      delivery,
+      scanCode: input.packageScanCode
+    },
+    deps
+  );
+
   const { delivery: updatedDelivery, event } = await recordCheckpoint(
     {
       delivery,
@@ -1010,8 +1148,37 @@ export async function acceptFinalMileAssignment(
       actor,
       occurredAt,
       stationId: delivery.destinationStationId,
+      currentCustodyRole: "final_mile_courier",
+      currentCustodyActorId: actor.actorId,
       metadata: {
+        packageScanCode: input.packageScanCode,
+        fallbackUsed: input.fallbackUsed ?? false,
+        supervisorOverrideActorId: input.supervisorOverrideActorId,
         ...(input.note === undefined ? {} : { note: input.note })
+      }
+    },
+    deps
+  );
+
+  await createHandoffEvent(
+    {
+      deliveryId: delivery.deliveryId,
+      handoffType: "destination_station_to_final_mile_courier",
+      fromRole: "station_operator",
+      ...(delivery.currentCustodyActorId === null
+        ? {}
+        : { fromActorId: delivery.currentCustodyActorId }),
+      toRole: "final_mile_courier",
+      toActorId: actor.actorId,
+      stationId: delivery.destinationStationId,
+      occurredAt,
+      proof: {
+        reference: input.packageScanCode,
+        type: "package_scan",
+        fallbackUsed: input.fallbackUsed ?? false,
+        ...(input.supervisorOverrideActorId === undefined
+          ? {}
+          : { supervisorOverrideActorId: input.supervisorOverrideActorId })
       }
     },
     deps
@@ -1063,6 +1230,8 @@ export async function markDeliveryOutForDelivery(
       actorId: actor.actorId
     });
   }
+
+  assertFinalMileCustody(delivery, actor, "mark_out_for_delivery");
 
   const occurredAt = deps.now();
   const { delivery: updatedDelivery, event } = await applyTransition(
@@ -1123,6 +1292,8 @@ export async function recordFinalMileFailedAttempt(
       actorId: actor.actorId
     });
   }
+
+  assertFinalMileCustody(delivery, actor, "record_failed_attempt");
 
   let workingDelivery = delivery;
   const occurredAt = deps.now();
@@ -1227,6 +1398,19 @@ export async function completeDelivery(
 
   const occurredAt = deps.now();
 
+  if (input.proofType === "otp" && deps.verification) {
+    await assertActiveReceiverVerificationToken(
+      {
+        delivery,
+        verificationToken: input.proofReference
+      },
+      {
+        verification: deps.verification,
+        now: deps.now
+      }
+    );
+  }
+
   if (delivery.currentStatus === "awaiting_receiver_pickup") {
     if (actor.role !== "station_operator") {
       throw new ApiServiceError("FORBIDDEN", "Pickup completion requires a station operator.", {
@@ -1289,6 +1473,8 @@ export async function completeDelivery(
       actorId: actor.actorId
     });
   }
+
+  assertFinalMileCustody(delivery, actor, "complete_delivery");
 
   let workingDelivery = delivery;
 

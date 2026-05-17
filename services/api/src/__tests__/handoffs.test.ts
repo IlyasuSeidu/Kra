@@ -136,7 +136,7 @@ describe("delivery lifecycle services", () => {
     });
   });
 
-  it("assigns a driver and dispatches the delivery after payment confirmation", async () => {
+  it("assigns a driver and completes origin handoff only after driver scan confirmation", async () => {
     const savedDeliveries: DeliveryRecord[] = [];
     const deliveryEvents: string[] = [];
     const handoffEvents: string[] = [];
@@ -176,7 +176,7 @@ describe("delivery lifecycle services", () => {
       },
       identityFactory: {
         nextDeliveryEventId: (() => {
-          const ids = ["EVT-DEL-6002", "EVT-DEL-6003", "EVT-DEL-6004"];
+          const ids = ["EVT-DEL-6002", "EVT-DEL-6003", "EVT-DEL-6004", "EVT-DEL-6005"];
           return () => ids.shift() ?? "EVT-DEL-EXTRA";
         })(),
         nextHandoffEventId: () => "EVT-HO-6002"
@@ -210,14 +210,28 @@ describe("delivery lifecycle services", () => {
       deps
     );
 
+    const pickupConfirmation = await confirmDriverPickup(
+      {
+        deliveryId: "DEL-6001",
+        packageScanCode: "PKG-6001"
+      },
+      {
+        actorId: "USR-DRV-001",
+        role: "driver"
+      },
+      deps
+    );
+
     expect(assignment.response.status).toBe("assigned_to_driver");
-    expect(dispatch.response.status).toBe("dispatched_from_origin");
+    expect(dispatch.response.status).toBe("assigned_to_driver");
+    expect(pickupConfirmation.response.status).toBe("dispatched_from_origin");
     expect(currentDelivery.assignedDriverId).toBe("USR-DRV-001");
     expect(currentDelivery.currentCustodyRole).toBe("driver");
     expect(deliveryEvents).toEqual([
       "EVT-DEL-6002:delivery_queued_for_driver_assignment:awaiting_driver_assignment",
       "EVT-DEL-6003:driver_assigned:assigned_to_driver",
-      "EVT-DEL-6004:delivery_dispatched_from_origin:dispatched_from_origin"
+      "EVT-DEL-6004:delivery_dispatched_from_origin:assigned_to_driver",
+      "EVT-DEL-6005:driver_pickup_confirmed:dispatched_from_origin"
     ]);
     expect(handoffEvents).toEqual(["EVT-HO-6002:origin_station_to_driver"]);
     expect(savedDeliveries.at(-1)?.currentStatus).toBe("dispatched_from_origin");
@@ -366,7 +380,7 @@ describe("delivery lifecycle services", () => {
       },
       identityFactory: {
         nextDeliveryEventId: (() => {
-          const ids = ["EVT-DEL-6007", "EVT-DEL-6008", "EVT-DEL-6009"];
+          const ids = ["EVT-DEL-6007", "EVT-DEL-6008", "EVT-DEL-6009", "EVT-DEL-6010"];
           return () => ids.shift() ?? "EVT-DEL-EXTRA";
         })(),
         nextHandoffEventId: (() => {
@@ -390,6 +404,19 @@ describe("delivery lifecycle services", () => {
       deps
     );
 
+    const acceptance = await acceptFinalMileAssignment(
+      {
+        deliveryId: "DEL-6001",
+        packageScanCode: "PKG-6001",
+        note: "Courier accepted at destination station"
+      },
+      {
+        actorId: "USR-COR-001",
+        role: "final_mile_courier"
+      },
+      deps
+    );
+
     const completion = await completeDelivery(
       {
         deliveryId: "DEL-6001",
@@ -405,6 +432,7 @@ describe("delivery lifecycle services", () => {
     );
 
     expect(assignment.response.status).toBe("assigned_for_final_mile");
+    expect(acceptance.response.status).toBe("assigned_for_final_mile");
     expect(completion.response.status).toBe("delivered");
     expect(currentDelivery.finalProof).toEqual({
       type: "otp",
@@ -693,7 +721,7 @@ describe("delivery lifecycle services", () => {
     ]);
   });
 
-  it("records driver acceptance and pickup confirmation without moving status", async () => {
+  it("keeps driver acceptance separate from scan-confirmed custody transfer", async () => {
     const savedDeliveries: DeliveryRecord[] = [];
     const deliveryEvents: DeliveryEventRecord[] = [];
 
@@ -760,7 +788,7 @@ describe("delivery lifecycle services", () => {
     );
 
     expect(accepted.response.status).toBe("assigned_to_driver");
-    expect(pickedUp.response.status).toBe("assigned_to_driver");
+    expect(pickedUp.response.status).toBe("dispatched_from_origin");
     expect(savedDeliveries).toHaveLength(2);
     expect(deliveryEvents.map((event) => event.type)).toEqual([
       "driver_assignment_accepted",
@@ -768,12 +796,15 @@ describe("delivery lifecycle services", () => {
     ]);
   });
 
-  it("records final-mile assignment acceptance without moving status", async () => {
+  it("records final-mile assignment acceptance as the custody transfer", async () => {
     const deliveryEvents: DeliveryEventRecord[] = [];
+    const handoffEvents: HandoffEventRecord[] = [];
+    const savedDeliveries: DeliveryRecord[] = [];
 
     const result = await acceptFinalMileAssignment(
       {
         deliveryId: "DEL-6001",
+        packageScanCode: "PKG-6001",
         note: "Courier ready"
       },
       {
@@ -787,12 +818,13 @@ describe("delivery lifecycle services", () => {
               makeDelivery({
                 currentStatus: "assigned_for_final_mile",
                 assignedFinalMileCourierId: "USR-COR-001",
-                currentCustodyRole: "final_mile_courier",
-                currentCustodyActorId: "USR-COR-001"
+                currentCustodyRole: "station_operator",
+                currentCustodyActorId: "USR-OP-002"
               })
             );
           },
-          save() {
+          save(delivery) {
+            savedDeliveries.push(delivery);
             return resolveVoid();
           }
         },
@@ -803,13 +835,14 @@ describe("delivery lifecycle services", () => {
           }
         },
         handoffEvents: {
-          create() {
+          create(event: HandoffEventRecord) {
+            handoffEvents.push(event);
             return resolveVoid();
           }
         },
         identityFactory: {
           nextDeliveryEventId: () => "EVT-DEL-COR-ACCEPT",
-          nextHandoffEventId: () => "EVT-HO-UNUSED"
+          nextHandoffEventId: () => "EVT-HO-COR-ACCEPT"
         },
         now: () => "2026-05-16T18:05:00.000Z"
       }
@@ -817,5 +850,8 @@ describe("delivery lifecycle services", () => {
 
     expect(result.response.status).toBe("assigned_for_final_mile");
     expect(deliveryEvents[0]?.type).toBe("final_mile_assignment_accepted");
+    expect(savedDeliveries[0]?.currentCustodyRole).toBe("final_mile_courier");
+    expect(savedDeliveries[0]?.currentCustodyActorId).toBe("USR-COR-001");
+    expect(handoffEvents[0]?.handoffType).toBe("destination_station_to_final_mile_courier");
   });
 });
