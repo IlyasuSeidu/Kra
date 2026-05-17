@@ -12,6 +12,7 @@
 ## Release Checklist
 - Secrets present.
 - Rules deployed.
+- `pnpm check:security-rules` passes against committed `firebase.json`, `firestore.rules`, `storage.rules`, and `firestore.indexes.json`.
 - Callback URLs verified.
 - Monitoring enabled.
 - Rollback plan available.
