@@ -342,11 +342,13 @@ Recovery entry:
 - Persisted `deliveryId` exists.
 - Fetch `get_delivery`.
 - Render summary if fetch returns accessible delivery.
+- Created response fails validation but persisted `deliveryId` exists.
+- Fetch `get_delivery` instead of treating the invalid handoff as terminal.
 
 Blocked entry:
 - No created response.
 - No persisted `deliveryId`.
-- Created response fails validation.
+- Created response fails validation and no persisted `deliveryId` exists.
 - Fetched delivery is not accessible.
 - Fetched delivery is cancelled.
 
@@ -544,8 +546,8 @@ Fetch error:
 - Secondary: `Go home`
 
 Already paid:
-- Primary: `View receipt`
-- Secondary: `View delivery`
+- Primary: `View delivery`
+- Secondary: `Go home`
 
 Already cancelled:
 - Primary: `Go home`
@@ -640,11 +642,12 @@ Initial resolution:
 - Read local draft summary for display.
 - If handoff is valid, render `ready`.
 - If handoff is missing but persisted `deliveryId` exists, fetch `get_delivery`.
+- If handoff is invalid but persisted `deliveryId` exists, fetch `get_delivery`.
 - If neither exists, render `handoff_missing`.
 
 Payment status resolution:
 - `pending` renders payment-required CTA.
-- `confirmed` routes or offers receipt/delivery detail.
+- `confirmed` routes or offers delivery detail.
 - `failed` routes to payment recovery if a payment record exists.
 - `refund_pending` or `refunded` renders delivery detail route, not payment CTA.
 
@@ -724,6 +727,12 @@ Use when:
 - Created response exists but fails schema validation.
 - Required quote fields are missing.
 - `paymentRequiredBeforeDispatch` is false or absent.
+- No persisted `deliveryId` is available for recovery fetch.
+
+If a persisted `deliveryId` exists:
+- Do not render this as terminal.
+- Enter `delivery_fetching`.
+- Recover through `get_delivery`.
 
 Layout:
 - Blocking callout.
@@ -847,11 +856,12 @@ Copy:
 - Title: `Payment confirmed`
 - Body: `This delivery is ready for the next operational step.`
 - Primary: `View delivery`
-- Secondary: `View receipt`
+- Secondary: `Go home`
 
 Rules:
 - Do not show payment CTA.
 - Do not initialize payment again.
+- Do not show receipt actions on this screen.
 
 ## Already Cancelled State
 Use when:
@@ -1270,7 +1280,7 @@ Handoff response exists but draft summary is gone:
 
 Created delivery already paid:
 - Show already paid state.
-- Route to delivery detail or receipt.
+- Route to delivery detail or home.
 
 Created delivery cancelled:
 - Show already cancelled state.
@@ -1385,7 +1395,7 @@ E2E tests:
 - QuoteReview to DeliverySummary to PaymentMethod route works.
 - App reload after created delivery recovers through `get_delivery`.
 - Missing handoff does not create delivery.
-- Payment confirmed state routes to delivery detail or receipt.
+- Payment confirmed state routes to delivery detail or home.
 - Cancelled state routes home.
 
 Coverage requirements:
