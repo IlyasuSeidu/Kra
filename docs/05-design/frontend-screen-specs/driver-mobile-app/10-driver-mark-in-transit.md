@@ -449,7 +449,7 @@ Reconnect:
 - On success, update status to `in_transit`.
 - On conflict, preserve local action and route to recovery.
 - On `INVALID_STATUS_TRANSITION`, refetch delivery and show latest state.
-- On `FORBIDDEN`, remove unsafe action and show scope denied.
+- On `FORBIDDEN`, preserve the failed local action, mark it scope-denied, and route to recovery so the driver or support can explicitly discard or resolve it.
 
 ## Note Field
 Purpose:
