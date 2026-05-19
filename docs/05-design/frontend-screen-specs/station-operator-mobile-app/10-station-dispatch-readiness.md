@@ -192,10 +192,16 @@ Required timeline evidence:
 - Event metadata `packageScanCode` when exposed.
 - Event metadata `handoffConfirmationStatus`.
 
-Do not fetch:
-- Receiver phone.
-- Receiver full address.
-- Payment provider reference.
+Sensitive data handling:
+- `GET /v1/deliveries/:id` currently returns the full receiver object.
+- This screen may receive receiver phone or address in the delivery detail payload.
+- Do not render receiver phone or full address.
+- Do not write receiver phone or full address into durable station cache.
+- Do not log receiver phone or full address.
+- Do not send receiver phone or full address to analytics.
+- If a future mobile-safe redacted delivery detail endpoint exists, prefer it for this screen.
+
+Do not call:
 - Admin user list.
 
 ## Package Scan Model
