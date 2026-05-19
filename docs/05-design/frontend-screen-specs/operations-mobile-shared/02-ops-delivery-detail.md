@@ -373,13 +373,16 @@ Custody strip fields:
 - `Evidence route`
 
 Custody display from `currentCustodyRole`:
-- `sender`: show `Sender`.
-- `origin_station`: show `Origin station`.
+- `station_operator`: show `Station operator`.
 - `driver`: show `Driver`.
-- `destination_station`: show `Destination station`.
 - `final_mile_courier`: show `Final-mile courier`.
-- `receiver`: show `Receiver`.
 - `null`: show `Custody needs review`.
+
+Station custody context:
+- `station_operator` is the only station custody role currently returned by `deliveryCustodyRoleSchema`.
+- Use `currentStatus`, `latestTouchpoint.stationId`, `originStationId`, and `destinationStationId` to add context such as `Origin station custody` or `Destination station custody`.
+- Do not invent `origin_station` or `destination_station` as `currentCustodyRole` values unless the shared schema adds them.
+- Sender and receiver remain lifecycle parties in handoff policy, but they are not current API custody-role values in `deliveryDetailResponseSchema`.
 
 Custody confidence rules:
 - If `currentCustodyRole` is present and latest timeline has a matching handoff entry, show `Verified`.
