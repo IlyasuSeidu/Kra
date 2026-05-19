@@ -74,7 +74,7 @@ The screen must:
 
 ## Print Authority
 First print is allowed when:
-- Delivery status is `received_at_origin`, `awaiting_driver_assignment`, or another later non-terminal status where the same package label is still valid.
+- Delivery status is exactly `received_at_origin`.
 - Current user is a station operator in the origin station scope.
 - Package label code is available from the local intake receipt or verified lifecycle evidence.
 - No local or backend evidence says first print already happened.
@@ -83,6 +83,7 @@ First print is allowed when:
 First print is blocked when:
 - Intake is offline pending.
 - Delivery status is still `created`.
+- Delivery status has advanced beyond `received_at_origin`.
 - Delivery is outside station scope.
 - Label code is missing.
 - A local first-print record already exists.
