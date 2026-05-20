@@ -479,9 +479,9 @@ Fields:
 - Refund-related status when payment status is `refund_pending` or `refunded`.
 
 Formatting:
-- Quote amount is stored as integer minor units.
-- Display as `GHS {amount / 100}` only if existing money formatter uses this convention.
-- If money formatter is not established, display both safe label and integer amount with docs-backed formatting decision before implementation.
+- Quote amount is stored as whole GHS integer units in the current shared contract.
+- Display as `GHS {amount}` using the project money formatter.
+- Do not divide by 100 or apply cent-scale conversion.
 
 Actions:
 - `Open payment reconciliation` when payment status is `failed`, `refund_pending`, or admin needs review.
