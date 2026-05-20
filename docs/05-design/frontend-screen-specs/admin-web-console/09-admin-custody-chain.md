@@ -9,7 +9,7 @@
 | Surface | Admin web console |
 | Backend coverage | `get_delivery` through `GET /v1/deliveries/:id`; `get_delivery_timeline` through `GET /v1/deliveries/:id/timeline` |
 | Offline critical | No |
-| Required role | `ops_admin`, `support_admin`, or `super_admin` |
+| Required role | `ops_admin`, `support_admin`, `finance_admin`, or `super_admin` |
 | Required states | `loading`, `ready`, `empty_timeline`, `partial_detail`, `missing_evidence`, `exception_present`, `conflict_risk`, `not_found`, `not_authorized`, `session_expired`, `stale`, `refreshing`, `api_error` |
 | Parent screens | `AdminDeliveryDetail`, `AdminPackageDetail`, protected admin shell |
 | Related screens | `AdminPackageDetail`, `AdminPackageLabelRegistry`, `AdminManualCustodyException`, `AdminBlockedDeliveryQueue`, `AdminIssueQueue`, `AdminAuditEvents`, `AdminStationDetail`, `AdminUserDetail` |
@@ -109,6 +109,7 @@ Therefore:
 Primary:
 - `ops_admin` investigating package custody, missing evidence, handoff disputes, and station accountability.
 - `support_admin` checking evidence before responding to package delay, damage, or loss reports.
+- `finance_admin` checking custody evidence before refund, payment, or reconciliation review.
 - `super_admin` reviewing high-risk custody exceptions and future audited reveal workflows.
 
 Secondary:
@@ -430,7 +431,8 @@ Issue entries with these categories affect custody confidence:
 - `handoff`
 - `loss`
 - `damage`
-- `other` when summary includes custody-safe known conflict text from backend
+
+Issue category `other` is displayed as a neutral related issue only. It must not affect custody confidence unless the backend later adds a structured custody-risk flag.
 
 Severity mapping:
 - `p1`: Red `Critical custody issue`
