@@ -869,6 +869,7 @@ export type SessionExpiredRouteContext = {
     | "protected_route"
     | "api_response"
     | "token_refresh"
+    | "manual_sign_out"
     | "idle_timeout"
     | "provider_revoked"
     | "offline_recheck";
