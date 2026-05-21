@@ -440,8 +440,14 @@ Copy rules:
 - Do not tell staff to continue without proof.
 
 ## Action Model
-Primary action:
+Default primary action:
 - `Scan again`
+
+Offline replay primary action:
+- `Open action recovery`
+
+Admin review primary action:
+- `Open admin review`
 
 Secondary actions:
 - `Open custody chain`
@@ -463,7 +469,14 @@ Action behavior:
 - `Open custody chain` closes modal and routes to custody chain for selected delivery.
 - `Report issue` passes safe context to issue creation without raw scan code.
 - `Back to delivery` closes modal and returns to host delivery.
+- `Open action recovery` closes modal and routes to the failed queued-action recovery record.
 - `Open admin review` routes to manual custody exception or admin package detail.
+
+Primary action selection:
+- Use `Open action recovery` when `mismatchType=offline_replay_mismatch` or `severity=offline_conflict`.
+- Use `Open admin review` when `mismatchType=admin_review_mismatch` and admin review is available.
+- Use `Scan again` for normal live scanner mismatches when rescan is available.
+- If the preferred primary action is unavailable, choose the safest available action in this order: `Open custody chain`, `Report issue`, `Back to delivery`.
 
 Actions must not:
 - Use `Ignore`.
@@ -1064,4 +1077,3 @@ Admin:
 
 ## Implementation Handoff
 Claude Code should build `WrongPackageScannedModal` as the dedicated `PACKAGE_SCAN_MISMATCH` recovery modal. It must block all handoff progress, show that custody did not change, keep raw scan code and bound delivery identity hidden, offer scan-again and escalation actions, pass only safe context into issue creation, support offline replay recovery, expose admin review only when authorized, and use alert-dialog accessibility behavior for a high-priority custody blocker.
-
