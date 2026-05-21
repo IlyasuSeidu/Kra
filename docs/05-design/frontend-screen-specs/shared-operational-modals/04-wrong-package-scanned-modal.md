@@ -156,6 +156,7 @@ Primary action:
 Secondary actions:
 - `Open custody chain`
 - `Report issue`
+- `Contact support`
 - `Back to delivery`
 
 Navigation model:
@@ -202,6 +203,7 @@ The host must provide:
 - retry callback
 - custody chain callback
 - issue creation callback
+- support route callback where allowed
 - admin review callback where allowed
 - close callback
 
@@ -452,6 +454,7 @@ Admin review primary action:
 Secondary actions:
 - `Open custody chain`
 - `Report issue`
+- `Contact support`
 - `Back to delivery`
 - `Open action recovery`
 - `Open admin review`
@@ -460,6 +463,7 @@ Action availability:
 - `Scan again`: show when host scanner can reopen.
 - `Open custody chain`: show for all staff roles with delivery access.
 - `Report issue`: show for station, driver, courier, support, and admin when issue creation is available.
+- `Contact support`: show for field roles when the host can open an assisted support route for scan-conflict review.
 - `Back to delivery`: always show.
 - `Open action recovery`: show for offline replay mismatch.
 - `Open admin review`: show only for admin/support contexts.
@@ -468,6 +472,7 @@ Action behavior:
 - `Scan again` closes this modal and returns to `ScanPackageModal` scanning state.
 - `Open custody chain` closes modal and routes to custody chain for selected delivery.
 - `Report issue` passes safe context to issue creation without raw scan code.
+- `Contact support` closes modal and opens the role-safe support route with redacted mismatch context.
 - `Back to delivery` closes modal and returns to host delivery.
 - `Open action recovery` closes modal and routes to the failed queued-action recovery record.
 - `Open admin review` routes to manual custody exception or admin package detail.
@@ -476,7 +481,7 @@ Primary action selection:
 - Use `Open action recovery` when `mismatchType=offline_replay_mismatch` or `severity=offline_conflict`.
 - Use `Open admin review` when `mismatchType=admin_review_mismatch` and admin review is available.
 - Use `Scan again` for normal live scanner mismatches when rescan is available.
-- If the preferred primary action is unavailable, choose the safest available action in this order: `Open custody chain`, `Report issue`, `Back to delivery`.
+- If the preferred primary action is unavailable, choose the safest available action in this order: `Open custody chain`, `Report issue`, `Contact support`, `Back to delivery`.
 
 Actions must not:
 - Use `Ignore`.
@@ -488,23 +493,24 @@ Actions must not:
 
 ## Role Behavior
 Station operator:
-- See scan again, custody chain, report issue, back to delivery.
+- See scan again, custody chain, report issue, contact support, back to delivery.
 - Do not see bound delivery ID.
 - Do not see package-label registry.
 - If at wrong station, host should show station-scope block instead of this modal.
 
 Driver:
-- See scan again, custody chain, report issue, back to run.
+- See scan again, custody chain, report issue, contact support, back to run.
 - Do not see station registry details.
 - Do not see other delivery assignment details.
 
 Final-mile courier:
-- See scan again, custody chain, report issue, back to assignment.
+- See scan again, custody chain, report issue, contact support, back to assignment.
 - Do not see other delivery details.
 - Do not proceed to out-for-delivery.
 
 Support:
 - See custody chain, report issue, admin-safe review route if permissions allow.
+- Do not show `Contact support` because support is already the receiving role.
 - May see mismatch type but not raw scan code by default.
 
 Admin:
@@ -556,7 +562,7 @@ Sender and receiver:
 - Admin review action is enabled.
 
 `support_route_available`:
-- Support route action is enabled.
+- Contact support action is enabled for field roles with support route capability.
 
 `offline_context`:
 - Mismatch came from queued action sync or offline recovery.
@@ -596,6 +602,7 @@ Component props:
 - `canRescan: boolean`
 - `canOpenCustodyChain: boolean`
 - `canReportIssue: boolean`
+- `canContactSupport: boolean`
 - `canOpenAdminReview: boolean`
 - `canOpenActionRecovery: boolean`
 - `isOfflineReplay?: boolean`
@@ -603,6 +610,7 @@ Component props:
 - `onScanAgain: () => void`
 - `onOpenCustodyChain: () => void`
 - `onReportIssue: (context: WrongPackageIssueContext) => void`
+- `onContactSupport: (context: WrongPackageSupportContext) => void`
 - `onOpenAdminReview: () => void`
 - `onOpenActionRecovery: () => void`
 - `onClose: () => void`
@@ -622,6 +630,27 @@ Never pass to issue context from this modal:
 - bound delivery ID
 - other tracking code
 - actor IDs
+- raw backend metadata
+- stack trace
+
+Support context:
+- `deliveryId`
+- `deliveryReference`
+- `source=package_scan_mismatch`
+- `scanIntent`
+- `mismatchType`
+- `severity`
+- `currentStatus`
+- `currentCustodyLabel`
+- `hostRoute`
+- `offlineQueueItemId` only when it is the current failed queue record and not a raw scan value
+
+Never pass to support context from this modal:
+- raw scan code
+- bound delivery ID
+- other tracking code
+- receiver phone
+- full receiver address
 - raw backend metadata
 - stack trace
 
@@ -661,6 +690,7 @@ Offline replay actions:
 - `Open action recovery`
 - `Open custody chain`
 - `Report issue`
+- `Contact support`
 - `Back to delivery`
 
 Do not:
@@ -692,6 +722,44 @@ Issue route should ask staff to describe:
 - whether label is damaged
 - whether another package is present
 - whether a supervisor is involved
+
+## Support Route Handoff
+When user taps `Contact support`:
+- Host opens the support route for the selected delivery, assignment, or station context.
+- The support route receives redacted mismatch context only.
+- The support route should start from a scan-conflict category instead of a generic conversation.
+- The support route must preserve the custody lock state from the modal.
+- The support route must not expose raw scan code or bound delivery identity.
+
+Support route entry points:
+- field staff help drawer
+- delivery support thread
+- station incident intake
+- assignment support flow
+- offline action recovery support panel
+
+Support route should show:
+- selected delivery reference
+- scan intent
+- current custody label
+- mismatch type
+- safe user-facing error code
+- timestamp if host provides one
+- whether offline replay is involved
+
+Support route must not allow:
+- custody override
+- label rebinding
+- package search by raw scan code
+- direct access to another delivery record
+- bypass of issue creation when issue evidence is required
+
+Support-route availability rules:
+- `support_route_available` is true only when `canContactSupport=true` and `onContactSupport` is supplied.
+- Field roles can see `Contact support` when support routing is enabled for the host surface.
+- Support and admin roles should use `Open admin review`, `Open custody chain`, or `Report issue` instead of contacting support from this modal.
+- Offline replay can offer `Contact support` as a secondary action after `Open action recovery`.
+- If support routing fails, keep the modal open and show route error recovery.
 
 ## Admin Review Handoff
 Admin review route may be:
@@ -860,6 +928,7 @@ Events:
 - `wrong_package_scanned_rescan_tapped`
 - `wrong_package_scanned_custody_chain_tapped`
 - `wrong_package_scanned_issue_tapped`
+- `wrong_package_scanned_support_tapped`
 - `wrong_package_scanned_admin_review_tapped`
 - `wrong_package_scanned_closed`
 - `package_scan_failed`
