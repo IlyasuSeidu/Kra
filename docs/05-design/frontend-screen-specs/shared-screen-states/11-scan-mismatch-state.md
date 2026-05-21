@@ -675,14 +675,14 @@ When route to custody chain fails:
 ## Navigation Routes
 Recommended route targets:
 - station scan flow: `/(ops)/station/scan`
-- dispatch readiness: `/(ops)/station/dispatch/:deliveryId`
-- driver pickup scan: `/(ops)/driver/pickup/:deliveryId/scan`
-- destination receipt scan: `/(ops)/station/inbound/:deliveryId/scan`
-- final-mile acceptance scan: `/(ops)/courier/assignments/:deliveryId/scan`
+- dispatch readiness: `/(ops)/station/outbound/:deliveryId/dispatch`
+- driver pickup scan: `/(ops)/driver/runs/:deliveryId/pickup-scan`
+- destination receipt scan: `/(ops)/station/inbound/:deliveryId/receive`
+- final-mile acceptance scan: `/(ops)/courier/assignments/:deliveryId/accept-scan`
 - custody chain: `/(ops)/deliveries/:deliveryId/custody`
 - station support: `/(ops)/station/support?deliveryId=:deliveryId`
-- issue create: `/(ops)/issues/new?deliveryId=:deliveryId&category=handoff`
-- admin package detail: `/admin/packages/:deliveryId`
+- issue create: `/(ops)/deliveries/:deliveryId/issues/new`
+- admin package detail: `/admin/deliveries/:deliveryId/package`
 
 Route safety:
 - never include raw scan code in URL
