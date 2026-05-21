@@ -11,7 +11,7 @@
 | Used by | `AdminIssueDetail`, `AdminIssueQueue`, `AdminManualCustodyException`, `AdminBlockedDeliveryQueue`, `AdminRefundEvidenceReview`, `AdminDeliveryDetail`, future support-admin case workspace |
 | Backend coverage | `resolve_issue` |
 | Trigger source | issue detail resolution action, start-review action, close action, blocked delivery queue issue action, refund evidence issue action |
-| Required states | `closed`, `opening`, `context_loading`, `ready`, `transition_selecting`, `review_ready`, `resolve_ready`, `close_ready`, `resolution_code_required`, `resolution_code_selected`, `note_required`, `note_invalid`, `evidence_missing`, `already_resolved`, `already_closed`, `transition_blocked`, `role_blocked`, `issue_missing`, `delivery_missing`, `stale_issue`, `submitting`, `server_confirmed`, `server_rejected`, `network_error`, `rate_limited`, `session_expired`, `closing` |
+| Required states | `closed`, `opening`, `context_loading`, `ready`, `transition_selecting`, `review_ready`, `resolve_ready`, `close_ready`, `resolution_code_required`, `resolution_code_selected`, `note_required`, `note_invalid`, `note_valid`, `evidence_missing`, `already_resolved`, `already_closed`, `transition_blocked`, `role_blocked`, `issue_missing`, `delivery_missing`, `stale_issue`, `submitting`, `server_confirmed`, `server_rejected`, `network_error`, `rate_limited`, `session_expired`, `closing_to_sign_in`, `closing` |
 
 ## Product Job
 `ResolveIssueModal` lets an authorized admin move one issue through backend-supported review, resolution, or closure with a required note and, when needed, a resolution code.
