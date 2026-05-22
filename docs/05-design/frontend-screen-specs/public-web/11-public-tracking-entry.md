@@ -6,7 +6,7 @@
 | Screen ID | `PublicTrackingEntry` |
 | App | `apps/web` |
 | Route | `/track` |
-| Primary test ID | `screen-public-tracking-entry` |
+| Primary test ID | `screen-public-track-entry` |
 | Source inventory | `docs/05-design/frontend-screen-inventory.md` |
 | Build priority | `P0 Launch Critical` |
 | Backend dependency | `get_public_tracking` |
@@ -394,7 +394,7 @@ Required fields:
 - Button: `Track package`
 
 Required attributes:
-- `data-testid="screen-public-tracking-entry"` on screen root.
+- `data-testid="screen-public-track-entry"` on screen root.
 - `data-testid="field-public-tracking-code"` on input.
 - `data-testid="action-public-track-submit"` on submit.
 - `autocomplete="off"` or equivalent if project convention supports it.
@@ -853,7 +853,7 @@ Avoid:
 ## Testing Requirements
 ### Unit/Component Tests
 Create tests that verify:
-- Page renders `screen-public-tracking-entry`.
+- Page renders `screen-public-track-entry`.
 - Input has visible label `Tracking code`.
 - Empty submit shows `Enter your tracking code`.
 - Invalid format does not call API.
