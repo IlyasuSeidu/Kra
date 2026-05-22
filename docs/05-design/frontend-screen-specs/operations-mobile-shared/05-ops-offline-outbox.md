@@ -1,24 +1,27 @@
 # Ops Offline Outbox Screen Spec
 
 ## Screen Contract
-| Field | Value |
-| --- | --- |
-| Screen ID | `OpsOfflineOutbox` |
-| App | `apps/mobile` |
-| Route | `/(ops)/offline-outbox` |
-| Primary test ID | `screen-ops-offline-outbox` |
-| Source inventory | `docs/05-design/frontend-screen-inventory.md` |
-| Build priority | `P0 Operations Critical` |
-| Backend dependency | local SQLite queue, `Idempotency-Key` header, `executeIdempotentOperation`, `apiErrorResponseSchema`, `apiErrorCodeSchema`, operation-specific response schemas |
-| Related routes | `/(ops)/offline-outbox/:queuedActionId/recover`, `/(ops)/deliveries/:deliveryId`, `/(ops)/deliveries/:deliveryId/custody`, `/(ops)/deliveries/:deliveryId/issues/new`, `/(ops)/support`, role-specific station/driver/courier workflow routes |
-| Required states | `loading_queue`, `empty`, `queued`, `syncing`, `partially_synced`, `synced_recently`, `failed`, `conflict`, `expired`, `blocked`, `offline`, `metered_connection`, `session_expired`, `not_authorized`, `storage_error`, `api_error` |
+
+| Field              | Value                                                                                                                                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID          | `OpsOfflineOutbox`                                                                                                                                                                                                                            |
+| App                | `apps/mobile`                                                                                                                                                                                                                                 |
+| Route              | `/(ops)/offline-outbox`                                                                                                                                                                                                                       |
+| Primary test ID    | `screen-ops-offline-outbox`                                                                                                                                                                                                                   |
+| Source inventory   | `docs/05-design/frontend-screen-inventory.md`                                                                                                                                                                                                 |
+| Build priority     | `P0 Operations Critical`                                                                                                                                                                                                                      |
+| Backend dependency | local SQLite queue, `Idempotency-Key` header, `executeIdempotentOperation`, `apiErrorResponseSchema`, `apiErrorCodeSchema`, operation-specific response schemas                                                                               |
+| Related routes     | `/(ops)/offline-outbox/:queuedActionId/recover`, `/(ops)/deliveries/:deliveryId`, `/(ops)/deliveries/:deliveryId/custody`, `/(ops)/deliveries/:deliveryId/issues/new`, `/(ops)/support`, role-specific station/driver/courier workflow routes |
+| Required states    | `loading_queue`, `empty`, `queued`, `syncing`, `partially_synced`, `synced_recently`, `failed`, `conflict`, `expired`, `blocked`, `offline`, `metered_connection`, `session_expired`, `not_authorized`, `storage_error`, `api_error`          |
 
 ## Product Job
+
 This screen shows staff every offline or delayed operational action that has not yet been confirmed by the backend. It prevents the most dangerous offline failure: staff believing custody, proof, issue, or station workflow state changed when the action is only local.
 
 The screen answers one operational question: `Which staff actions are still local, which are syncing, and which need review before they can safely affect the delivery record?`
 
 The staff member should be able to:
+
 - See the count of queued, syncing, failed, conflicted, and recently synced actions.
 - Understand that queued actions are not backend-confirmed.
 - Retry safe actions when online.
@@ -31,6 +34,7 @@ The staff member should be able to:
 - Recover from storage errors, expired session, permission changes, and backend conflicts.
 
 This screen is not:
+
 - A delivery success screen.
 - A custody transfer screen.
 - A scan screen.
@@ -41,13 +45,16 @@ This screen is not:
 - A place to bypass backend authorization, station scope, assignment, payment, or proof rules.
 
 ## Audience
+
 Primary audience:
+
 - Station operators who queued intake, dispatch readiness, or destination receipt while offline.
 - Drivers who queued pickup, transit, or destination handoff work.
 - Final-mile couriers who queued acceptance, proof, failed attempt, or completion work.
 - Field staff on unreliable mobile networks.
 
 Secondary audience:
+
 - Claude Code implementing the local queue surface.
 - QA validating offline replay behavior.
 - Operations leads checking loss-prevention safeguards.
@@ -55,9 +62,11 @@ Secondary audience:
 - Accessibility reviewers checking status and recovery flows.
 
 ## User State
+
 The user may be anxious because the physical work is done but the app has not confirmed it. The UI must be calm and exact: local action, backend confirmation, conflict, and failure are different states.
 
 The user may be:
+
 - Reconnecting after a long offline shift.
 - Checking whether a package scan actually reached the backend.
 - Seeing a failed replay after backend state changed.
@@ -67,6 +76,7 @@ The user may be:
 - Working under metered data and weak connectivity.
 
 The screen must:
+
 - Use local queue as the primary data source.
 - Treat backend as the source of truth for completion.
 - Use one stable idempotency key per queued mutation.
@@ -77,7 +87,9 @@ The screen must:
 - Make failed and conflicted actions impossible to confuse with synced actions.
 
 ## Queue Data Contract
+
 Each queued action must include at minimum:
+
 - `localActionId`
 - `routeKey`
 - `operationId`
@@ -100,6 +112,7 @@ Each queued action must include at minimum:
 - `createdFromRoute`
 
 Allowed local statuses:
+
 - `queued`
 - `syncing`
 - `synced`
@@ -110,12 +123,14 @@ Allowed local statuses:
 - `discarded`
 
 Payload storage rules:
+
 - Store sensitive request body in encrypted local storage where platform support exists.
 - Store only a redacted `payloadSummary` for list display.
 - Never show raw package scan code, proof reference, receiver phone, receiver address, supervisor PIN, or raw metadata in a row.
 - Keep local payload until server confirms success or a user explicitly discards a safe action.
 
 Idempotency rules:
+
 - Every queued action gets exactly one stable `idempotencyKey`.
 - Retry must reuse the same `idempotencyKey`.
 - Retry must reuse the same `requestFingerprint`.
@@ -124,9 +139,11 @@ Idempotency rules:
 - If backend returns an existing successful result for the same key, mark synced.
 
 ## Queueable Operation Policy
+
 Queue only operations that product and backend policy allow to replay safely.
 
 Allowed queue candidates:
+
 - `confirm_intake`
 - `dispatch_delivery`
 - `confirm_pickup`
@@ -140,10 +157,12 @@ Allowed queue candidates:
 - `complete_delivery` only when proof metadata exists and server replay is safe
 
 Conditionally queue:
+
 - `record_failed_attempt` only after backend replay/idempotency policy is explicitly supported for repeated failed-attempt records.
 - Admin and finance mutations are not part of this ops mobile outbox.
 
 Never queue:
+
 - Payment initialization.
 - Payment verification.
 - Refund approval.
@@ -154,13 +173,16 @@ Never queue:
 - Any operation without a stable idempotency key and recovery path.
 
 Mutation authority:
+
 - The outbox may replay a queued operation.
 - The outbox may not invent a new operation.
 - The outbox may not modify request payload silently.
 - The outbox may not mark delivery status, custody, proof, or issue state as complete before backend success.
 
 ## Primary Action
+
 Primary action by state:
+
 - `empty`: return to role home.
 - `queued`: sync now.
 - `syncing`: view progress.
@@ -175,6 +197,7 @@ Primary action by state:
 - `storage_error`: open support.
 
 Secondary actions:
+
 - `Refresh queue`
 - `Pause sync`
 - `Resume sync`
@@ -185,6 +208,7 @@ Secondary actions:
 - `Back to role home`
 
 Blocked behavior:
+
 - Do not auto-discard failed or conflicted actions.
 - Do not retry while session is expired.
 - Do not retry while the device is offline.
@@ -195,7 +219,9 @@ Blocked behavior:
 - Do not let users bulk-delete unresolved custody or proof evidence.
 
 ## First Meaningful Value
+
 First meaningful value is reached when staff sees:
+
 - Total queued action count.
 - Oldest queued action age.
 - Sync readiness.
@@ -204,6 +230,7 @@ First meaningful value is reached when staff sees:
 - Direct recovery route for failed/conflicted actions.
 
 The first viewport must answer:
+
 - `How many actions are waiting?`
 - `Are any actions failing or conflicting?`
 - `Is anything actively syncing?`
@@ -211,9 +238,11 @@ The first viewport must answer:
 - `Can I safely continue my work?`
 
 ## Main Tension
+
 Offline work keeps operations moving, but it can create false confidence if the UI blurs local capture with server truth. The outbox must make local work visible without pretending it has changed backend custody or proof state.
 
 The design must balance:
+
 - Operational urgency against backend truth.
 - Bulk sync speed against conflict review.
 - Local evidence preservation against privacy.
@@ -222,13 +251,17 @@ The design must balance:
 - Weak connectivity against staff confidence.
 
 ## Design Brief
+
 User and job:
+
 - Field staff needs to see, sync, and repair queued operational actions.
 
 Context of use:
+
 - Mobile, reconnecting after offline work, package custody at risk, low bandwidth, one-handed field use.
 
 Entry point:
+
 - Ops role home offline card.
 - Delivery detail offline banner.
 - Scan success queued state.
@@ -237,42 +270,55 @@ Entry point:
 - Manual navigation.
 
 Success state:
+
 - All safe actions sync successfully, or unresolved actions route to recovery without data loss.
 
 Primary action:
+
 - Sync safe queued actions or repair failed actions.
 
 Navigation model:
+
 - Status dashboard plus actionable list, grouped by `Needs review`, `Ready to sync`, `Syncing`, and `Recently synced`.
 
 Density:
+
 - Medium. The outbox must show enough evidence context without exposing sensitive data.
 
 Visual thesis:
+
 - A field operations sync ledger: plain, trust-building, status-rich, and impossible to confuse with completed work.
 
 Restraint rule:
+
 - Avoid celebratory success styling for queued work, raw payload dumps, bulk destructive actions, and decorative network graphics.
 
 Product lens:
+
 - Reliability, accountability, and duplicate-prevention.
 
 System stance:
+
 - Local-first queue inspector with backend-confirmation discipline.
 
 Interaction thesis:
+
 - Show local actions, replay safely, isolate conflicts, preserve evidence.
 
 Signature move:
+
 - A top `Backend confirmation` banner that clearly separates local queue state from server-confirmed state.
 
 Activation event:
+
 - User syncs, opens recovery, opens delivery, opens custody chain, opens support, or safely clears synced history.
 
 ## Elite Quality Gate
+
 This spec is not closed unless `OpsOfflineOutbox` prevents false confirmation and preserves recovery evidence.
 
 Non-negotiable quality requirements:
+
 - First viewport shows queued count, failed/conflict count, oldest age, and sync readiness.
 - Queued custody/proof actions say `Not confirmed yet`.
 - Retry reuses the original `idempotencyKey`.
@@ -285,6 +331,7 @@ Non-negotiable quality requirements:
 - Screen supports screen reader, large text, high contrast, reduced motion, and small phones.
 
 Closure rule:
+
 - If queued work can look completed, the screen remains open.
 - If retry can rotate idempotency keys, the screen remains open.
 - If failed evidence can be discarded accidentally, the screen remains open.
@@ -292,7 +339,9 @@ Closure rule:
 - If conflicts are retried without review, the screen remains open.
 
 ## Research And Inspiration Notes
+
 Use these sources for quality direction, not visual copying:
+
 - [web.dev Offline Cookbook](https://web.dev/articles/offline-cookbook): offline UX needs explicit cache, network, and replay behavior rather than hidden magic.
 - [Android offline-first data layer](https://developer.android.com/topic/architecture/data-layer/offline-first): local source-of-truth and queued writes need clear synchronization and conflict handling.
 - [Material Design lists](https://m1.material.io/components/lists.html): queue rows should be vertically scannable and grouped by task state.
@@ -301,6 +350,7 @@ Use these sources for quality direction, not visual copying:
 - [WCAG Target Size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html): retry, recovery, and disclosure actions need reliable touch targets.
 
 Applied decisions:
+
 - Treat outbox as a ledger, not a notification list.
 - Group by risk status before chronology.
 - Keep server-confirmed state visually distinct from queued state.
@@ -308,13 +358,16 @@ Applied decisions:
 - Avoid showing sensitive payload values.
 
 ## Data Contract And Backend Alignment
+
 Local store:
+
 - Storage: local SQLite queue.
 - Owner: ops mobile app.
 - Persistence: durable across app restarts.
 - Security: encrypted storage for sensitive payloads where platform support exists.
 
 Backend replay:
+
 - Mutating POST requests use `Idempotency-Key` header.
 - Backend `executeIdempotentOperation` scopes idempotency by `routeKey`, `actorKey`, and `idempotencyKey`.
 - Backend compares `requestFingerprint` through stable hash.
@@ -323,19 +376,23 @@ Backend replay:
 - Mismatched payload under same idempotency key returns `VALIDATION_ERROR`.
 
 Shared error schema:
+
 - `apiErrorResponseSchema` provides `requestId`, `code`, `message`, and optional details.
 - `apiErrorCodeSchema` currently includes `VALIDATION_ERROR`, `FORBIDDEN`, `NOT_FOUND`, `ROUTE_NOT_ENABLED`, `PAYMENT_REQUIRED`, `INVALID_STATUS_TRANSITION`, `PHONE_VERIFICATION_REQUIRED`, `PACKAGE_SCAN_MISMATCH`, `RATE_LIMITED`, and `INTERNAL_ERROR`.
 
 Outbox must parse operation-specific success schemas:
+
 - `deliveryLifecycleResponseSchema` for handoff/lifecycle actions.
 - `supportIssueResponseSchema` or issue response schema for issue creation when implemented.
 - Proof asset response schemas for proof upload actions.
 - Other schemas only when explicitly approved for offline replay.
 
 ## Information Architecture
+
 The screen uses five stacked regions.
 
 Region 1: Sync summary
+
 - Total queued count.
 - Needs review count.
 - Syncing count.
@@ -344,10 +401,12 @@ Region 1: Sync summary
 - Network state.
 
 Region 2: Confirmation warning
+
 - Copy: `Queued actions are saved on this device. They are not backend-confirmed until sync succeeds.`
 - Visible whenever queued, failed, conflict, or syncing items exist.
 
 Region 3: Action controls
+
 - Sync now.
 - Pause sync.
 - Resume sync.
@@ -355,6 +414,7 @@ Region 3: Action controls
 - Support.
 
 Region 4: Grouped action list
+
 - Needs review.
 - Ready to sync.
 - Syncing.
@@ -362,6 +422,7 @@ Region 4: Grouped action list
 - Discarded history if retained.
 
 Region 5: Empty or system state
+
 - Empty queue.
 - Offline.
 - Storage error.
@@ -369,7 +430,9 @@ Region 5: Empty or system state
 - Not authorized.
 
 ## Row Content Specification
+
 Each row must show:
+
 - Operation label.
 - Delivery tracking code when known.
 - Local status.
@@ -382,6 +445,7 @@ Each row must show:
 - Primary row action.
 
 Operation labels:
+
 - `Station intake`
 - `Dispatch readiness`
 - `Driver pickup`
@@ -395,6 +459,7 @@ Operation labels:
 - `Issue report`
 
 Status labels:
+
 - `Queued`
 - `Syncing`
 - `Needs review`
@@ -406,6 +471,7 @@ Status labels:
 - `Discarded`
 
 Payload summary examples:
+
 - Station and delivery identity.
 - Operation type.
 - Condition value when safe.
@@ -413,6 +479,7 @@ Payload summary examples:
 - Issue category/severity when safe.
 
 Never show:
+
 - Package scan code.
 - Receiver phone.
 - Receiver address.
@@ -423,82 +490,101 @@ Never show:
 - Raw idempotency key in normal row copy.
 
 ## State Matrix
+
 `loading_queue`:
+
 - Show skeleton summary and rows.
 - Do not show empty state until local store read completes.
 
 `empty`:
+
 - Show `No offline actions`.
 - Explain that completed backend work will appear in delivery timeline, not here.
 - Primary action: back to role home.
 
 `queued`:
+
 - Show ready-to-sync group.
 - Primary action: sync now.
 - Show warning that backend is not confirmed.
 
 `syncing`:
+
 - Show active progress row.
 - Disable duplicate retry.
 - Keep item visible until backend response resolves.
 
 `partially_synced`:
+
 - Show synced and remaining groups.
 - Keep needs-review group above successful group.
 
 `synced_recently`:
+
 - Show success history separately.
 - Allow safe clearing of synced history.
 - Do not clear unresolved items.
 
 `failed`:
+
 - Show failed group.
 - Primary action: open recovery.
 - Preserve payload and idempotency data.
 
 `conflict`:
+
 - Show conflict group above queued group.
 - Primary action: open recovery.
 - Do not auto-retry.
 
 `expired`:
+
 - Show session or auth-expired state.
 - Prompt sign-in.
 - Preserve queue.
 
 `blocked`:
+
 - Show policy block.
 - Route to recovery or support.
 
 `offline`:
+
 - Show offline banner.
 - Disable sync now.
 - Keep list visible.
 
 `metered_connection`:
+
 - Show data warning if large proof upload is queued.
 - Allow user or policy to delay heavy sync.
 
 `session_expired`:
+
 - Hide sensitive payload summaries if session policy requires it.
 - Prompt sign-in.
 - Preserve local queue.
 
 `not_authorized`:
+
 - Show role/access change message.
 - Route items to recovery.
 
 `storage_error`:
+
 - Show local storage issue.
 - Stop sync.
 - Open support.
 
 `api_error`:
+
 - Show retry if safe.
 - If repeated, route to recovery.
 
 ## Replay Rules
+
 Sync candidate:
+
 - Device is online.
 - Session is valid.
 - Actor role still has permission.
@@ -510,6 +596,7 @@ Sync candidate:
 - Item is not conflict/expired unless recovery approves retry.
 
 Replay sequence:
+
 - Mark row `syncing`.
 - Send original request body.
 - Send original `Idempotency-Key`.
@@ -519,6 +606,7 @@ Replay sequence:
 - Keep synced row visible briefly.
 
 Failure sequence:
+
 - Parse `apiErrorResponseSchema`.
 - Increment `attemptCount`.
 - Store `lastAttemptAt`.
@@ -528,59 +616,74 @@ Failure sequence:
 - Route to recovery when user opens row.
 
 Auto-retry:
+
 - Allowed only for transient network/API failures.
 - Never auto-retry conflict, authorization, status transition, payment, scan mismatch, or validation fingerprint errors.
 - Use backoff.
 - Stop after configured attempt cap and require review.
 
 ## Error Mapping
+
 `VALIDATION_ERROR`:
+
 - If idempotency payload mismatch: state `conflict`.
 - Otherwise state `failed`.
 - Action: open recovery.
 
 `FORBIDDEN`:
+
 - State: `not_authorized` or row `blocked`.
 - Action: sign in, refresh role, or support.
 
 `NOT_FOUND`:
+
 - State: row `conflict`.
 - Action: open recovery and delivery context if available.
 
 `ROUTE_NOT_ENABLED`:
+
 - State: row `blocked`.
 - Action: support.
 
 `PAYMENT_REQUIRED`:
+
 - State: row `blocked`.
 - Action: open delivery detail or support.
 
 `INVALID_STATUS_TRANSITION`:
+
 - State: row `conflict`.
 - Action: open recovery.
 
 `PHONE_VERIFICATION_REQUIRED`:
+
 - State: row `blocked`.
 - Action: open proof/verification flow if authorized.
 
 `PACKAGE_SCAN_MISMATCH`:
+
 - State: row `conflict`.
 - Action: open recovery, custody chain, or issue route.
 
 `RATE_LIMITED`:
+
 - State: row `failed` with delayed retry.
 - Action: wait or support.
 
 `INTERNAL_ERROR`:
+
 - State: row `failed`.
 - Action: retry later or support.
 
 Network timeout:
+
 - State: keep queued or failed depending on retry policy.
 - Action: retry with same idempotency key.
 
 ## Recovery Routing
+
 Open `OpsActionRecovery` when:
+
 - Status is `failed`.
 - Status is `conflict`.
 - Status is `expired`.
@@ -590,6 +693,7 @@ Open `OpsActionRecovery` when:
 - Backend state changed.
 
 Pass to recovery route:
+
 - `queuedActionId`.
 - Redacted context.
 - Last error code.
@@ -599,6 +703,7 @@ Pass to recovery route:
 - Attempt count.
 
 Do not pass:
+
 - Raw payload in navigation params.
 - Raw scan code.
 - Supervisor PIN.
@@ -606,7 +711,9 @@ Do not pass:
 - Raw local media path.
 
 ## Privacy And Security
+
 Security rules:
+
 - Queue must be tied to authenticated user and device.
 - Sensitive payload must be encrypted where platform support exists.
 - Queue must clear or lock on sign-out according to security policy.
@@ -616,6 +723,7 @@ Security rules:
 - Recovery route retrieves sensitive payload from secure local store only after authorization.
 
 Loss prevention:
+
 - Queued custody action does not transfer custody until backend success.
 - Queued proof action does not complete delivery until backend success.
 - Queued issue action does not create an issue until backend success.
@@ -623,6 +731,7 @@ Loss prevention:
 - Local record is preserved after conflict.
 
 Discard rules:
+
 - Synced history can be cleared.
 - Discarded unresolved action requires confirmation.
 - Custody/proof unresolved actions require recovery review before discard.
@@ -630,7 +739,9 @@ Discard rules:
 - Discard must never call backend delete.
 
 ## Offline And Freshness
+
 Offline rules:
+
 - Screen is useful offline.
 - Queue list loads from local SQLite.
 - Sync controls are disabled offline.
@@ -639,54 +750,65 @@ Offline rules:
 - User can continue role workflows that support queueing.
 
 Freshness:
+
 - Show last successful sync time.
 - Show oldest queued age.
 - Show last attempt time per item.
 - Show stale auth warning when session age is unknown.
 
 Reconnect:
+
 - Optionally auto-start safe sync after network returns.
 - Do not auto-start sync when conflicts exist.
 - Do not auto-start large media upload on metered connection unless policy allows.
 - Do not replay more than configured concurrency limit.
 
 ## Accessibility Requirements
+
 Screen reader:
+
 - Announce summary counts when the screen loads.
 - Announce sync start, item success, item failure, and conflicts as status messages.
 - Each row announces operation, delivery, status, queued time, attempts, and primary action.
 - Sensitive hidden fields are not included in accessible labels.
 
 Focus:
+
 - Initial focus lands on title.
 - After sync now, focus stays on summary unless a blocking error appears.
 - Failed sync moves focus to summary warning.
 - Opening recovery preserves return focus.
 
 Touch:
+
 - Row actions meet target-size requirements.
 - Retry and recovery are not tiny icon-only controls.
 - Destructive discard requires a full confirmation control.
 
 Visual:
+
 - Queued, syncing, failed, conflict, expired, and synced states are visually distinct.
 - Do not rely on color alone.
 - Long lists remain readable with large text.
 - Summary count layout survives narrow screens.
 
 Motion:
+
 - Respect reduced motion.
 - Progress indicators must not be constant attention traps.
 - Use clear text updates over ornamental motion.
 
 Localization:
+
 - Use localized time and duration formatting.
 - Avoid idioms.
 - Keep status labels short.
 - Do not concatenate translated fragments in row titles if grammar can break.
 
 ## Analytics And Observability
+
 Required analytics events:
+
 - `ops_offline_outbox_viewed`
 - `offline_action_queued`
 - `offline_action_replay_started`
@@ -701,6 +823,7 @@ Required analytics events:
 - `offline_outbox_storage_error`
 
 Allowed analytics fields:
+
 - `localActionId`
 - `routeKey`
 - `operationId`
@@ -714,6 +837,7 @@ Allowed analytics fields:
 - `isMeteredConnection`
 
 Do not send:
+
 - Raw request payload.
 - Package scan code.
 - Receiver phone.
@@ -725,6 +849,7 @@ Do not send:
 - Request fingerprint.
 
 Operational metrics:
+
 - Queued action count.
 - Oldest queued action age.
 - Sync success rate.
@@ -734,17 +859,21 @@ Operational metrics:
 - Time from queued to backend confirmed.
 
 ## Performance Requirements
+
 Budget:
+
 - Queue summary renders within 500 milliseconds after local store access.
 - Long lists remain responsive.
 - Sync status updates within 100 milliseconds of state change.
 
 Storage:
+
 - Read summary counts before full row detail if the queue is large.
 - Index local queue by status, queuedAt, actorId, and deliveryId.
 - Avoid decrypting sensitive payload until user opens recovery or sync starts.
 
 Sync:
+
 - Use limited concurrency.
 - Do not replay two actions for the same delivery concurrently unless operation ordering is proven safe.
 - Preserve order for actions on the same delivery.
@@ -752,15 +881,19 @@ Sync:
 - Avoid duplicate in-flight request for the same `localActionId`.
 
 Failure isolation:
+
 - One failed item must not block safe items on other deliveries.
 - One delivery conflict must pause later actions for the same delivery until recovery.
 - Storage error stops sync and routes support.
 
 ## Test IDs
+
 Primary:
+
 - `screen-ops-offline-outbox`
 
 Summary:
+
 - `ops-offline-outbox-title`
 - `ops-offline-outbox-total-count`
 - `ops-offline-outbox-needs-review-count`
@@ -770,6 +903,7 @@ Summary:
 - `ops-offline-outbox-confirmation-warning`
 
 Actions:
+
 - `ops-offline-outbox-sync-now`
 - `ops-offline-outbox-pause-sync`
 - `ops-offline-outbox-resume-sync`
@@ -778,12 +912,14 @@ Actions:
 - `ops-offline-outbox-back-to-role-home`
 
 Groups:
+
 - `ops-offline-outbox-group-needs-review`
 - `ops-offline-outbox-group-ready`
 - `ops-offline-outbox-group-syncing`
 - `ops-offline-outbox-group-synced`
 
 Rows:
+
 - `ops-offline-outbox-row`
 - `offline-action-{route-key}-{local-id}`
 - `ops-offline-outbox-row-operation`
@@ -796,6 +932,7 @@ Rows:
 - `ops-offline-outbox-row-discard`
 
 States:
+
 - `ops-offline-outbox-loading`
 - `ops-offline-outbox-empty`
 - `ops-offline-outbox-offline`
@@ -806,7 +943,9 @@ States:
 - `ops-offline-outbox-api-error`
 
 ## API Integration Notes
+
 Outbox read flow:
+
 - Load authenticated user.
 - Open local SQLite queue.
 - Query summary counts.
@@ -815,6 +954,7 @@ Outbox read flow:
 - Subscribe to queue updates while screen is active.
 
 Replay flow:
+
 - Select safe sync candidates.
 - Validate session.
 - Validate network.
@@ -826,19 +966,23 @@ Replay flow:
 - Invalidate affected app caches.
 
 Conflict flow:
+
 - Parse backend error.
 - Classify row.
 - Preserve local payload.
 - Route to `OpsActionRecovery`.
 
 Sync ordering:
+
 - Preserve order for same `deliveryId`.
 - Allow parallel sync for unrelated deliveries only if operation type is safe.
 - Proof upload and completion ordering must preserve media/proof dependencies.
 - Scan or custody actions for one delivery must not be replayed out of sequence.
 
 ## QA Acceptance Criteria
+
 Functional:
+
 - Empty queue renders empty state.
 - Queued items show not-confirmed warning.
 - Sync now is disabled offline.
@@ -853,6 +997,7 @@ Functional:
 - Unresolved custody/proof items cannot be discarded without recovery confirmation.
 
 Backend alignment:
+
 - Mutating POSTs use `Idempotency-Key`.
 - `executeIdempotentOperation` behavior is respected.
 - `VALIDATION_ERROR` from idempotency mismatch maps to conflict.
@@ -860,6 +1005,7 @@ Backend alignment:
 - Same-delivery operation ordering is preserved.
 
 Security:
+
 - Raw payload does not render.
 - Package scan code does not render.
 - Proof reference does not render.
@@ -867,6 +1013,7 @@ Security:
 - Queue locks or clears on sign-out according to policy.
 
 Accessibility:
+
 - Summary counts are announced.
 - Row status is announced.
 - Sync progress is announced.
@@ -874,6 +1021,7 @@ Accessibility:
 - Discard confirmation is keyboard and screen-reader accessible.
 
 Resilience:
+
 - Reconnect storm does not duplicate mutations.
 - Rate limit applies delayed retry.
 - Network timeout does not rotate idempotency key.
@@ -881,7 +1029,9 @@ Resilience:
 - Conflicted item blocks later same-delivery actions until recovery.
 
 ## Visual Quality Checklist
+
 Before handoff, confirm:
+
 - The top warning makes backend-confirmation status unmistakable.
 - Failed and conflicted actions visually outrank ready-to-sync actions.
 - Synced items cannot be confused with queued items.
@@ -892,9 +1042,11 @@ Before handoff, confirm:
 - Large text and small phones remain usable.
 
 ## Implementation Guardrails For Claude Code
+
 Build this as a local queue management screen only when frontend work begins.
 
 Implementation rules:
+
 - Keep queue storage access in a dedicated outbox service.
 - Keep replay classifier in a pure function with unit tests.
 - Keep sync ordering logic testable.
@@ -905,6 +1057,7 @@ Implementation rules:
 - Never call a new mutation with a new idempotency key for an existing queued action.
 
 Suggested file ownership:
+
 - Screen route owns summary, grouping, and navigation.
 - Outbox service owns SQLite reads/writes.
 - Sync worker owns replay and backoff.
@@ -913,6 +1066,7 @@ Suggested file ownership:
 - Recovery route owns repair/discard decisions.
 
 Required implementation tests:
+
 - Queue row renders redacted payload summary.
 - Queued custody action says not confirmed.
 - Retry reuses idempotency key.
@@ -926,20 +1080,22 @@ Required implementation tests:
 - Unresolved custody/proof action cannot be bulk discarded.
 - Analytics excludes payload and idempotency key.
 
-## Open Decisions
-No product-blocking decisions remain for this screen.
+## Final Implementation Decisions
 
-Implementation may choose:
-- Exact SQLite abstraction.
-- Exact encryption adapter.
-- Exact retry backoff values.
-- Exact synced-history retention window.
-- Exact metered-connection policy.
+The outbox must use the app-wide persistence adapter. Screens must not issue direct SQL or own their own queue schema.
 
-Future backend/platform improvement:
-- Add a shared typed client operation registry that marks which operation IDs are safe for offline replay, required response schema, cache invalidations, and same-delivery ordering constraints.
+Sensitive outbox payloads must be encrypted at rest. Encryption keys must come from the shared secure-storage adapter, and payloads containing receiver data, proof metadata, package identifiers, or handoff context must not be stored unencrypted.
+
+Retry backoff is fixed for v1: 5 seconds, 30 seconds, 2 minutes, 10 minutes, then manual retry after 5 failed attempts. The UI must show the next retry time when it is known.
+
+Synced and discarded history must retain the newest 100 entries or 24 hours of entries, whichever limit is reached first.
+
+Text-only mutations can replay on metered connections. Media, proof, and large evidence uploads must wait for an unmetered connection unless the user explicitly confirms upload over the current connection.
+
+Platform follow-up decision: add a shared typed client operation registry that marks safe offline operation IDs, required response schemas, cache invalidations, and same-delivery ordering constraints.
 
 ## Final Handoff Notes
+
 `OpsOfflineOutbox` is an accountability screen. It must protect staff and packages by showing what is saved locally, what is syncing, what failed, and what is actually backend-confirmed.
 
 The safest implementation treats the idempotency key as the replay contract and the backend response as the only source of completion truth.

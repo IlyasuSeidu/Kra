@@ -1,20 +1,22 @@
 # CourierAssignmentDetail Screen Specification
 
 ## Screen Contract
-| Field | Value |
-| --- | --- |
-| Screen ID | `CourierAssignmentDetail` |
-| Route | `/(ops)/courier/assignments/:deliveryId` |
-| Primary test ID | `screen-courier-assignment-detail` |
-| Surface | Final-mile courier mobile app |
-| Backend coverage | `get_delivery` |
-| Offline critical | Yes, read cached with sensitive-field rules |
-| Required role | `final_mile_courier` |
-| Primary data source | `GET /v1/deliveries/:id` through route key `get_delivery` |
-| Related routes | `/(ops)/courier/assignments`, `/(ops)/courier/assignments/:deliveryId/accept-scan`, `/(ops)/courier/assignments/:deliveryId/custody-accepted`, `/(ops)/courier/assignments/:deliveryId/out-for-delivery`, `/(ops)/courier/assignments/:deliveryId/route`, `/(ops)/courier/assignments/:deliveryId/proof`, `/(ops)/courier/assignments/:deliveryId/failed-attempt`, `/(ops)/courier/issues`, `/(ops)/offline-outbox` |
-| Current implementation mode | Contract-backed assignment detail with receiver instructions, package facts, custody state, guarded contact access, and route-only lifecycle actions |
+
+| Field                       | Value                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID                   | `CourierAssignmentDetail`                                                                                                                                                                                                                                                                                                                                                                                           |
+| Route                       | `/(ops)/courier/assignments/:deliveryId`                                                                                                                                                                                                                                                                                                                                                                            |
+| Primary test ID             | `screen-courier-assignment-detail`                                                                                                                                                                                                                                                                                                                                                                                  |
+| Surface                     | Final-mile courier mobile app                                                                                                                                                                                                                                                                                                                                                                                       |
+| Backend coverage            | `get_delivery`                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Offline critical            | Yes, read cached with sensitive-field rules                                                                                                                                                                                                                                                                                                                                                                         |
+| Required role               | `final_mile_courier`                                                                                                                                                                                                                                                                                                                                                                                                |
+| Primary data source         | `GET /v1/deliveries/:id` through route key `get_delivery`                                                                                                                                                                                                                                                                                                                                                           |
+| Related routes              | `/(ops)/courier/assignments`, `/(ops)/courier/assignments/:deliveryId/accept-scan`, `/(ops)/courier/assignments/:deliveryId/custody-accepted`, `/(ops)/courier/assignments/:deliveryId/out-for-delivery`, `/(ops)/courier/assignments/:deliveryId/route`, `/(ops)/courier/assignments/:deliveryId/proof`, `/(ops)/courier/assignments/:deliveryId/failed-attempt`, `/(ops)/courier/issues`, `/(ops)/offline-outbox` |
+| Current implementation mode | Contract-backed assignment detail with receiver instructions, package facts, custody state, guarded contact access, and route-only lifecycle actions                                                                                                                                                                                                                                                                |
 
 ## Product Job
+
 `CourierAssignmentDetail` is the safe operating page for one assigned doorstep job.
 
 It answers eight field questions:
@@ -31,6 +33,7 @@ It answers eight field questions:
 The screen must give enough information to prevent wrong-package, wrong-receiver, wrong-address, and missing-proof failures without leaking receiver-sensitive data outside the courier's operational need.
 
 ## Product Standard
+
 This screen is the courier's source of truth for a single final-mile assignment.
 
 The courier should be able to:
@@ -59,6 +62,7 @@ The screen must never:
 - Show route optimization or live ETA when backend does not provide it.
 
 ## Audience
+
 Primary audience:
 
 - Final-mile couriers assigned to doorstep delivery jobs.
@@ -72,6 +76,7 @@ Secondary audience:
 - Claude Code implementing the React Native detail screen and tests.
 
 ## Context Of Use
+
 The courier may open this screen:
 
 - From the assigned jobs queue.
@@ -87,6 +92,7 @@ The courier may open this screen:
 The courier may be carrying the package, standing at the station counter, riding toward the receiver, or waiting outside a building. The UI must support short attention, large touch targets, sunlight readability, and privacy around people nearby.
 
 ## Design Brief
+
 User and job:
 
 - A verified final-mile courier needs complete, safe, and status-aware instructions for one assigned doorstep job.
@@ -116,6 +122,7 @@ Platform stance:
 - Native-plus mobile detail screen with sticky action footer, collapsible secondary facts, and clear status semantics.
 
 ## External Research Used
+
 Only directly relevant links were used:
 
 - [Uber: delivering using the Driver app](https://www.uber.com/us/en/deliver/basics/making-deliveries/how-to-deliver/): supports showing order details, customer name, delivery options, support access, and customer-unavailable recovery inside the delivery flow.
@@ -127,6 +134,7 @@ Only directly relevant links were used:
 - [WCAG headings and labels](https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels.html): supports descriptive section titles, contact actions, and proof labels.
 
 ## Local Product References
+
 - `docs/05-design/frontend-screen-inventory.md`
 - `docs/05-design/frontend-screen-specs/final-mile-courier-mobile-app/02-courier-home.md`
 - `docs/05-design/frontend-screen-specs/final-mile-courier-mobile-app/03-courier-assignments.md`
@@ -152,6 +160,7 @@ Only directly relevant links were used:
 - `apps/mobile/src/index.ts`
 
 ## Backend Contract
+
 Current read:
 
 - Operation key: `get_delivery`.
@@ -242,6 +251,7 @@ Future backend improvement:
 Claude Code must not block the v1 screen on that future endpoint.
 
 ## Authorization Rules
+
 Required principal:
 
 - `role === "final_mile_courier"`.
@@ -272,6 +282,7 @@ Sensitive data boundaries:
 - Do not show internal actor IDs unless current user needs the fact of custody owner.
 
 ## Receiver Detail Policy
+
 Receiver fields are operationally necessary but sensitive.
 
 Display rules:
@@ -299,6 +310,7 @@ Address rules:
 - If address is missing on a doorstep delivery, show an issue state and route to support or failed-attempt child flow as appropriate.
 
 ## Doorstep Policy Contract
+
 Local policy facts:
 
 - Doorstep delivery is limited to receiver addresses within `10km` of launch destination stations.
@@ -321,6 +333,7 @@ Detail-screen implications:
 - Label policy reminders as guidance when based only on docs.
 
 ## Handoff And Custody Rules
+
 Custody model:
 
 - Assignment is not custody.
@@ -345,15 +358,16 @@ Disallowed:
 - Detail screen must not record failed attempt.
 
 ## Status And Next Action Matrix
-| Backend status | Detail label | Custody label | Primary action | Primary route |
-| --- | --- | --- | --- | --- |
-| `assigned_for_final_mile` | `Assigned for doorstep delivery` | `Custody not accepted` | `Accept by scan` | `/(ops)/courier/assignments/:deliveryId/accept-scan` |
-| `out_for_delivery` | `Out for delivery` | `Courier custody active` | `Complete handoff` | `/(ops)/courier/assignments/:deliveryId/proof` |
-| `delivery_attempt_failed` | `Attempt recorded` | `Review next step` | `Review return path` | `/(ops)/courier/assignments/:deliveryId/return-to-station` |
-| `issue_reported` | `Issue open` | `Paused for review` | `Open issue` | `/(ops)/courier/issues` |
-| `on_hold` | `On hold` | `Paused` | `Contact support` | `/(ops)/courier/issues` |
-| `delivered` | `Delivered` | `Receiver handoff complete` | `View completion` | none or completed screen |
-| unknown | `Needs review` | `Do not act yet` | `Contact support` | `/(ops)/courier/issues` |
+
+| Backend status            | Detail label                     | Custody label               | Primary action       | Primary route                                              |
+| ------------------------- | -------------------------------- | --------------------------- | -------------------- | ---------------------------------------------------------- |
+| `assigned_for_final_mile` | `Assigned for doorstep delivery` | `Custody not accepted`      | `Accept by scan`     | `/(ops)/courier/assignments/:deliveryId/accept-scan`       |
+| `out_for_delivery`        | `Out for delivery`               | `Courier custody active`    | `Complete handoff`   | `/(ops)/courier/assignments/:deliveryId/proof`             |
+| `delivery_attempt_failed` | `Attempt recorded`               | `Review next step`          | `Review return path` | `/(ops)/courier/assignments/:deliveryId/return-to-station` |
+| `issue_reported`          | `Issue open`                     | `Paused for review`         | `Open issue`         | `/(ops)/courier/issues`                                    |
+| `on_hold`                 | `On hold`                        | `Paused`                    | `Contact support`    | `/(ops)/courier/issues`                                    |
+| `delivered`               | `Delivered`                      | `Receiver handoff complete` | `View completion`    | none or completed screen                                   |
+| unknown                   | `Needs review`                   | `Do not act yet`            | `Contact support`    | `/(ops)/courier/issues`                                    |
 
 Secondary actions by state:
 
@@ -364,6 +378,7 @@ Secondary actions by state:
 - `delivered`: `Back to completed`, `Back to queue`.
 
 ## Information Architecture
+
 Top-level sections:
 
 - Detail authority strip.
@@ -403,6 +418,7 @@ Primary path:
 8. App routes to the child workflow.
 
 ## Data Model
+
 Use a view model that separates backend detail from field-safe UI:
 
 ```ts
@@ -410,11 +426,20 @@ type CourierAssignmentDetailState =
   | { kind: "boot_loading" }
   | { kind: "ready"; model: CourierAssignmentDetailModel; sync: CourierAssignmentDetailSync }
   | { kind: "refreshing"; model: CourierAssignmentDetailModel; sync: CourierAssignmentDetailSync }
-  | { kind: "offline_cached"; model: CourierAssignmentDetailModel; sync: CourierAssignmentDetailSync }
+  | {
+      kind: "offline_cached";
+      model: CourierAssignmentDetailModel;
+      sync: CourierAssignmentDetailSync;
+    }
   | { kind: "stale_cache"; model: CourierAssignmentDetailModel; sync: CourierAssignmentDetailSync }
   | { kind: "not_found"; deliveryId: string }
   | { kind: "forbidden"; deliveryId: string }
-  | { kind: "partial_failure"; model?: CourierAssignmentDetailModel; sync: CourierAssignmentDetailSync; requestId?: string }
+  | {
+      kind: "partial_failure";
+      model?: CourierAssignmentDetailModel;
+      sync: CourierAssignmentDetailSync;
+      requestId?: string;
+    }
   | { kind: "unsafe_to_act"; model: CourierAssignmentDetailModel; reason: string };
 
 type CourierAssignmentDetailModel = {
@@ -443,7 +468,11 @@ type CourierReceiverView = {
   maskedPhone?: string;
   addressText?: string;
   addressVisibility: "visible" | "hidden_until_custody" | "missing" | "not_required";
-  contactAvailability: "available" | "disabled_until_out_for_delivery" | "disabled_offline" | "not_supported";
+  contactAvailability:
+    | "available"
+    | "disabled_until_out_for_delivery"
+    | "disabled_offline"
+    | "not_supported";
 };
 
 type CourierPackageView = {
@@ -504,6 +533,7 @@ type CourierAssignmentDetailSync = {
 ```
 
 ## Fetch Strategy
+
 Initial load:
 
 - Read route `deliveryId`.
@@ -545,7 +575,9 @@ Offline:
 - Keep support and back actions available.
 
 ## Component Specifications
+
 ### `CourierAssignmentDetailScreen`
+
 Responsibility:
 
 - Own route parsing, fetch, cache restore, privacy transformation, next-action derivation, and navigation.
@@ -571,6 +603,7 @@ Test IDs:
 - `courier-assignment-detail-not-found`
 
 ### `CourierAssignmentDetailAuthorityStrip`
+
 Responsibility:
 
 - Show data source, freshness, conflict, and refresh state.
@@ -596,6 +629,7 @@ Test IDs:
 - `courier-assignment-detail-outbox-link`
 
 ### `CourierAssignmentStatusBanner`
+
 Responsibility:
 
 - Make status and custody impossible to miss.
@@ -623,6 +657,7 @@ Test IDs:
 - `courier-assignment-custody-label`
 
 ### `CourierAssignmentPrimaryActionFooter`
+
 Responsibility:
 
 - Keep the next safe action reachable.
@@ -660,6 +695,7 @@ Test IDs:
 - `courier-assignment-secondary-actions`
 
 ### `CourierAssignmentReceiverCard`
+
 Responsibility:
 
 - Present receiver and destination instructions safely.
@@ -689,6 +725,7 @@ Test IDs:
 - `courier-assignment-contact-gate`
 
 ### `CourierAssignmentContactGate`
+
 Responsibility:
 
 - Prevent casual exposure of receiver phone.
@@ -716,6 +753,7 @@ Test IDs:
 - `courier-assignment-contact-disabled-reason`
 
 ### `CourierAssignmentPackageCard`
+
 Responsibility:
 
 - Help courier verify the package before moving.
@@ -745,6 +783,7 @@ Test IDs:
 - `courier-assignment-station-pair`
 
 ### `CourierAssignmentProofPolicyCard`
+
 Responsibility:
 
 - Tell courier what proof will be required before arrival.
@@ -769,6 +808,7 @@ Test IDs:
 - `courier-assignment-proof-fallbacks`
 
 ### `CourierAssignmentMovementSummary`
+
 Responsibility:
 
 - Give enough status confidence without requiring full timeline.
@@ -794,6 +834,7 @@ Test IDs:
 - `courier-assignment-latest-touchpoint`
 
 ### `CourierAssignmentSafetyCard`
+
 Responsibility:
 
 - Provide operational guardrails.
@@ -812,6 +853,7 @@ Test IDs:
 - `courier-assignment-open-support`
 
 ### `CourierAssignmentOfflinePanel`
+
 Responsibility:
 
 - Explain offline limitations.
@@ -830,6 +872,7 @@ Test IDs:
 - `courier-assignment-conflict-warning`
 
 ### `CourierAssignmentErrorPanel`
+
 Responsibility:
 
 - Recover from not found, forbidden, or fetch failure.
@@ -855,6 +898,7 @@ Test IDs:
 - `courier-assignment-back-to-assignments`
 
 ## Visual Direction
+
 The screen should feel like a trustworthy delivery dossier, not a cluttered receipt.
 
 Art direction:
@@ -896,6 +940,7 @@ Motion:
 - Reduced motion removes stagger and expansion animation.
 
 ## Mobile Layout
+
 Compact phones:
 
 - Single column.
@@ -922,6 +967,7 @@ Safe areas:
 - Keyboard should not cover support note input if support route is later embedded.
 
 ## Accessibility
+
 Required:
 
 - Screen title identifies delivery detail and tracking code.
@@ -950,6 +996,7 @@ Do not:
 - Put disabled controls before the explanation that makes them understandable.
 
 ## Offline And Low-Bandwidth Behavior
+
 Offline with safe cache:
 
 - Render saved detail.
@@ -987,7 +1034,9 @@ Low bandwidth:
 - Use text-only detail and child routes.
 
 ## State Specifications
+
 ### `boot_loading`
+
 Use when:
 
 - No cache exists and first `get_delivery` fetch is running.
@@ -1000,6 +1049,7 @@ UI:
 - Disabled footer.
 
 ### `ready`
+
 Use when:
 
 - `get_delivery` succeeded and delivery is assigned to the courier.
@@ -1012,6 +1062,7 @@ UI:
 - Primary action footer.
 
 ### `refreshing`
+
 Use when:
 
 - Existing detail is visible and refresh is in progress.
@@ -1023,6 +1074,7 @@ UI:
 - Disable contact only if stale or token changes.
 
 ### `offline_cached`
+
 Use when:
 
 - Cached detail exists and network is unavailable.
@@ -1034,6 +1086,7 @@ UI:
 - Outbox link visible if needed.
 
 ### `stale_cache`
+
 Use when:
 
 - Cached detail is older than freshness threshold.
@@ -1045,6 +1098,7 @@ UI:
 - Disable primary action if server confirmation is required.
 
 ### `not_found`
+
 Use when:
 
 - Backend returns `NOT_FOUND`.
@@ -1056,6 +1110,7 @@ UI:
 - Clear cached row.
 
 ### `forbidden`
+
 Use when:
 
 - Backend returns `FORBIDDEN`.
@@ -1068,6 +1123,7 @@ UI:
 - Do not show cached sensitive fields.
 
 ### `partial_failure`
+
 Use when:
 
 - Network fetch fails but cache exists.
@@ -1079,6 +1135,7 @@ UI:
 - Request ID when available.
 
 ### `unsafe_to_act`
+
 Use when:
 
 - Detail is stale, queued action conflicts exist, status is unknown, or scope is uncertain.
@@ -1090,17 +1147,18 @@ UI:
 - Explain required recovery.
 
 ## Action Routing
+
 Primary routes:
 
-| Action type | Route |
-| --- | --- |
-| `accept_scan` | `/(ops)/courier/assignments/:deliveryId/accept-scan` |
+| Action type              | Route                                                     |
+| ------------------------ | --------------------------------------------------------- |
+| `accept_scan`            | `/(ops)/courier/assignments/:deliveryId/accept-scan`      |
 | `start_out_for_delivery` | `/(ops)/courier/assignments/:deliveryId/out-for-delivery` |
-| `open_route` | `/(ops)/courier/assignments/:deliveryId/route` |
-| `proof` | `/(ops)/courier/assignments/:deliveryId/proof` |
-| `failed_attempt` | `/(ops)/courier/assignments/:deliveryId/failed-attempt` |
-| `issue` | `/(ops)/courier/issues` |
-| `back_to_queue` | `/(ops)/courier/assignments` |
+| `open_route`             | `/(ops)/courier/assignments/:deliveryId/route`            |
+| `proof`                  | `/(ops)/courier/assignments/:deliveryId/proof`            |
+| `failed_attempt`         | `/(ops)/courier/assignments/:deliveryId/failed-attempt`   |
+| `issue`                  | `/(ops)/courier/issues`                                   |
+| `back_to_queue`          | `/(ops)/courier/assignments`                              |
 
 Route params:
 
@@ -1127,6 +1185,7 @@ Secondary action rules:
 - `Open support` appears whenever detail is active or blocked.
 
 ## Error Handling
+
 API errors:
 
 - `NOT_FOUND`: clear cache and show not found.
@@ -1153,6 +1212,7 @@ Do not:
 - Show full address after forbidden response.
 
 ## Content Design
+
 Screen title:
 
 - `Delivery detail`
@@ -1205,6 +1265,7 @@ Offline copy:
 - `No saved detail is available for this delivery.`
 
 ## Analytics
+
 Emit sanitized events only.
 
 Events:
@@ -1249,6 +1310,7 @@ Forbidden properties:
 - Actor IDs.
 
 ## Security And Privacy
+
 Data minimization:
 
 - Render only fields needed for the courier's current delivery task.
@@ -1275,6 +1337,7 @@ Display:
 - Full address should sit below the fold when status is pre-custody unless product approves otherwise.
 
 ## Performance Requirements
+
 Targets:
 
 - Cached first paint under `500ms`.
@@ -1293,6 +1356,7 @@ Implementation rules:
 - Do not poll while screen is backgrounded.
 
 ## QA Acceptance Criteria
+
 Functional:
 
 - Route renders `screen-courier-assignment-detail`.
@@ -1348,6 +1412,7 @@ Mutation boundary:
 - Detail screen does not call `record_failed_attempt`.
 
 ## Automated Test Plan
+
 Unit tests:
 
 - `deriveCourierAssignmentDetailState`
@@ -1389,10 +1454,10 @@ Component tests:
 
 Integration tests:
 
-- Stub `get_delivery` for assigned courier.
-- Stub `get_delivery` forbidden for different courier.
-- Stub network failure after cache.
-- Stub stale cache and verify unsafe action disabled.
+- Simulate `get_delivery` for assigned courier.
+- Simulate `get_delivery` forbidden for different courier.
+- Simulate network failure after cache.
+- Simulate stale cache and verify unsafe action disabled.
 - Return from child workflow triggers refresh.
 - Contact action does not render raw phone.
 
@@ -1406,6 +1471,7 @@ End-to-end checks:
 - Courier starts delivery and sees proof as next action.
 
 ## Implementation Notes For Claude Code
+
 Build this as a production contract screen, not a decorative detail page.
 
 Likely implementation files:
@@ -1443,25 +1509,22 @@ Use optional enhancement only:
 - Future `openIssueSummary`.
 - Future `assignmentAcceptedAt`.
 
-## Open Questions
-None block v1 implementation.
+## Final Implementation Decisions
 
-Non-blocking product questions:
+The full doorstep address must be hidden until the authenticated courier is confirmed as assigned and custody acceptance has succeeded. Before custody acceptance, the screen can show only station routing context, delivery area, and non-sensitive destination summary required by policy.
 
-- Should full address be visible before custody acceptance, or only after scan?
-- Should receiver contact require out-for-delivery status, or is accepted custody enough?
-- Should a future contact proxy hide receiver phone from the device dialer?
-- Should detail include a timeline preview once `get_delivery_timeline` is wired into courier screens?
-- Should address cache use secure storage only, or should it require live network every time?
+Receiver contact must require accepted custody and an out-for-delivery eligible state or an explicit delivery-step action. Raw receiver phone values must never render in text, clipboard, logs, screenshots, analytics, or error messages.
 
-V1 default decision:
+Contact must use an explicit courier action with privacy copy. If a contact proxy is available, the proxy is mandatory; if no proxy is available, the phone value can be passed only at the moment of the user-initiated call or message action and must not be persisted.
 
-- Address can be displayed only after assigned-courier authorization is confirmed and according to custody policy.
-- Raw phone is never rendered.
-- Contact action is gated and uses the phone only at the moment of explicit courier action.
-- Mutations remain in child workflows.
+Timeline preview is excluded from v1. It can be added only after a typed courier-safe timeline contract exists and the screen can filter restricted station, support, proof, and audit metadata.
+
+Address cache must use secure storage with a short action-session TTL. If secure storage is unavailable, the screen must fetch live data and must not persist the address locally.
+
+Lifecycle mutations must remain in child workflows and must not be executed from this detail screen.
 
 ## Definition Of Done
+
 The screen is complete when:
 
 - It renders at `/(ops)/courier/assignments/:deliveryId`.
@@ -1477,4 +1540,5 @@ The screen is complete when:
 - It passes accessibility, privacy, offline, and route tests.
 
 ## Final Build Instruction
+
 Build `CourierAssignmentDetail` as the courier's verified field dossier for one assigned doorstep delivery. It must use `get_delivery`, enforce assigned-courier scope, show the information needed to avoid loss of goods, gate receiver-sensitive details, keep lifecycle mutations in child workflows, and remain usable with saved data while clearly warning when offline or stale state makes action unsafe.
