@@ -1,20 +1,22 @@
 # CourierAssignments Screen Specification
 
 ## Screen Contract
-| Field | Value |
-| --- | --- |
-| Screen ID | `CourierAssignments` |
-| Route | `/(ops)/courier/assignments` |
-| Primary test ID | `screen-courier-assignments` |
-| Surface | Final-mile courier mobile app |
-| Backend coverage | `list_deliveries` with final-mile courier assignment scope |
-| Offline critical | Yes, read cached with explicit freshness |
-| Required role | `final_mile_courier` |
-| Primary data source | `GET /v1/deliveries` through route key `list_deliveries` |
-| Related routes | `/(ops)/courier/home`, `/(ops)/courier/assignments/:deliveryId`, `/(ops)/courier/assignments/:deliveryId/accept-scan`, `/(ops)/courier/assignments/:deliveryId/out-for-delivery`, `/(ops)/courier/assignments/:deliveryId/proof`, `/(ops)/courier/assignments/:deliveryId/failed-attempt`, `/(ops)/courier/completed`, `/(ops)/courier/issues`, `/(ops)/offline-outbox` |
-| Current implementation mode | Contract-backed active assignment list with local grouping, status tabs, safe search, and child workflow routing |
+
+| Field                       | Value                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID                   | `CourierAssignments`                                                                                                                                                                                                                                                                                                                                                    |
+| Route                       | `/(ops)/courier/assignments`                                                                                                                                                                                                                                                                                                                                            |
+| Primary test ID             | `screen-courier-assignments`                                                                                                                                                                                                                                                                                                                                            |
+| Surface                     | Final-mile courier mobile app                                                                                                                                                                                                                                                                                                                                           |
+| Backend coverage            | `list_deliveries` with final-mile courier assignment scope                                                                                                                                                                                                                                                                                                              |
+| Offline critical            | Yes, read cached with explicit freshness                                                                                                                                                                                                                                                                                                                                |
+| Required role               | `final_mile_courier`                                                                                                                                                                                                                                                                                                                                                    |
+| Primary data source         | `GET /v1/deliveries` through route key `list_deliveries`                                                                                                                                                                                                                                                                                                                |
+| Related routes              | `/(ops)/courier/home`, `/(ops)/courier/assignments/:deliveryId`, `/(ops)/courier/assignments/:deliveryId/accept-scan`, `/(ops)/courier/assignments/:deliveryId/out-for-delivery`, `/(ops)/courier/assignments/:deliveryId/proof`, `/(ops)/courier/assignments/:deliveryId/failed-attempt`, `/(ops)/courier/completed`, `/(ops)/courier/issues`, `/(ops)/offline-outbox` |
+| Current implementation mode | Contract-backed active assignment list with local grouping, status tabs, safe search, and child workflow routing                                                                                                                                                                                                                                                        |
 
 ## Product Job
+
 `CourierAssignments` is the courier's active job queue.
 
 It answers six operational questions:
@@ -29,6 +31,7 @@ It answers six operational questions:
 The screen must let couriers scan a whole worklist without exposing receiver-sensitive data or allowing unsafe mutations from the list.
 
 ## Product Standard
+
 This screen is not a generic list. It is a custody-aware queue for doorstep delivery.
 
 The courier should be able to:
@@ -56,6 +59,7 @@ The screen must never:
 - Claim an offline child action has reached the server before sync confirms it.
 
 ## Audience
+
 Primary audience:
 
 - Final-mile couriers handling assigned doorstep jobs after destination station handoff.
@@ -69,6 +73,7 @@ Secondary audience:
 - Claude Code implementing the React Native screen, data hooks, and tests.
 
 ## Context Of Use
+
 The courier may open this screen:
 
 - Immediately after sign-in.
@@ -84,6 +89,7 @@ The courier may open this screen:
 The environment may include glare, noise, a moving vehicle, intermittent network, and time pressure. The layout must prioritize large touch targets, high-contrast text, and a queue hierarchy that can be understood in under five seconds.
 
 ## Design Brief
+
 User and job:
 
 - A verified final-mile courier needs to view and triage active assigned jobs without risking custody errors.
@@ -113,6 +119,7 @@ Platform stance:
 - Native-plus React Native. Strong thumb ergonomics, sticky filters, pull-to-refresh, and accessible row semantics.
 
 ## External Research Used
+
 Only directly relevant links were used:
 
 - [Uber: delivering using the Driver app](https://www.uber.com/gb/en/deliver/basics/making-deliveries/how-to-deliver/?uclick_id=04e130d9-8550-478e-ac44-fbf310f8eb1e): supports delivery apps surfacing requests, acceptance, pickup confirmation, customer location details only at the right delivery stage, and delivery issue flows.
@@ -125,6 +132,7 @@ Only directly relevant links were used:
 - [WCAG target size minimum](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html): supports large row actions and one-handed touch operation.
 
 ## Local Product References
+
 - `docs/05-design/frontend-screen-inventory.md`
 - `docs/05-design/frontend-screen-specs/final-mile-courier-mobile-app/01-courier-sign-in.md`
 - `docs/05-design/frontend-screen-specs/final-mile-courier-mobile-app/02-courier-home.md`
@@ -147,6 +155,7 @@ Only directly relevant links were used:
 - `apps/mobile/src/index.ts`
 
 ## Backend Contract
+
 Current read:
 
 - Operation key: `list_deliveries`.
@@ -227,6 +236,7 @@ Future backend improvement:
 Claude Code must implement against the current contract first and isolate future fields behind optional adapters.
 
 ## Authorization Rules
+
 Required principal:
 
 - `role === "final_mile_courier"`.
@@ -271,6 +281,7 @@ Privacy:
 - Internal staff IDs must not be shown.
 
 ## Doorstep Policy Contract
+
 Policy facts from local rules:
 
 - Doorstep delivery is available after confirmed destination-station receipt.
@@ -291,6 +302,7 @@ List-level implication:
 - If exact due timestamps are missing, the UI must label urgency as `Policy guidance` rather than exact countdown.
 
 ## Handoff And Custody Rules
+
 Custody states:
 
 - Assigned job is not courier custody.
@@ -312,15 +324,16 @@ Disallowed list behavior:
 - Do not let queued offline acceptance silently reorder the list as if confirmed.
 
 ## Active Status Taxonomy
+
 Default active statuses:
 
-| Backend status | Queue group | User-facing label | Primary route |
-| --- | --- | --- | --- |
+| Backend status            | Queue group        | User-facing label    | Primary route                                        |
+| ------------------------- | ------------------ | -------------------- | ---------------------------------------------------- |
 | `assigned_for_final_mile` | `needs_acceptance` | `Needs custody scan` | `/(ops)/courier/assignments/:deliveryId/accept-scan` |
-| `out_for_delivery` | `in_delivery` | `Out for delivery` | `/(ops)/courier/assignments/:deliveryId/proof` |
-| `delivery_attempt_failed` | `needs_follow_up` | `Attempt recorded` | `/(ops)/courier/assignments/:deliveryId` |
-| `issue_reported` | `blocked` | `Issue open` | `/(ops)/courier/issues` |
-| `on_hold` | `blocked` | `On hold` | `/(ops)/courier/assignments/:deliveryId` |
+| `out_for_delivery`        | `in_delivery`      | `Out for delivery`   | `/(ops)/courier/assignments/:deliveryId/proof`       |
+| `delivery_attempt_failed` | `needs_follow_up`  | `Attempt recorded`   | `/(ops)/courier/assignments/:deliveryId`             |
+| `issue_reported`          | `blocked`          | `Issue open`         | `/(ops)/courier/issues`                              |
+| `on_hold`                 | `blocked`          | `On hold`            | `/(ops)/courier/assignments/:deliveryId`             |
 
 Closed or non-active statuses:
 
@@ -341,6 +354,7 @@ Unknown status:
 - Log an analytics event with status string.
 
 ## Queue Ordering
+
 Sort active rows with this stable priority:
 
 1. Rows with queued local action conflicts.
@@ -365,6 +379,7 @@ Do not sort by:
 - Earnings amount.
 
 ## Information Architecture
+
 Top-level sections:
 
 - Sync authority strip.
@@ -402,6 +417,7 @@ Primary user path:
 8. Courier returns to refreshed assignment list.
 
 ## Data Model
+
 Use a view model that separates backend row from UI decisions:
 
 ```ts
@@ -413,7 +429,12 @@ type CourierAssignmentsState =
   | { kind: "stale_cache"; model: CourierAssignmentsModel; sync: CourierAssignmentsSync }
   | { kind: "empty"; sync: CourierAssignmentsSync }
   | { kind: "offline_empty" }
-  | { kind: "partial_failure"; model?: CourierAssignmentsModel; sync: CourierAssignmentsSync; requestId?: string }
+  | {
+      kind: "partial_failure";
+      model?: CourierAssignmentsModel;
+      sync: CourierAssignmentsSync;
+      requestId?: string;
+    }
   | { kind: "unauthorized" };
 
 type CourierAssignmentsModel = {
@@ -494,6 +515,7 @@ type CourierAssignmentsSync = {
 ```
 
 ## Fetch Strategy
+
 Initial load:
 
 - Read cached courier assignment list from local store.
@@ -527,6 +549,7 @@ Cache:
 - Sanitize sensitive fields before persistence.
 
 ## Filtering And Search
+
 Tabs:
 
 - `Active`
@@ -557,7 +580,9 @@ No-results behavior:
 - Do not show completed jobs as a fallback.
 
 ## Component Specifications
+
 ### `CourierAssignmentsScreen`
+
 Responsibility:
 
 - Own data fetch, cache restore, filters, grouping, and route navigation.
@@ -581,6 +606,7 @@ Primary test IDs:
 - `courier-assignments-error`
 
 ### `CourierAssignmentsAuthorityStrip`
+
 Responsibility:
 
 - Show whether visible data is live, refreshing, cached, stale, or offline.
@@ -606,6 +632,7 @@ Test IDs:
 - `courier-assignments-outbox-link`
 
 ### `CourierAssignmentsHeader`
+
 Responsibility:
 
 - Orient courier to active work volume.
@@ -635,6 +662,7 @@ Test IDs:
 - `courier-assignments-last-refresh`
 
 ### `CourierAssignmentsSearch`
+
 Responsibility:
 
 - Let courier find a row quickly.
@@ -654,6 +682,7 @@ Test IDs:
 - `courier-assignments-search-clear`
 
 ### `CourierAssignmentsStatusTabs`
+
 Responsibility:
 
 - Group queue by operational state.
@@ -680,6 +709,7 @@ Test IDs:
 - `courier-assignments-tab-blocked`
 
 ### `CourierAssignmentsPriorityRail`
+
 Responsibility:
 
 - Summarize the most important operational risk above the list.
@@ -702,6 +732,7 @@ Test IDs:
 - `courier-assignments-priority-action`
 
 ### `CourierAssignmentsList`
+
 Responsibility:
 
 - Render grouped active rows.
@@ -723,6 +754,7 @@ Test IDs:
 - `courier-assignments-group-blocked`
 
 ### `CourierAssignmentCard`
+
 Responsibility:
 
 - Present one assigned delivery row and its safest next action.
@@ -772,6 +804,7 @@ Test IDs:
 - `courier-assignment-sync-badge-{deliveryId}`
 
 ### `CourierAssignmentSecondaryMeta`
+
 Responsibility:
 
 - Show compact non-sensitive supporting facts.
@@ -796,6 +829,7 @@ Disallowed facts:
 - Exact coordinates.
 
 ### `CourierAssignmentsOfflineOutboxStrip`
+
 Responsibility:
 
 - Show queued local operations that may alter visible assignments.
@@ -819,6 +853,7 @@ Test IDs:
 - `courier-assignments-outbox-count`
 
 ### `CourierAssignmentsEmptyPanel`
+
 Responsibility:
 
 - Explain why no active jobs are visible.
@@ -844,6 +879,7 @@ Test IDs:
 - `courier-assignments-empty-refresh`
 
 ### `CourierAssignmentsErrorPanel`
+
 Responsibility:
 
 - Recover from failed list fetch.
@@ -866,6 +902,7 @@ Test IDs:
 - `courier-assignments-retry`
 
 ## Visual Direction
+
 The screen should feel like a professional field operations app for African doorstep delivery, not a food-delivery clone.
 
 Art direction:
@@ -909,6 +946,7 @@ Motion:
 - Honor reduced motion.
 
 ## Mobile Layout
+
 Compact phones:
 
 - Single-column list.
@@ -936,6 +974,7 @@ Safe areas:
 - Pull-to-refresh must not conflict with system gesture area.
 
 ## Accessibility
+
 Required:
 
 - Logical focus order: authority strip, header, search, tabs, priority rail, grouped rows.
@@ -967,6 +1006,7 @@ Keyboard behavior:
 - Row card itself may open detail; primary action remains separate and clearly named.
 
 ## Offline And Low-Bandwidth Behavior
+
 Offline with cache:
 
 - Show cached rows immediately.
@@ -1010,7 +1050,9 @@ Labels:
 - `Reconnect to confirm before handoff`
 
 ## State Specifications
+
 ### `boot_loading`
+
 Use when:
 
 - No cache exists and first fetch is running.
@@ -1028,6 +1070,7 @@ Do not:
 - Show action buttons.
 
 ### `ready`
+
 Use when:
 
 - Network fetch succeeded and active rows exist.
@@ -1039,6 +1082,7 @@ UI:
 - Groups render in priority order.
 
 ### `refreshing`
+
 Use when:
 
 - Existing rows are visible and network refresh is running.
@@ -1050,6 +1094,7 @@ UI:
 - Do not blank list.
 
 ### `offline_cached`
+
 Use when:
 
 - Device is offline and local safe rows exist.
@@ -1061,6 +1106,7 @@ UI:
 - Child route availability follows cache safety.
 
 ### `stale_cache`
+
 Use when:
 
 - Cached rows are older than freshness policy.
@@ -1072,6 +1118,7 @@ UI:
 - Encourage refresh before custody-impacting child workflows.
 
 ### `empty`
+
 Use when:
 
 - Network fetch succeeded but no active assigned jobs exist.
@@ -1084,6 +1131,7 @@ UI:
 - Optional `View completed`.
 
 ### `offline_empty`
+
 Use when:
 
 - No cache and network unavailable.
@@ -1095,6 +1143,7 @@ UI:
 - Provide retry.
 
 ### `partial_failure`
+
 Use when:
 
 - Refresh failed but cache exists.
@@ -1106,6 +1155,7 @@ UI:
 - Include request ID if present.
 
 ### `unauthorized`
+
 Use when:
 
 - API returns auth or role failure.
@@ -1117,16 +1167,17 @@ UI:
 - Do not render rows.
 
 ## Action Routing
+
 Route mapping:
 
-| Row state | Primary action | Route |
-| --- | --- | --- |
-| `assigned_for_final_mile` | `Accept by scan` | `/(ops)/courier/assignments/:deliveryId/accept-scan` |
-| `out_for_delivery` | `Complete handoff` | `/(ops)/courier/assignments/:deliveryId/proof` |
-| `delivery_attempt_failed` | `Review attempt` | `/(ops)/courier/assignments/:deliveryId` |
-| `issue_reported` | `Open issue` | `/(ops)/courier/issues` |
-| `on_hold` | `Review details` | `/(ops)/courier/assignments/:deliveryId` |
-| unknown active status | `Review details` | `/(ops)/courier/assignments/:deliveryId` |
+| Row state                 | Primary action     | Route                                                |
+| ------------------------- | ------------------ | ---------------------------------------------------- |
+| `assigned_for_final_mile` | `Accept by scan`   | `/(ops)/courier/assignments/:deliveryId/accept-scan` |
+| `out_for_delivery`        | `Complete handoff` | `/(ops)/courier/assignments/:deliveryId/proof`       |
+| `delivery_attempt_failed` | `Review attempt`   | `/(ops)/courier/assignments/:deliveryId`             |
+| `issue_reported`          | `Open issue`       | `/(ops)/courier/issues`                              |
+| `on_hold`                 | `Review details`   | `/(ops)/courier/assignments/:deliveryId`             |
+| unknown active status     | `Review details`   | `/(ops)/courier/assignments/:deliveryId`             |
 
 Secondary route:
 
@@ -1148,6 +1199,7 @@ Rules:
 - Preserve list filter in route state when returning.
 
 ## Error Handling
+
 API errors:
 
 - `UNAUTHORIZED`: clear cache and route to sign-in.
@@ -1173,6 +1225,7 @@ Do not:
 - Retry infinitely.
 
 ## Content Design
+
 Header title:
 
 - `Assigned doorstep jobs`
@@ -1228,6 +1281,7 @@ Search empty copy:
 - `No assigned jobs match this search.`
 
 ## Analytics
+
 Emit sanitized events only.
 
 Events:
@@ -1270,6 +1324,7 @@ Forbidden properties:
 - Proof asset reference.
 
 ## Security And Privacy
+
 Data minimization:
 
 - Store and render only fields needed for queue triage.
@@ -1296,6 +1351,7 @@ Display:
 - Use child detail for receiver instructions only after authorized navigation.
 
 ## Performance Requirements
+
 Targets:
 
 - Cached first paint under `500ms` on supported devices.
@@ -1316,6 +1372,7 @@ Implementation rules:
 - Keep local search O(n) over the scoped list.
 
 ## QA Acceptance Criteria
+
 Functional:
 
 - Route renders `screen-courier-assignments`.
@@ -1366,6 +1423,7 @@ Mutation boundary:
 - Screen only routes to child workflows for those operations.
 
 ## Automated Test Plan
+
 Unit tests:
 
 - `deriveCourierAssignmentsState`
@@ -1407,7 +1465,7 @@ Component tests:
 
 Integration tests:
 
-- Stub `list_deliveries` as final-mile courier and verify scoped active rows.
+- Simulate `list_deliveries` as final-mile courier and verify scoped active rows.
 - Refresh updates group counts.
 - Returning from accept scan invalidates and refreshes list.
 - Offline cache renders when network fails.
@@ -1424,6 +1482,7 @@ End-to-end checks:
 - Courier opens proof flow for out-for-delivery job.
 
 ## Implementation Notes For Claude Code
+
 Build this as a real production screen spec implementation, not a visual-only page.
 
 Required files will likely include:
@@ -1461,17 +1520,18 @@ Mutation boundary:
 - This screen is read plus navigation.
 - Child routes perform custody, out-for-delivery, proof, and failed attempt workflows.
 
-## Open Questions
-None block v1 implementation.
+## Final Implementation Decisions
 
-Non-blocking product questions:
+The active queue must be grouped by current delivery state and courier action readiness, not by same-day policy buckets. If a trusted `assignedAt` value later exists, it can support secondary ordering inside the active groups, but it must not create a new primary bucket without a product policy update.
 
-- Should active queue include same-day policy bucketing when backend adds `assignedAt`?
-- Should courier list show station display names instead of IDs after station directory endpoint exists?
-- Should dispatch later provide optimized stop order for multiple doorstep jobs?
-- Should blocked jobs route to issue detail instead of generic issues list once issue detail screen exists?
+Station names must be resolved through the shared typed station-label adapter. If the adapter cannot safely resolve a display name, the UI must show the station ID with a `Station ID` label instead of inventing a name.
+
+The screen must not infer optimized stop order. Multiple doorstep jobs must render in backend-provided order when available; otherwise they must use a stable local order based on urgent action state, delivery lifecycle state, and delivery short code.
+
+Blocked jobs must route to the shared issues list with the delivery context. When a typed courier issue-detail route exists, the row action must route directly to that issue detail; until then, the generic issues list remains the required destination.
 
 ## Definition Of Done
+
 The screen is complete when:
 
 - It renders at `/(ops)/courier/assignments`.
@@ -1487,4 +1547,5 @@ The screen is complete when:
 - It matches the final-mile courier policies in the local docs.
 
 ## Final Build Instruction
+
 Build `CourierAssignments` as the active work queue for final-mile couriers. It must be scoped by `list_deliveries`, grouped by custody-safe status, searchable without exposing sensitive receiver data, offline-aware, and route-only for lifecycle actions. It should feel serious, fast, and field-ready: a courier can open it in poor network conditions and still know what job to handle next without risking loss of goods or privacy leakage.
