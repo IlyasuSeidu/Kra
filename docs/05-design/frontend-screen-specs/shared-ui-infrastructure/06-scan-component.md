@@ -1,28 +1,30 @@
 # Scan Component Infrastructure Spec
 
 ## Metadata
-| Field | Value |
-| --- | --- |
-| Infrastructure item | Scan component |
-| Component family | Shared UI infrastructure |
-| Primary components | `PackageScanComponent`, `PackageScanController`, `PackageScanCamera`, `PackageScanManualEntry`, `PackageScanReview`, `PackageScanFallbackGate`, `PackageScanResultMapper` |
-| Supporting components | `ScanIntentBanner`, `ScanPermissionState`, `ScanTorchToggle`, `ScanFrameGuide`, `ScanContextStrip`, `ScanMismatchRouter`, `ScanDuplicateRouter`, `ScanOfflineQueueBridge`, `ScanAccessibilityAnnouncer`, `ScanPrivacyRedactor` |
-| Inventory behavior | Camera scan plus manual fallback, validation display, mismatch recovery |
-| Repo targets | `apps/mobile`, limited compatibility helpers for `apps/web` and `apps/admin` where camera support is explicitly allowed |
-| Primary surfaces | operations mobile shared screens, station operator mobile app, driver mobile app, final-mile courier mobile app |
-| Primary users | station operators, drivers, final-mile couriers, station leads, support/admin reviewers in read-only conflict contexts |
-| Backend coverage | package label binding, handoff scan request schemas, `PACKAGE_SCAN_MISMATCH`, package label repository, delivery lifecycle, role/capability checks, offline outbox |
-| Browser mutation operation | None directly; the component captures a scan value and returns typed scan intent data to host-owned mutations |
-| Data sensitivity | raw scan code, redacted scan code, delivery ID, tracking code, package label binding context, actor role, station scope, assignment scope, fallback reason |
-| Offline critical | Yes for approved station, driver, and courier scan workflows that can queue through offline outbox |
-| Related inventory section | Shared UI Infrastructure |
-| Related infrastructure specs | typed API client, RTK Query cache, offline outbox, role routing, custody chain component, timeline component, empty/error library, test harness |
-| Related screen specs | `OpsScanPackage`, `ScanPackageModal`, station intake, station dispatch readiness, driver pickup scan, station destination receipt, courier accept assignment scan |
-| Related state specs | scan mismatch, duplicate package label, custody not confirmed, offline, stale data, not authorized, session expired, rate limited |
-| Design tokens | No unique visual tokens; scanner surfaces use existing camera, warning, danger, neutral, success, focus, and offline tokens |
-| Accessibility target | Camera, manual entry, scan result, blocked state, and fallback controls must be usable without relying on color, motion, or camera-only input |
+
+| Field                        | Value                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Infrastructure item          | Scan component                                                                                                                                                                                                                 |
+| Component family             | Shared UI infrastructure                                                                                                                                                                                                       |
+| Primary components           | `PackageScanComponent`, `PackageScanController`, `PackageScanCamera`, `PackageScanManualEntry`, `PackageScanReview`, `PackageScanFallbackGate`, `PackageScanResultMapper`                                                      |
+| Supporting components        | `ScanIntentBanner`, `ScanPermissionState`, `ScanTorchToggle`, `ScanFrameGuide`, `ScanContextStrip`, `ScanMismatchRouter`, `ScanDuplicateRouter`, `ScanOfflineQueueBridge`, `ScanAccessibilityAnnouncer`, `ScanPrivacyRedactor` |
+| Inventory behavior           | Camera scan plus manual fallback, validation display, mismatch recovery                                                                                                                                                        |
+| Repo targets                 | `apps/mobile`, limited compatibility helpers for `apps/web` and `apps/admin` where camera support is explicitly allowed                                                                                                        |
+| Primary surfaces             | operations mobile shared screens, station operator mobile app, driver mobile app, final-mile courier mobile app                                                                                                                |
+| Primary users                | station operators, drivers, final-mile couriers, station leads, support/admin reviewers in read-only conflict contexts                                                                                                         |
+| Backend coverage             | package label binding, handoff scan request schemas, `PACKAGE_SCAN_MISMATCH`, package label repository, delivery lifecycle, role/capability checks, offline outbox                                                             |
+| Browser mutation operation   | None directly; the component captures a scan value and returns typed scan intent data to host-owned mutations                                                                                                                  |
+| Data sensitivity             | raw scan code, redacted scan code, delivery ID, tracking code, package label binding context, actor role, station scope, assignment scope, fallback reason                                                                     |
+| Offline critical             | Yes for approved station, driver, and courier scan workflows that can queue through offline outbox                                                                                                                             |
+| Related inventory section    | Shared UI Infrastructure                                                                                                                                                                                                       |
+| Related infrastructure specs | typed API client, RTK Query cache, offline outbox, role routing, custody chain component, timeline component, empty/error library, test harness                                                                                |
+| Related screen specs         | `OpsScanPackage`, `ScanPackageModal`, station intake, station dispatch readiness, driver pickup scan, station destination receipt, courier accept assignment scan                                                              |
+| Related state specs          | scan mismatch, duplicate package label, custody not confirmed, offline, stale data, not authorized, session expired, rate limited                                                                                              |
+| Design tokens                | No unique visual tokens; scanner surfaces use existing camera, warning, danger, neutral, success, focus, and offline tokens                                                                                                    |
+| Accessibility target         | Camera, manual entry, scan result, blocked state, and fallback controls must be usable without relying on color, motion, or camera-only input                                                                                  |
 
 ## Purpose
+
 The scan component is Kra's shared package-label capture primitive.
 
 It provides camera scanning, manual fallback, redacted review, local validation, intent display, accessible status, and recovery routing for package scan workflows. It does not submit backend mutations by itself unless the host explicitly delegates submission through a typed adapter.
@@ -47,6 +49,7 @@ A camera read is not a package handoff. It becomes operational evidence only aft
 ```
 
 ## Product Job
+
 Field staff need a scanner that is fast enough for station queues and strict enough for custody control.
 
 The scan component must:
@@ -67,6 +70,7 @@ The scan component must:
 The scanner must be reusable, but it must never become generic.
 
 ## Strategic Role
+
 Package scanning is Kra's physical evidence handshake.
 
 Correct scanning protects against:
@@ -83,6 +87,7 @@ Correct scanning protects against:
 The scan component is therefore a loss-prevention component with camera UX, not a camera component with loss-prevention hints.
 
 ## Design Brief
+
 Audience:
 
 - Claude Code and frontend engineers implementing shared mobile scan primitives.
@@ -112,6 +117,7 @@ Platform stance:
 - Mobile first through Expo Camera. Web/admin camera use is optional, permission-gated, secure-context dependent, and must preserve the same scan safety model.
 
 ## External Research Used
+
 Only directly relevant scanner, barcode, camera, and accessibility references were used:
 
 - [Expo Camera](https://docs.expo.dev/versions/latest/sdk/camera/): supports camera permission hooks, camera view, barcode scanning callbacks, barcode scanner settings, torch mode, and native camera behavior in Expo apps.
@@ -123,6 +129,7 @@ Only directly relevant scanner, barcode, camera, and accessibility references we
 - [WAI-ARIA Dialog Modal Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/): supports focus containment and return behavior when scanner is used inside a modal.
 
 ## Local Sources
+
 Local implementation and policy inputs:
 
 - `docs/05-design/frontend-screen-inventory.md`
@@ -145,6 +152,7 @@ Local implementation and policy inputs:
 - `services/api/src/service-errors.ts`
 
 ## Non-Goals
+
 The scan component must not:
 
 - implement actual frontend screens
@@ -163,6 +171,7 @@ The scan component must not:
 - convert scan detection into backend success
 
 ## Component Boundary
+
 The scan component owns:
 
 - camera permission state
@@ -195,6 +204,7 @@ The host owns:
 - analytics event ownership beyond component technical scan events
 
 ## Host Input Contract
+
 Required props:
 
 ```ts
@@ -233,6 +243,7 @@ Rules:
 - component must reject missing required input with a developer-visible invariant.
 
 ## Output Contract
+
 The component returns one of these outcomes:
 
 ```ts
@@ -259,7 +270,12 @@ type PackageScanOutcome =
     }
   | {
       kind: "recovery_requested";
-      recovery: "scan_again" | "open_custody_chain" | "report_issue" | "open_outbox" | "open_support";
+      recovery:
+        | "scan_again"
+        | "open_custody_chain"
+        | "report_issue"
+        | "open_outbox"
+        | "open_support";
     };
 ```
 
@@ -271,15 +287,16 @@ Rules:
 - cancellation must not create an outbox action.
 
 ## Intent Mapping
+
 Each scan intent maps to one field and one product meaning.
 
-| Intent | Request field | Product meaning | Backend operation |
-| --- | --- | --- | --- |
-| `intake_label_binding` | `labelScanCode` | bind package label and confirm origin intake | `confirm_intake` |
-| `dispatch_readiness` | `packageScanCode` | record station dispatch readiness, no custody transfer | `dispatch_delivery` |
-| `driver_pickup_custody` | `packageScanCode` | driver accepts origin custody after backend confirmation | `confirm_pickup` |
-| `destination_receipt` | `packageScanCode` | destination station receives package from driver | `receive_destination` |
-| `courier_accept_custody` | `packageScanCode` | courier accepts final-mile custody | `accept_final_mile_assignment` |
+| Intent                   | Request field     | Product meaning                                          | Backend operation              |
+| ------------------------ | ----------------- | -------------------------------------------------------- | ------------------------------ |
+| `intake_label_binding`   | `labelScanCode`   | bind package label and confirm origin intake             | `confirm_intake`               |
+| `dispatch_readiness`     | `packageScanCode` | record station dispatch readiness, no custody transfer   | `dispatch_delivery`            |
+| `driver_pickup_custody`  | `packageScanCode` | driver accepts origin custody after backend confirmation | `confirm_pickup`               |
+| `destination_receipt`    | `packageScanCode` | destination station receives package from driver         | `receive_destination`          |
+| `courier_accept_custody` | `packageScanCode` | courier accepts final-mile custody                       | `accept_final_mile_assignment` |
 
 Rules:
 
@@ -289,6 +306,7 @@ Rules:
 - component must not submit if host says required parent fields are missing.
 
 ## Code Normalization
+
 Normalize scan values before local validation.
 
 Rules:
@@ -311,9 +329,10 @@ function redactScanCode(code: string): string {
 }
 ```
 
-The implementation may choose a stricter redaction, but it must not expose the full code in normal UI.
+Redaction can be stricter than this baseline. Normal UI must never expose the full code.
 
 ## Camera State Machine
+
 Canonical states:
 
 ```ts
@@ -354,6 +373,7 @@ Rules:
 - `offline_queued` appears only after durable outbox insert succeeds.
 
 ## Camera Behavior
+
 Required behavior:
 
 - request camera permission through platform-approved API.
@@ -377,6 +397,7 @@ Blocked behavior:
 - do not read multiple codes and guess the right one.
 
 ## Manual Fallback Policy
+
 Manual entry is a controlled fallback, not a default path.
 
 Allowed when:
@@ -405,6 +426,7 @@ Manual entry must:
 - route to recovery when fallback is blocked.
 
 ## Offline Integration
+
 The component does not own the offline outbox, but it must cooperate with it.
 
 Rules:
@@ -419,21 +441,22 @@ Rules:
 - offline queued state must link to offline outbox.
 
 ## Error And Recovery Mapping
+
 Backend or host errors map to component recovery states.
 
-| Signal | Component state | Recovery |
-| --- | --- | --- |
-| `PACKAGE_SCAN_MISMATCH` | `mismatch` | scan again, custody chain, issue |
-| duplicate label policy | `duplicate_label` | custody chain, issue, admin route when allowed |
-| `FORBIDDEN` | `blocked` | role-safe denied state |
-| `PAYMENT_REQUIRED` | `blocked` | payment blocked state |
-| `INVALID_STATUS_TRANSITION` | `blocked` | refresh delivery |
-| `RATE_LIMITED` | `blocked` | cooldown state |
-| network failure with queue allowed | `offline_queue_ready` | queue action |
-| network failure without queue | `error` | retry or reconnect |
-| camera denied | `permission_denied` | allow camera or manual fallback |
-| camera unavailable | `camera_unavailable` | manual fallback |
-| manual validation failure | `manual_entry` | fix input |
+| Signal                             | Component state       | Recovery                                       |
+| ---------------------------------- | --------------------- | ---------------------------------------------- |
+| `PACKAGE_SCAN_MISMATCH`            | `mismatch`            | scan again, custody chain, issue               |
+| duplicate label policy             | `duplicate_label`     | custody chain, issue, admin route when allowed |
+| `FORBIDDEN`                        | `blocked`             | role-safe denied state                         |
+| `PAYMENT_REQUIRED`                 | `blocked`             | payment blocked state                          |
+| `INVALID_STATUS_TRANSITION`        | `blocked`             | refresh delivery                               |
+| `RATE_LIMITED`                     | `blocked`             | cooldown state                                 |
+| network failure with queue allowed | `offline_queue_ready` | queue action                                   |
+| network failure without queue      | `error`               | retry or reconnect                             |
+| camera denied                      | `permission_denied`   | allow camera or manual fallback                |
+| camera unavailable                 | `camera_unavailable`  | manual fallback                                |
+| manual validation failure          | `manual_entry`        | fix input                                      |
 
 Rules:
 
@@ -443,6 +466,7 @@ Rules:
 - server `requestId` should be available to host recovery.
 
 ## Privacy And Redaction
+
 The scan component handles sensitive physical identifiers.
 
 Always redact:
@@ -470,6 +494,7 @@ Rules:
 - after review, show redacted code only.
 
 ## Accessibility Requirements
+
 The component must be usable without a successful camera flow.
 
 Requirements:
@@ -487,6 +512,7 @@ Requirements:
 - focus moves to the first relevant recovery action after blocking errors.
 
 ## Performance Requirements
+
 The scanner must be responsive on low-cost devices.
 
 Rules:
@@ -501,6 +527,7 @@ Rules:
 - clean up camera resources on unmount.
 
 ## Telemetry
+
 Allowed events:
 
 - `scan_component_opened`
@@ -538,6 +565,7 @@ Forbidden properties:
 - backend raw error details
 
 ## Test Requirements
+
 Claude Code must add tests when implementing this component.
 
 Unit tests:
@@ -590,6 +618,7 @@ End-to-end tests after UI exists:
 - staff cannot use scanner to bypass role or assignment block.
 
 ## Implementation Sequence
+
 Claude Code should implement in this order when frontend build starts:
 
 1. Define scan intent types and host input/output contracts.
@@ -607,6 +636,7 @@ Claude Code should implement in this order when frontend build starts:
 13. Add unit, component, integration, and later end-to-end tests.
 
 ## Claude Code Build Instructions
+
 When Claude Code implements this spec:
 
 - do not build actual screen UI from this file.
@@ -623,6 +653,7 @@ When Claude Code implements this spec:
 - do not implement supervisor override inside the scanner without host policy.
 
 ## Completion Checklist
+
 This infrastructure item is complete only when:
 
 - shared scan component contract exists.
@@ -638,6 +669,7 @@ This infrastructure item is complete only when:
 - tests cover permission, manual entry, intent mapping, redaction, recovery, and offline bridge.
 
 ## Quality Bar
+
 Pass conditions:
 
 - A station operator can scan fast without losing sight of the current handoff intent.
@@ -659,6 +691,7 @@ Fail conditions:
 - scanner is unusable without camera access.
 
 ## Spec Closure Review
+
 This file is closed when it gives Claude Code a complete reusable scanner contract for package-label workflows without weakening custody rules.
 
 Review questions:
