@@ -1,24 +1,27 @@
 # Admin Finance Summary Screen Spec
 
 ## Metadata
-| Field | Value |
-| --- | --- |
-| Screen name | `AdminFinanceSummary` |
-| Route | `/admin/finance` |
-| Test id | `screen-admin-finance-summary` |
-| Surface | Admin web console |
-| Backend coverage | `admin_finance`; links to `admin_payment_reconciliation`, refund review, refund settlement, pricing rules, and audit screens |
-| Offline critical | No |
-| Required read role | `finance_admin` or `super_admin` through backend finance admin policy |
-| Required mutation role | No mutation on this screen |
-| Required states | `loading`, `ready`, `empty`, `stale`, `refreshing`, `not_authorized`, `session_expired`, `api_error`, `partial_navigation_unavailable` |
-| Parent screens | Protected admin shell |
-| Related screens | `AdminPaymentReconciliation`, `AdminPaymentReconciliationDetail`, `AdminRefundReview`, `AdminRefundSettlement`, `AdminRefundEvidenceReview`, `AdminPricingRules`, `AdminPricingRuleEdit`, `AdminStaffActivityLog`, `AdminOverview`, `SenderReceiptDetail`, `SenderRefundStatus` |
+
+| Field                  | Value                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen name            | `AdminFinanceSummary`                                                                                                                                                                                                                                                           |
+| Route                  | `/admin/finance`                                                                                                                                                                                                                                                                |
+| Test id                | `screen-admin-finance-summary`                                                                                                                                                                                                                                                  |
+| Surface                | Admin web console                                                                                                                                                                                                                                                               |
+| Backend coverage       | `admin_finance`; links to `admin_payment_reconciliation`, refund review, refund settlement, pricing rules, and audit screens                                                                                                                                                    |
+| Offline critical       | No                                                                                                                                                                                                                                                                              |
+| Required read role     | `finance_admin` or `super_admin` through backend finance admin policy                                                                                                                                                                                                           |
+| Required mutation role | No mutation on this screen                                                                                                                                                                                                                                                      |
+| Required states        | `loading`, `ready`, `empty`, `stale`, `refreshing`, `not_authorized`, `session_expired`, `api_error`, `partial_navigation_unavailable`                                                                                                                                          |
+| Parent screens         | Protected admin shell                                                                                                                                                                                                                                                           |
+| Related screens        | `AdminPaymentReconciliation`, `AdminPaymentReconciliationDetail`, `AdminRefundReview`, `AdminRefundSettlement`, `AdminRefundEvidenceReview`, `AdminPricingRules`, `AdminPricingRuleEdit`, `AdminStaffActivityLog`, `AdminOverview`, `SenderReceiptDetail`, `SenderRefundStatus` |
 
 ## Purpose
+
 `AdminFinanceSummary` is the finance command view for customer money movement visibility. It gives an authorized finance admin a trustworthy read-only view of confirmed collections, pending refund liability, completed refunds, recent payment rows, and the next finance actions that belong in deeper specialist screens.
 
 The screen should answer:
+
 - `How much confirmed customer collection value is currently visible?`
 - `How much refund liability is pending?`
 - `How much has already been recorded as refunded?`
@@ -32,17 +35,21 @@ The screen should answer:
 This screen is not a ledger writer, payout execution surface, refund approval form, reconciliation detail view, pricing editor, or accounting export. It is a high-trust triage cockpit that routes finance staff to the right next screen without inventing unsupported capabilities.
 
 ## Backend Reality
+
 The concrete endpoint is:
+
 ```http
 GET /v1/admin/finance
 ```
 
 Operation:
+
 ```text
 admin_finance
 ```
 
 Server behavior:
+
 - The endpoint requires authenticated admin access and `requireFinanceAdmin`.
 - The endpoint sets no-store cache behavior.
 - The endpoint reads recent payment metrics through `payments.listRecent(100)`.
@@ -57,6 +64,7 @@ Server behavior:
 - The endpoint does not export reports.
 
 Response shape:
+
 ```json
 {
   "generatedAt": "2026-05-20T08:30:00.000Z",
@@ -82,6 +90,7 @@ Response shape:
 ```
 
 Important backend facts:
+
 - Payment statuses are `pending`, `confirmed`, `failed`, `refund_pending`, and `refunded`.
 - Provider is currently `mtn_momo`.
 - `amountGhs` is a positive integer per row.
@@ -99,6 +108,7 @@ Important backend facts:
 - Partner and carrier payout automation is deferred outside V1.
 
 Therefore:
+
 - This screen must fetch only `admin_finance` for the primary view.
 - This screen must display backend totals exactly.
 - This screen must not calculate replacement totals from visible rows.
@@ -108,11 +118,14 @@ Therefore:
 - This screen must not expose finance controls to non-finance roles.
 
 ## Primary Users
+
 Primary:
+
 - `finance_admin` monitoring customer payment health.
 - `super_admin` reviewing finance health during launch or incident response.
 
 Secondary:
+
 - Operations lead asking whether payment blockers affect dispatch.
 - Support lead asking whether refund liability needs customer messaging.
 - Product owner checking launch finance readiness.
@@ -121,6 +134,7 @@ Secondary:
 - Claude Code implementing the admin console later.
 
 Non-users:
+
 - `sender`.
 - `receiver`.
 - `driver`.
@@ -131,7 +145,9 @@ Non-users:
 - Public visitor.
 
 ## User Goal
+
 Authorized finance users use this screen to:
+
 - Check customer collection value.
 - Check pending refund liability.
 - Check refunded value.
@@ -146,7 +162,9 @@ Authorized finance users use this screen to:
 The screen should reduce finance uncertainty without pretending to be a full accounting system.
 
 ## Entry Points
+
 The screen can open from:
+
 - Admin shell navigation under `Finance`.
 - `AdminOverview` finance card.
 - `AdminLaunchReadiness` finance signal.
@@ -157,6 +175,7 @@ The screen can open from:
 - Direct route `/admin/finance`.
 
 The screen must not open from:
+
 - Public web.
 - Sender mobile app.
 - Receiver tracking.
@@ -166,7 +185,9 @@ The screen must not open from:
 - Unauthenticated routes.
 
 ## Scope
+
 In scope:
+
 - Finance summary loading.
 - Generated timestamp display.
 - Confirmed amount total display.
@@ -189,6 +210,7 @@ In scope:
 - Accessibility and keyboard support.
 
 Out of scope:
+
 - Creating a payment.
 - Verifying a sender payment.
 - Approving a refund inline.
@@ -206,9 +228,11 @@ Out of scope:
 - Raw audit metadata display.
 
 ## Product Position
+
 `AdminFinanceSummary` should feel like a control-room finance board, not a decorative dashboard. The main job is to make risk, liability, and next action clear at a glance.
 
 Design principles:
+
 - Lead with money state.
 - Separate collection value from refund liability.
 - Treat pending refund as a liability, not income.
@@ -219,13 +243,16 @@ Design principles:
 - Keep the page serious, compact, and calm.
 
 Restraint rule:
+
 - Do not add charts unless they explain a decision better than numbers and table rows.
 - Do not use decorative financial graphics.
 - Do not show payout controls.
 - Do not present row-derived totals as source of truth.
 
 ## External UX Research And References
+
 Only use references that apply directly to finance summary, status, and data-table design:
+
 - [USWDS table component](https://designsystem.digital.gov/components/table/): supports using tables for structured data, accessible headers, captions, small-screen handling, and sortable-table live announcements.
 - [USWDS summary box component](https://designsystem.digital.gov/components/summary-box/): supports calling out three to five key details from dense pages.
 - [GOV.UK notification banner](https://design-system.service.gov.uk/components/notification-banner/): supports using a single high-priority banner for service-wide or user-specific notices and accessible region labeling.
@@ -235,6 +262,7 @@ Only use references that apply directly to finance summary, status, and data-tab
 - [MTN MoMo API](https://momo.mtn.com/api/): confirms MoMo supports collection flows and transaction status concepts, matching Kra's provider reference and reconciliation approach.
 
 How these references affect this screen:
+
 - Use a summary zone for the three finance totals and generated timestamp.
 - Use tables for recent payment records on desktop.
 - Use stacked row cards or horizontal scroll on narrow screens.
@@ -243,9 +271,11 @@ How these references affect this screen:
 - Use key-value metadata for provider, generated time, and row detail.
 
 ## UX Thesis
+
 The page should feel like a finance-grade command ledger: dense enough for operators, calm enough for high-stakes review, and strict enough that no one can confuse monitoring with settlement.
 
 Visual direction:
+
 - Clean ivory or warm gray canvas.
 - Dark ink text.
 - Deep green for confirmed money.
@@ -256,6 +286,7 @@ Visual direction:
 - Use subtle dividers, generous column alignment, and strong numeric hierarchy.
 
 Motion direction:
+
 - Refresh should show a restrained progress state.
 - Metric changes may softly crossfade.
 - Row status changes may highlight once for no more than `1200ms`.
@@ -263,7 +294,9 @@ Motion direction:
 - Never animate money numbers in a way that makes exact values hard to read.
 
 ## Information Architecture
+
 Order from top to bottom:
+
 1. Admin shell header and finance breadcrumb.
 2. Optional high-priority finance banner.
 3. Page title, generated timestamp, and refresh action.
@@ -275,10 +308,12 @@ Order from top to bottom:
 9. Unsupported actions note.
 
 The desktop layout should use a two-column composition:
+
 - Left wide column for totals and recent payments.
 - Right narrow rail for finance work queues, policy notes, and unsupported actions.
 
 The mobile layout should use one column:
+
 - Header.
 - Totals.
 - Work queue shortcuts.
@@ -287,7 +322,9 @@ The mobile layout should use one column:
 - Policy notes.
 
 ## Header
+
 The header must include:
+
 - Breadcrumb: `Admin` -> `Finance`.
 - H1: `Finance summary`.
 - Supporting text: `Monitor customer collections, refund liability, and recent MTN MoMo payment records.`
@@ -296,6 +333,7 @@ The header must include:
 - Optional last refresh status live text.
 
 Header behavior:
+
 - On first load, show loading skeleton for timestamp and totals.
 - On refresh, keep existing data visible while the refresh is in progress.
 - If refresh succeeds, update timestamp and announce `Finance summary refreshed`.
@@ -303,6 +341,7 @@ Header behavior:
 - If no previous data exists, show the full error state.
 
 Stale rule:
+
 - Data less than `5 minutes` old: no stale warning.
 - Data `5` to `15 minutes` old: show quiet text `Review before acting: data is more than 5 minutes old.`
 - Data more than `15 minutes` old: show warning banner `Refresh finance data before making refund or reconciliation decisions.`
@@ -310,15 +349,18 @@ Stale rule:
 - If client clock is unavailable or invalid, show `Generated time could not be compared. Refresh before acting.`
 
 ## Finance Banner
+
 Only one banner may appear above the H1.
 
 Banner priority:
+
 1. Session or authorization issue.
 2. More than `15 minutes` stale.
 3. Partial navigation unavailable.
 4. Backend finance error.
 
 Banner content rules:
+
 - Keep the banner specific.
 - Include one primary action.
 - Do not duplicate the page title.
@@ -327,19 +369,23 @@ Banner content rules:
 - Use `role="alert"` only for urgent errors or refresh failure that blocks action.
 
 Stale banner copy:
+
 ```text
 Refresh finance data before making refund or reconciliation decisions.
 ```
 
 Partial navigation banner copy:
+
 ```text
 Some finance workflows are unavailable in this build. Recent payment visibility is still available.
 ```
 
 ## Primary Totals
+
 Render three top-level metric cards using backend totals:
 
 Card 1:
+
 - Label: `Confirmed collections`.
 - Value: `GHS {totals.confirmedAmountGhs}`.
 - Meaning: money collected and confirmed internally.
@@ -347,6 +393,7 @@ Card 1:
 - Secondary text: `Customer payments confirmed by Kra records.`
 
 Card 2:
+
 - Label: `Pending refund liability`.
 - Value: `GHS {totals.refundPendingAmountGhs}`.
 - Meaning: payments marked refund pending.
@@ -354,6 +401,7 @@ Card 2:
 - Secondary text: `Approved or pending settlement amount requiring finance follow-through.`
 
 Card 3:
+
 - Label: `Refunded`.
 - Value: `GHS {totals.refundedAmountGhs}`.
 - Meaning: payments recorded as refunded.
@@ -361,6 +409,7 @@ Card 3:
 - Secondary text: `Refunds recorded as settled in Kra records.`
 
 Metric card requirements:
+
 - Use `GHS` prefix consistently.
 - Use thousands separators when needed.
 - Do not show decimal places unless backend later supports fractional money.
@@ -369,13 +418,16 @@ Metric card requirements:
 - Include accessible labels with the full amount and meaning.
 
 Metric card hierarchy:
+
 - Confirmed collections is largest.
 - Pending refund liability is visually distinct.
 - Refunded is stable and secondary.
 - Never make refunded appear like available cash.
 
 ## Derived Row Orientation
+
 The UI may compute row orientation values from `payments`:
+
 - Total recent rows.
 - Count by status.
 - Count missing `verifiedAt`.
@@ -386,12 +438,14 @@ The UI may compute row orientation values from `payments`:
 These values are for navigation only.
 
 Rules:
+
 - Label the section `Recent records only`.
 - Do not imply counts cover all historical records.
 - Do not use row counts for accounting totals.
 - Do not call this a complete ledger.
 
 Recommended status chips:
+
 - `Confirmed`
 - `Pending verification`
 - `Failed`
@@ -399,6 +453,7 @@ Recommended status chips:
 - `Refunded`
 
 Status-chip labels:
+
 - `confirmed`: `Confirmed`
 - `pending`: `Pending verification`
 - `failed`: `Failed`
@@ -406,7 +461,9 @@ Status-chip labels:
 - `refunded`: `Refunded`
 
 ## Work Queue Shortcuts
+
 Right rail or mobile section title:
+
 ```text
 Finance work queues
 ```
@@ -414,85 +471,113 @@ Finance work queues
 Cards:
 
 ### Reconciliation Review
+
 Purpose:
+
 - Route to payment reconciliation for records that need provider/internal review.
 
 Primary action:
+
 - `Open reconciliation`
 
 Destination:
+
 - `/admin/finance/reconciliation`
 
 Display:
+
 - Use available row orientation to show `Pending verification rows visible: {count}`.
 - If separate reconciliation count is unavailable, say `Use reconciliation view for authoritative review count.`
 
 Rules:
+
 - Do not claim exact unmatched count on this screen.
 - Do not run internal reconciliation worker.
 - Do not expose internal task secret.
 
 ### Refund Review
+
 Purpose:
+
 - Route to refund review for confirmed payments that may need policy review.
 
 Primary action:
+
 - `Review refunds`
 
 Destination:
+
 - If a selected row is present: `/admin/finance/refunds/:paymentId/review`.
 - If no selected row is present: show guidance to select a payment row.
 
 Rules:
+
 - Refund approval does not happen here.
 - Use confirmed rows only for review entry.
 - If a row is already `refund_pending`, use settlement route instead.
 
 ### Refund Settlement
+
 Purpose:
+
 - Route to settlement for records already marked `refund_pending`.
 
 Primary action:
+
 - `Settle pending refund`
 
 Destination:
+
 - `/admin/finance/refunds/:paymentId/settle`.
 
 Rules:
+
 - Only enable from a selected `refund_pending` row.
 - Do not display this as a bulk settlement action.
 - Do not collect provider transfer details here.
 
 ### Pricing Rules
+
 Purpose:
+
 - Route to active pricing review.
 
 Primary action:
+
 - `View pricing rules`
 
 Destination:
+
 - `/admin/pricing-rules`.
 
 Rules:
+
 - Do not edit prices here.
 - Do not imply pricing changes affect existing quotes.
 
 ### Audit Events
+
 Purpose:
+
 - Route to finance audit evidence.
 
 Primary action:
+
 - `Open audit log`
 
 Destination:
+
 - `/admin/staff-activity?targetType=payment`.
 
 Rules:
+
 - This route is a best-effort query link.
 - If audit filtering by target type is not supported in the built frontend, route to `/admin/staff-activity`.
 
 ## Recent Payment Table
+
 Desktop table columns:
+
 1. `Payment`
 2. `Delivery`
 3. `Status`
@@ -505,6 +590,7 @@ Desktop table columns:
 10. `Action`
 
 Column details:
+
 - `Payment`: `paymentId`, copy action, row detail link when available.
 - `Delivery`: `deliveryId`, link to `/admin/deliveries/:deliveryId`.
 - `Status`: semantic badge using status mapping.
@@ -517,6 +603,7 @@ Column details:
 - `Action`: context-specific route.
 
 Table requirements:
+
 - Include a visible caption: `Recent finance payment records`.
 - Use column headers with proper scope.
 - Provide stable row keys by `paymentId`.
@@ -528,6 +615,7 @@ Table requirements:
 - If horizontal scroll is used, the scroll container must be keyboard focusable.
 
 Default row ordering:
+
 1. Rows with `refund_pending`.
 2. Rows with `pending`.
 3. Rows with `failed`.
@@ -536,22 +624,25 @@ Default row ordering:
 6. Within each group, newest `initiatedAt` first.
 
 Reason:
+
 - Finance should see liability and unresolved verification before settled history.
 
 If backend later returns authoritative sort order, preserve backend order and remove client priority sort only after product approval.
 
 ## Row Actions
+
 Row action by status:
 
-| Status | Primary row action | Destination | Notes |
-| --- | --- | --- | --- |
-| `pending` | `Open reconciliation` | `/admin/finance/reconciliation/:paymentId` | Use detail route when implemented; otherwise route to reconciliation list with payment context |
-| `confirmed` | `Open delivery` | `/admin/deliveries/:deliveryId` | Refund review can appear in overflow if policy allows |
-| `failed` | `Open delivery` | `/admin/deliveries/:deliveryId` | Do not show refund action |
-| `refund_pending` | `Settle refund` | `/admin/finance/refunds/:paymentId/settle` | Finance settlement belongs in settlement screen |
-| `refunded` | `View refund` | `/admin/finance/refunds/:paymentId/evidence` | If evidence route is unavailable, route to delivery detail |
+| Status           | Primary row action    | Destination                                  | Notes                                                                                          |
+| ---------------- | --------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pending`        | `Open reconciliation` | `/admin/finance/reconciliation/:paymentId`   | Use detail route when implemented; otherwise route to reconciliation list with payment context |
+| `confirmed`      | `Open delivery`       | `/admin/deliveries/:deliveryId`              | Refund review can appear in overflow if policy allows                                          |
+| `failed`         | `Open delivery`       | `/admin/deliveries/:deliveryId`              | Do not show refund action                                                                      |
+| `refund_pending` | `Settle refund`       | `/admin/finance/refunds/:paymentId/settle`   | Finance settlement belongs in settlement screen                                                |
+| `refunded`       | `View refund`         | `/admin/finance/refunds/:paymentId/evidence` | If evidence route is unavailable, route to delivery detail                                     |
 
 Overflow actions:
+
 - `Copy payment ID`.
 - `Copy provider reference`.
 - `Open delivery`.
@@ -561,6 +652,7 @@ Overflow actions:
 - `Open refund evidence` when status is `refunded`.
 
 Rules:
+
 - Disable unavailable routes with explanatory text.
 - Do not show disabled actions without reason.
 - Do not show settlement for `confirmed`, `pending`, `failed`, or `refunded`.
@@ -568,17 +660,19 @@ Rules:
 - Do not allow bulk actions.
 
 ## Status Semantics
+
 Use exact backend status values and finance-safe labels:
 
-| Backend status | Label | Meaning | Tone | Primary concern |
-| --- | --- | --- | --- | --- |
-| `pending` | `Pending verification` | Payment started but not final | Blue or slate | Reconciliation review if old |
-| `confirmed` | `Confirmed` | Payment confirmed internally | Green | Dispatch entitlement and receipt |
-| `failed` | `Failed` | Payment did not complete | Red | Sender retry or support context |
-| `refund_pending` | `Refund pending` | Refund has been approved or recorded pending settlement | Amber | Finance settlement |
-| `refunded` | `Refunded` | Refund recorded as settled | Neutral | Evidence and audit |
+| Backend status   | Label                  | Meaning                                                 | Tone          | Primary concern                  |
+| ---------------- | ---------------------- | ------------------------------------------------------- | ------------- | -------------------------------- |
+| `pending`        | `Pending verification` | Payment started but not final                           | Blue or slate | Reconciliation review if old     |
+| `confirmed`      | `Confirmed`            | Payment confirmed internally                            | Green         | Dispatch entitlement and receipt |
+| `failed`         | `Failed`               | Payment did not complete                                | Red           | Sender retry or support context  |
+| `refund_pending` | `Refund pending`       | Refund has been approved or recorded pending settlement | Amber         | Finance settlement               |
+| `refunded`       | `Refunded`             | Refund recorded as settled                              | Neutral       | Evidence and audit               |
 
 Status display rules:
+
 - Use label plus icon or text marker.
 - Never rely on color alone.
 - Include status in row accessible name.
@@ -587,9 +681,11 @@ Status display rules:
 - Do not call `confirmed` provider settled unless provider reconciliation confirms it elsewhere.
 
 ## Provider Reference Handling
+
 Finance users may see full provider references on this screen.
 
 Rules:
+
 - Display provider reference in a monospaced, wrap-safe style.
 - Provide `Copy reference` action.
 - Copy action must announce success through a live region.
@@ -598,17 +694,21 @@ Rules:
 - Do not include provider credentials or callback secrets.
 
 Copy success text:
+
 ```text
 Provider reference copied.
 ```
 
 Copy failure text:
+
 ```text
 Could not copy provider reference. Select and copy it manually.
 ```
 
 ## Date And Time Rules
+
 Display:
+
 - Use absolute date and time.
 - Include timezone abbreviation.
 - Prefer user locale formatting while preserving exact meaning.
@@ -616,66 +716,82 @@ Display:
 - Show generated timestamp near the page title.
 
 Do not:
+
 - Use vague relative-only text such as `just now` without absolute timestamp.
 - Hide timezone.
 - Treat absent `verifiedAt` as failed.
 
 Recommended format:
+
 ```text
 20 May 2026, 08:30 GMT
 ```
 
 ## Empty State
+
 Trigger:
+
 - Endpoint succeeds.
 - `payments` is an empty array.
 - Totals are all zero.
 
 Empty title:
+
 ```text
 No recent finance records yet
 ```
 
 Empty body:
+
 ```text
 Customer payment records will appear here after senders initialize MTN MoMo payments. Finance can still open pricing rules and reconciliation.
 ```
 
 Actions:
+
 - `Refresh finance data`.
 - `View pricing rules`.
 - `Open reconciliation`.
 
 Rules:
+
 - Do not show an empty table with no explanation.
 - Do not show payout setup.
 - Do not show speculative revenue copy.
 
 ## Partial Empty State
+
 Trigger:
+
 - Endpoint succeeds.
 - `payments` is empty.
 - One or more totals is nonzero.
 
 Interpretation:
+
 - Backend totals and recent rows are not the same reporting scope.
 
 Copy:
+
 ```text
 Totals are available, but no recent payment rows were returned.
 ```
 
 Required behavior:
+
 - Show totals.
 - Show the empty recent-records section.
 - Show a note: `Use export or reconciliation views for broader finance history when available.`
 
 Do not:
+
 - Treat this as a data integrity failure.
 - Set totals to zero.
 
 ## Loading State
+
 Initial load:
+
 - Show page header skeleton.
 - Show three metric skeleton cards.
 - Show recent table skeleton with `6` rows on desktop.
@@ -683,6 +799,7 @@ Initial load:
 - Announce `Loading finance summary`.
 
 Refresh load:
+
 - Keep existing data visible.
 - Disable refresh button.
 - Show inline progress text: `Refreshing finance data`.
@@ -690,32 +807,39 @@ Refresh load:
 - Do not clear selected row until refresh completes.
 
 Loading accessibility:
+
 - Use `aria-busy="true"` on the finance content region.
 - Use polite live region for loading state.
 - Do not move focus on background refresh.
 
 ## Error State
+
 Full error title:
+
 ```text
 Finance summary could not load
 ```
 
 Full error body:
+
 ```text
 Kra could not load the finance summary. Refresh, or open reconciliation if you need to continue a payment review.
 ```
 
 Actions:
+
 - `Try again`.
 - `Open reconciliation`.
 - `Return to admin overview`.
 
 Inline refresh error:
+
 ```text
 Could not refresh finance summary. Current data is still shown.
 ```
 
 Error rules:
+
 - Preserve prior successful data when refresh fails.
 - Show request ID when backend error includes it.
 - Do not expose stack traces.
@@ -723,23 +847,28 @@ Error rules:
 - Do not show raw unknown details by default.
 
 ## Authorization State
+
 If backend returns forbidden:
 
 Title:
+
 ```text
 Finance access required
 ```
 
 Body:
+
 ```text
 This screen is restricted to finance admins and super admins with finance access.
 ```
 
 Actions:
+
 - `Return to admin overview`.
 - `Sign in with another account`.
 
 Rules:
+
 - Do not render totals.
 - Do not render provider references.
 - Do not render payment rows.
@@ -747,29 +876,36 @@ Rules:
 - Clear any cached finance data from visible UI.
 
 ## Session Expired State
+
 If bearer auth expires:
 
 Title:
+
 ```text
 Sign in again to view finance data
 ```
 
 Body:
+
 ```text
 Finance records are protected. Sign in again to continue.
 ```
 
 Actions:
+
 - `Sign in`.
 - `Return to admin overview`.
 
 Rules:
+
 - Do not retry indefinitely.
 - Do not show stale finance data after logout.
 - Preserve intended return route after successful sign-in.
 
 ## Data Integrity Checks
+
 Client validation should reject or quarantine impossible display data:
+
 - Missing `generatedAt`.
 - Missing `totals`.
 - Negative total.
@@ -784,6 +920,7 @@ Client validation should reject or quarantine impossible display data:
 - Invalid date-time.
 
 Quarantine behavior:
+
 - Do not crash the whole screen for one bad row.
 - Hide invalid row from the table.
 - Show inline warning: `{n} payment record could not be displayed because it failed client validation.`
@@ -791,17 +928,21 @@ Quarantine behavior:
 - Route user to support or engineering issue process if invalid rows appear.
 
 Full failure:
+
 - If root response fails contract validation, show full error state.
 
 ## Finance Policy Notes
+
 Show a compact policy panel:
 
 Title:
+
 ```text
 Finance policy guardrails
 ```
 
 Rows:
+
 - `MTN MoMo is the primary production payment path for pilot.`
 - `Payment must be confirmed before dispatch.`
 - `Unresolved pending payments move to reconciliation after 5, 15, and 30 minute checks.`
@@ -809,19 +950,23 @@ Rows:
 - `Pilot driver and courier payouts are processed weekly by finance outside the app.`
 
 Rules:
+
 - Keep this panel short.
 - Link to docs or internal policy only if app navigation supports it.
 - Do not bury primary payment records below long policy text.
 
 ## Unsupported Actions Panel
+
 Show a clear but quiet panel:
 
 Title:
+
 ```text
 Not handled on this screen
 ```
 
 Items:
+
 - `Approving refunds`.
 - `Settling refunds`.
 - `Running reconciliation jobs`.
@@ -832,18 +977,22 @@ Items:
 - `Provider credential changes`.
 
 Body:
+
 ```text
 This screen is for monitoring and routing. Specialist finance workflows handle decisions and settlement.
 ```
 
 Purpose:
+
 - Prevent Claude Code from adding unsupported UI.
 - Prevent admins from expecting payout or settlement execution here.
 
 ## Search And Filtering
+
 Backend does not support query parameters for `admin_finance`.
 
 Allowed client-side filters:
+
 - Status.
 - Provider.
 - Payment ID.
@@ -853,6 +1002,7 @@ Allowed client-side filters:
 - Missing verification.
 
 Rules:
+
 - Label filters `Filter recent records`.
 - State clearly that filters apply to visible recent rows only.
 - Do not send unsupported query parameters to backend.
@@ -860,23 +1010,28 @@ Rules:
 - Announce filtered result count through a polite live region.
 
 Filter result copy:
+
 ```text
 12 recent records shown.
 ```
 
 No filter result copy:
+
 ```text
 No recent records match these filters.
 ```
 
 Actions:
+
 - `Clear filters`.
 - `Refresh finance data`.
 
 ## Selection Model
+
 The screen may support single-row selection for contextual right rail actions.
 
 Rules:
+
 - Only one row may be selected at a time.
 - Selection must be keyboard reachable.
 - Selection must be announced.
@@ -884,12 +1039,15 @@ Rules:
 - If selected row disappears after refresh, clear selection and announce `Selected payment is no longer in recent records.`
 
 Do not:
+
 - Add multi-select.
 - Add bulk refund actions.
 - Add bulk reconciliation actions.
 
 ## Navigation Rules
+
 Routes:
+
 - `/admin/finance/reconciliation`
 - `/admin/finance/reconciliation/:paymentId`
 - `/admin/finance/refunds/:paymentId/review`
@@ -900,17 +1058,21 @@ Routes:
 - `/admin/deliveries/:deliveryId`
 
 If a route is not implemented yet:
+
 - Hide the action or disable it with copy.
 - Do not route to a broken page.
-- Add a TODO only in code comments if the route constant is absent; do not surface internal TODO text to users.
+- Add an implementation note only in code comments if the route constant is absent; do not surface internal engineering notes to users.
 
 Fallback route behavior:
+
 - If reconciliation detail is unavailable, route to `/admin/finance/reconciliation` with selected payment context in UI state or query if supported.
 - If refund evidence route is unavailable, route to delivery detail.
 - If audit target filters are unavailable, route to `/admin/staff-activity`.
 
 ## Copy System
+
 Tone:
+
 - Precise.
 - Calm.
 - Accountable.
@@ -920,6 +1082,7 @@ Tone:
 - No vague optimism.
 
 Preferred terms:
+
 - `Confirmed collections`.
 - `Pending refund liability`.
 - `Refunded`.
@@ -930,6 +1093,7 @@ Preferred terms:
 - `Settlement`.
 
 Avoid:
+
 - `Revenue` unless accounting approves the term.
 - `Profit`.
 - `Cash on hand`.
@@ -940,7 +1104,9 @@ Avoid:
 - `Instant settlement`.
 
 ## Content Inventory
+
 Required static labels:
+
 - `Finance summary`
 - `Monitor customer collections, refund liability, and recent MTN MoMo payment records.`
 - `Confirmed collections`
@@ -956,6 +1122,7 @@ Required static labels:
 - `View pricing rules`
 
 Required status labels:
+
 - `Pending verification`
 - `Confirmed`
 - `Failed`
@@ -963,13 +1130,16 @@ Required status labels:
 - `Refunded`
 
 Required unavailable labels:
+
 - `Not verified yet`
 - `No refund recorded`
 - `Unavailable`
 - `Finance access required`
 
 ## Accessibility Requirements
+
 Landmarks:
+
 - Main content landmark.
 - Finance summary region.
 - Metric cards grouped under an H2.
@@ -977,6 +1147,7 @@ Landmarks:
 - Recent payments table grouped under an H2.
 
 Keyboard:
+
 - All actions reachable by keyboard.
 - Table row copy actions reachable.
 - Row selection reachable.
@@ -984,6 +1155,7 @@ Keyboard:
 - Focus order follows visual order.
 
 Screen reader:
+
 - Metrics expose label, amount, and meaning.
 - Status badges expose text labels.
 - Copy actions include object in accessible name, such as `Copy provider reference for PAY-0001`.
@@ -993,29 +1165,35 @@ Screen reader:
 - Stale warning uses region or alert based on severity.
 
 Contrast:
+
 - Text contrast at least WCAG AA.
 - Status colors have text labels.
 - Focus ring visible against all surfaces.
 - Amber liability card must remain legible.
 
 Reduced motion:
+
 - Disable metric crossfade.
 - Disable row highlight animation.
 - Keep progress indication textual.
 
 ## Responsive Design
+
 Desktop:
+
 - Two-column layout.
 - Sticky right rail optional only if it does not obscure content.
 - Table can use compact density.
 - Provider reference may wrap over two lines.
 
 Tablet:
+
 - Two columns may collapse below `1024px`.
 - Work queue rail moves below totals.
 - Table may horizontally scroll with focusable container.
 
 Mobile:
+
 - One-column layout.
 - Metric cards stack.
 - Status chips wrap.
@@ -1024,18 +1202,22 @@ Mobile:
 - Copy actions must have minimum touch target.
 
 Do not:
+
 - Hide provider reference without an accessible way to view it for finance users.
 - Squeeze ten columns into unreadable mobile table.
 - Place primary row action below policy notes.
 
 ## Performance Requirements
+
 Targets:
+
 - Initial finance content should render quickly after auth.
 - Refresh should not block page chrome.
 - Table of 100 rows should not require virtualization.
 - Client filtering over 100 rows should be instant.
 
 Rules:
+
 - Do not poll by default.
 - Do not refetch on every filter keystroke if it causes re-render jank.
 - Keep provider references out of analytics payloads.
@@ -1043,12 +1225,15 @@ Rules:
 - Avoid heavy chart libraries for this screen.
 
 Refresh policy:
+
 - Manual refresh required.
 - Optional background stale indicator may check time locally.
 - Do not auto-refresh while user is copying references or selecting rows.
 
 ## Security And Privacy
+
 Sensitive fields:
+
 - `providerReference`.
 - `paymentId`.
 - `deliveryId`.
@@ -1056,6 +1241,7 @@ Sensitive fields:
 - Payment status.
 
 Rules:
+
 - Only render for authorized finance roles.
 - Do not log provider references in client analytics.
 - Do not include provider references in error tracking breadcrumbs.
@@ -1067,12 +1253,15 @@ Rules:
 - Do not show provider secrets, tokens, callback secrets, or internal task secrets.
 
 Clipboard:
+
 - User must trigger copy.
 - Show copied state for no more than `3 seconds`.
 - Clear copied state when route changes.
 
 ## Analytics
+
 Allowed events:
+
 - `admin_finance_viewed`
 - `admin_finance_refreshed`
 - `admin_finance_refresh_failed`
@@ -1083,6 +1272,7 @@ Allowed events:
 - `admin_finance_route_opened`
 
 Event payload rules:
+
 - Include role category only if allowed by privacy policy.
 - Include status filter.
 - Include row status.
@@ -1093,7 +1283,9 @@ Event payload rules:
 - Do not include amount unless approved as aggregated metric.
 
 ## Testing Requirements
+
 Unit tests:
+
 - Renders three backend totals.
 - Does not recompute totals from rows.
 - Maps all five payment statuses.
@@ -1109,6 +1301,7 @@ Unit tests:
 - Does not show inline settlement.
 
 Integration tests:
+
 - Loads `/admin/finance` with finance role.
 - Blocks non-finance admin.
 - Handles empty state.
@@ -1120,6 +1313,7 @@ Integration tests:
 - Copies provider reference without analytics leakage.
 
 Accessibility tests:
+
 - Page has one H1.
 - Metric cards have accessible names.
 - Table has caption and scoped headers.
@@ -1130,6 +1324,7 @@ Accessibility tests:
 - Color is not the only status indicator.
 
 Visual tests:
+
 - Desktop finance summary.
 - Desktop empty state.
 - Desktop stale state.
@@ -1139,6 +1334,7 @@ Visual tests:
 - Error state.
 
 ## Acceptance Criteria
+
 1. A finance admin can open `/admin/finance` and see the three backend totals.
 2. The page displays the `generatedAt` timestamp in an absolute format with timezone.
 3. The page displays up to 100 recent payment records.
@@ -1161,4 +1357,5 @@ Visual tests:
 20. Accessibility checks pass for headings, table semantics, live regions, contrast, and keyboard navigation.
 
 ## Implementation Notes For Claude Code
+
 Build `AdminFinanceSummary` as a read-only finance command view. Use `useAdminFinanceQuery` or the app's equivalent query wrapper for `GET /v1/admin/finance`. Render backend totals as authoritative, render recent payment rows with status-safe actions, and route deeper work to reconciliation, refund, delivery, pricing, and audit screens. Do not add inline refund decisions, settlement forms, payout execution, station-operator compensation, partner settlements, provider credential controls, or unsupported backend query parameters. Keep provider references finance-only, exclude them from analytics, and make refresh, filtering, stale state, and table interactions accessible.
