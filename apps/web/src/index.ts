@@ -22,9 +22,24 @@ export const publicPages: PublicPage[] = [
     description: "Explains the sender, station, driver, and receiver journey."
   },
   {
+    route: "/service-areas",
+    title: "Service Areas",
+    description: "Shows approved launch corridors, stations, and service-area rules."
+  },
+  {
+    route: "/coverage",
+    title: "Coverage",
+    description: "Explains launch coverage, station corridors, and doorstep service limits."
+  },
+  {
     route: "/pricing",
     title: "Pricing",
     description: "Explains route pricing, surcharges, and policy boundaries."
+  },
+  {
+    route: "/trust-and-custody",
+    title: "Trust And Custody",
+    description: "Explains package scans, handoffs, receiver proof, and accountability."
   },
   {
     route: "/track",
@@ -35,11 +50,6 @@ export const publicPages: PublicPage[] = [
     route: "/business",
     title: "Business",
     description: "Explains the service for retail and small-business senders."
-  },
-  {
-    route: "/coverage",
-    title: "Coverage",
-    description: "Explains active routes, stations, and launch-city availability."
   },
   {
     route: "/partners",
@@ -57,6 +67,16 @@ export const publicPages: PublicPage[] = [
     description: "Public support and help surface."
   },
   {
+    route: "/delivery-policy",
+    title: "Delivery Policy",
+    description: "Publishes lifecycle, handoff, failed-attempt, and service-limit rules."
+  },
+  {
+    route: "/refund-policy",
+    title: "Refund Policy",
+    description: "Publishes refund, dispute, and evidence review rules."
+  },
+  {
     route: "/privacy",
     title: "Privacy",
     description: "Public privacy notice for senders, staff, and receivers."
@@ -65,6 +85,11 @@ export const publicPages: PublicPage[] = [
     route: "/terms",
     title: "Terms",
     description: "Public delivery, payment, and platform terms."
+  },
+  {
+    route: "/maintenance",
+    title: "Maintenance",
+    description: "Public service-interruption and maintenance-status page."
   }
 ];
 
@@ -77,7 +102,8 @@ export const landingSections: LandingSection[] = [
   {
     id: "proof",
     title: "Why Kra is different",
-    purpose: "Show tracking, custody, station operations, OTP delivery proof, and support discipline."
+    purpose:
+      "Show tracking, custody, station operations, OTP delivery proof, and support discipline."
   },
   {
     id: "corridors",

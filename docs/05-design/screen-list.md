@@ -1,11 +1,13 @@
 # Screen List
 
 ## Canonical Source
+
 The implementation-ready frontend checklist now lives in `docs/05-design/frontend-screen-inventory.md`.
 
 This file remains as the compact legacy screen summary. Claude Code should build from `frontend-screen-inventory.md` because it includes required states, modals, shared infrastructure, backend route coverage, and launch completeness rules.
 
 ## Sender
+
 - Onboarding
 - Sign In
 - Dashboard
@@ -17,7 +19,27 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Receipt Detail
 - Support Thread
 
+## Public
+
+- Landing
+- How It Works
+- Service Areas
+- Coverage
+- Pricing
+- Trust And Custody
+- Business
+- Partners
+- About
+- Support
+- Delivery Policy
+- Refund Policy
+- Privacy
+- Terms
+- Tracking Entry
+- Maintenance
+
 ## Driver
+
 - Sign In
 - Dashboard
 - Assigned Run Detail
@@ -28,6 +50,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Support
 
 ## Station Operator
+
 - Sign In
 - Dashboard
 - Intake
@@ -40,6 +63,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Support
 
 ## Final-Mile
+
 - Sign In
 - Home
 - Assignment Detail
@@ -49,6 +73,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Earnings
 
 ## Admin
+
 - Overview
 - Delivery Explorer
 - Package Detail
@@ -59,14 +84,37 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Settings
 
 ## Approved Launch Screen Inventory
+
 ### Out Of Scope For Launch
+
 - public ratings screen
 - enterprise invoice screen
 - AI customer chat screen
 - route-optimization map screen
 
 ## Route Names
+
+### Public
+
+- `PublicLanding`
+- `PublicHowItWorks`
+- `PublicServiceAreas`
+- `PublicCoverage`
+- `PublicPricingExplainer`
+- `PublicTrustCustody`
+- `PublicBusiness`
+- `PublicPartners`
+- `PublicAbout`
+- `PublicSupportEntry`
+- `PublicDeliveryPolicy`
+- `PublicRefundPolicy`
+- `PublicPrivacy`
+- `PublicTerms`
+- `PublicTrackingEntry`
+- `PublicMaintenance`
+
 ### Sender
+
 - `SenderOnboarding`
 - `SenderSignIn`
 - `SenderHome`
@@ -79,6 +127,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `SupportThread`
 
 ### Driver
+
 - `DriverSignIn`
 - `DriverHome`
 - `AssignedRunDetail`
@@ -89,6 +138,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `DriverSupport`
 
 ### Station
+
 - `StationSignIn`
 - `StationOverview`
 - `StationIntake`
@@ -101,6 +151,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `StationSupport`
 
 ### Final-Mile
+
 - `CourierSignIn`
 - `CourierHome`
 - `CourierAssignmentDetail`
@@ -110,6 +161,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `CourierEarnings`
 
 ### Admin
+
 - `AdminOverview`
 - `AdminDeliveryExplorer`
 - `AdminPackageDetail`
@@ -120,6 +172,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `AdminSettings`
 
 ## Required UI States
+
 - `loading`
 - `empty`
 - `error`
@@ -129,6 +182,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `not_authorized`
 
 ## Workflow Coverage Rule
+
 - The launch screen set covers:
   - sender booking and payment
   - station intake and dispatch
@@ -138,4 +192,5 @@ This file remains as the compact legacy screen summary. Claude Code should build
   - admin issue and payment review
 
 ## Baseline Status
+
 This file is now concrete enough to support route scaffolding and UI-state planning.
