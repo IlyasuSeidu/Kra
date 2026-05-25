@@ -2,18 +2,18 @@
 
 ## Screen Contract
 
-| Field              | Value                                                                            |
-| ------------------ | -------------------------------------------------------------------------------- |
-| Screen ID          | `PublicServiceAreas`                                                             |
-| App                | `apps/web`                                                                       |
-| Canonical route    | `/service-areas`                                                                 |
-| Legacy alias       | `/coverage` may redirect to `/service-areas` if the current app still exposes it |
-| Primary test ID    | `screen-public-service-areas`                                                    |
-| Source inventory   | `docs/05-design/frontend-screen-inventory.md`                                    |
-| Build priority     | `P0 Launch Critical`                                                             |
-| Backend dependency | `station data when exposed`; static approved launch content is allowed for v1    |
-| Related routes     | `/`, `/how-it-works`, `/pricing`, `/track`, `/trust-and-custody`, `/support`     |
-| Required states    | `loading`, `empty`, `unavailable`, `normal`                                      |
+| Field              | Value                                                                          |
+| ------------------ | ------------------------------------------------------------------------------ |
+| Screen ID          | `PublicServiceAreas`                                                           |
+| App                | `apps/web`                                                                     |
+| Canonical route    | `/service-areas`                                                               |
+| Related route      | `/coverage` explains coverage rules and routes users to this station directory |
+| Primary test ID    | `screen-public-service-areas`                                                  |
+| Source inventory   | `docs/05-design/frontend-screen-inventory.md`                                  |
+| Build priority     | `P0 Launch Critical`                                                           |
+| Backend dependency | `station data when exposed`; static approved launch content is allowed for v1  |
+| Related routes     | `/`, `/how-it-works`, `/pricing`, `/track`, `/trust-and-custody`, `/support`   |
+| Required states    | `loading`, `empty`, `unavailable`, `normal`                                    |
 
 ## Product Job
 
