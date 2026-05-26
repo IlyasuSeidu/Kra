@@ -24,18 +24,70 @@ export const mobileRoleShells = {
     "SenderIssueCreate",
     "SenderSupportThread"
   ],
-  driver: ["DriverHome", "DriverManifest", "DriverRoute", "DriverDestinationHandoff"],
+  driver: [
+    "DriverHome",
+    "AssignedRunDetail",
+    "DriverManifest",
+    "DriverOriginPickupScan",
+    "DriverCustodyAccepted",
+    "DriverRoute",
+    "DriverDestinationArrival",
+    "DriverDestinationHandoff"
+  ],
   station_operator: [
     "StationOverview",
     "StationIntakeQueue",
     "StationPackageIntake",
     "StationOutboundQueue",
-    "StationDestinationReceipt"
+    "StationDriverPickupScan",
+    "StationInboundQueue",
+    "StationDestinationReceipt",
+    "StationFinalMileQueue",
+    "StationHandoffLog"
   ],
   final_mile_courier: [
     "CourierHome",
     "CourierAssignmentDetail",
+    "CourierAcceptAssignmentScan",
+    "CourierCustodyAccepted",
+    "CourierOutForDelivery",
+    "CourierRoute",
     "CourierProofCapture",
-    "CourierFailedAttempt"
+    "CourierFailedAttempt",
+    "CourierReturnToStation",
+    "CourierCompletedJobs"
+  ]
+} as const;
+
+export const mobileTrackingLifecycleScreens = {
+  sender: ["SenderDeliveryDetail", "SenderTrackingTimeline", "SenderDeliveryHistory"],
+  shared_operations: ["OpsDeliveryDetail", "OpsCustodyChain"],
+  driver: [
+    "AssignedRunDetail",
+    "DriverManifest",
+    "DriverOriginPickupScan",
+    "DriverCustodyAccepted",
+    "DriverRoute",
+    "DriverDestinationArrival",
+    "DriverDestinationHandoff"
+  ],
+  station_operator: [
+    "StationOutboundQueue",
+    "StationDriverPickupScan",
+    "StationInboundQueue",
+    "StationDestinationReceipt",
+    "StationFinalMileQueue",
+    "StationHandoffLog"
+  ],
+  final_mile_courier: [
+    "CourierAssignmentDetail",
+    "CourierAcceptAssignmentScan",
+    "CourierCustodyAccepted",
+    "CourierOutForDelivery",
+    "CourierRoute",
+    "CourierProofCapture",
+    "CourierFailedAttempt",
+    "CourierReturnToStation",
+    "CourierCompletedJobs"
   ]
 } as const;

@@ -4,6 +4,13 @@ export interface PublicPage {
   description: string;
 }
 
+export interface ReceiverPublicFlowPage {
+  route: string;
+  title: string;
+  description: string;
+  requiresTrackingCode: boolean;
+}
+
 export interface LandingSection {
   id: string;
   title: string;
@@ -93,6 +100,63 @@ export const publicPages: PublicPage[] = [
   }
 ];
 
+export const receiverPublicFlow: ReceiverPublicFlowPage[] = [
+  {
+    route: "/r/:trackingCode",
+    title: "Receiver Tracking Landing",
+    description: "Receiver-safe delivery status entry for a secure tracking link.",
+    requiresTrackingCode: true
+  },
+  {
+    route: "/r/:trackingCode/verify-phone",
+    title: "Receiver Phone Challenge",
+    description: "Phone challenge before sensitive receiver tracking details are shown.",
+    requiresTrackingCode: true
+  },
+  {
+    route: "/r/:trackingCode/verify-otp",
+    title: "Receiver OTP Verification",
+    description: "OTP verification that creates a delivery-scoped receiver access token.",
+    requiresTrackingCode: true
+  },
+  {
+    route: "/r/:trackingCode/timeline",
+    title: "Receiver Tracking Timeline",
+    description: "Public-safe delivery timeline without internal handoff or payment data.",
+    requiresTrackingCode: true
+  },
+  {
+    route: "/r/:trackingCode/arrival",
+    title: "Receiver Arrival Instructions",
+    description: "Arrival and proof guidance for receiver handoff.",
+    requiresTrackingCode: true
+  },
+  {
+    route: "/r/:trackingCode/failed-attempt",
+    title: "Receiver Failed Attempt",
+    description: "Missed-delivery guidance without exposing courier notes or internal issue data.",
+    requiresTrackingCode: true
+  },
+  {
+    route: "/r/:trackingCode/refusal",
+    title: "Receiver Refusal Information",
+    description: "Receiver-safe refusal and review guidance.",
+    requiresTrackingCode: true
+  },
+  {
+    route: "/r/expired",
+    title: "Tracking Link Expired",
+    description: "Expired tracking-link recovery without exposing delivery data.",
+    requiresTrackingCode: false
+  },
+  {
+    route: "/r/access-denied",
+    title: "Tracking Access Denied",
+    description: "Access-denied state for mismatched receiver verification.",
+    requiresTrackingCode: false
+  }
+];
+
 export const landingSections: LandingSection[] = [
   {
     id: "hero",
@@ -131,6 +195,7 @@ export const publicSurface = {
   app: "web",
   implementationStatus: "contract_only",
   pages: publicPages,
+  receiverPublicFlow,
   landingSections,
   seoBaseline: {
     siteName: "Kra",

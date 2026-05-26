@@ -51,13 +51,28 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Tracking Entry
 - Maintenance
 
+## Receiver Public Flow
+
+- Secure Tracking Link Landing
+- Phone Verification Request
+- OTP Verification
+- Receiver Tracking Timeline
+- Arrival Instructions
+- Failed Attempt Information
+- Receiver Refusal Information
+- Tracking Link Expired
+- Tracking Access Denied
+
 ## Driver
 
 - Sign In
 - Dashboard
 - Assigned Run Detail
 - Manifest
+- Origin Pickup Scan
+- Custody Accepted
 - Route
+- Destination Arrival
 - Destination Handoff
 - Earnings
 - Support
@@ -70,7 +85,10 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Package Intake
 - Outbound Queue
 - Driver Assignment
+- Driver Pickup Scan Review
+- Inbound Queue
 - Destination Receipt
+- Final-Mile Queue
 - Final-Mile Assignment
 - Handoff Log
 - Reports
@@ -81,20 +99,29 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Sign In
 - Home
 - Assignment Detail
+- Accept Assignment Scan
+- Custody Accepted
+- Out For Delivery
 - Route
 - Proof Capture
 - Failed Attempt
+- Return To Station
+- Completed Jobs
 - Earnings
 
 ## Admin
 
 - Overview
 - Delivery Explorer
+- Delivery Detail
 - Package Detail
+- Custody Chain
+- Manual Custody Exception
 - Station Detail
 - User Detail
 - Finance Summary
 - Issue Queue
+- Audit Events
 - Settings
 
 ## Approved Launch Screen Inventory
@@ -126,6 +153,18 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `PublicTerms`
 - `PublicTrackingEntry`
 - `PublicMaintenance`
+
+### Receiver Public Flow
+
+- `ReceiverTrackingLanding`
+- `ReceiverPhoneChallenge`
+- `ReceiverOtpVerify`
+- `ReceiverTrackingTimeline`
+- `ReceiverArrivalInstructions`
+- `ReceiverFailedAttempt`
+- `ReceiverRefusalInfo`
+- `TrackingLinkExpired`
+- `TrackingAccessDenied`
 
 ### Sender
 
@@ -159,7 +198,10 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `DriverHome`
 - `AssignedRunDetail`
 - `DriverManifest`
+- `DriverOriginPickupScan`
+- `DriverCustodyAccepted`
 - `DriverRoute`
+- `DriverDestinationArrival`
 - `DriverDestinationHandoff`
 - `DriverEarnings`
 - `DriverSupport`
@@ -172,7 +214,10 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `StationPackageIntake`
 - `StationOutboundQueue`
 - `StationDriverAssignment`
+- `StationDriverPickupScan`
+- `StationInboundQueue`
 - `StationDestinationReceipt`
+- `StationFinalMileQueue`
 - `StationFinalMileAssignment`
 - `StationHandoffLog`
 - `StationReports`
@@ -183,20 +228,29 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `CourierSignIn`
 - `CourierHome`
 - `CourierAssignmentDetail`
+- `CourierAcceptAssignmentScan`
+- `CourierCustodyAccepted`
+- `CourierOutForDelivery`
 - `CourierRoute`
 - `CourierProofCapture`
 - `CourierFailedAttempt`
+- `CourierReturnToStation`
+- `CourierCompletedJobs`
 - `CourierEarnings`
 
 ### Admin
 
 - `AdminOverview`
 - `AdminDeliveryExplorer`
+- `AdminDeliveryDetail`
 - `AdminPackageDetail`
+- `AdminCustodyChain`
+- `AdminManualCustodyException`
 - `AdminStationDetail`
 - `AdminUserDetail`
 - `AdminFinanceSummary`
 - `AdminIssueQueue`
+- `AdminAuditEvents`
 - `AdminSettings`
 
 ## Required UI States
@@ -213,10 +267,14 @@ This file remains as the compact legacy screen summary. Claude Code should build
 
 - The launch screen set covers:
   - sender booking and payment
+  - public receiver tracking and verification
+  - sender tracking timeline
   - station intake and dispatch
   - driver transport
   - destination receipt
   - pickup and final-mile completion
+  - operational custody chain and handoff evidence
+  - admin custody audit and exception review
   - admin issue and payment review
 
 ## Baseline Status
