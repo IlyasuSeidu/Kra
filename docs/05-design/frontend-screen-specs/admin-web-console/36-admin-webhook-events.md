@@ -1,24 +1,27 @@
 # Admin Webhook Events Screen Spec
 
-## Metadata
-| Field | Value |
-| --- | --- |
-| Screen name | `AdminWebhookEvents` |
-| Route | `/admin/webhook-events` |
-| Test id | `screen-admin-webhook-events` |
-| Surface | Admin web console |
-| Backend coverage | `admin_webhook_events`; observes `ingest_mtn_momo_webhook` results |
-| Offline critical | No |
-| Required read role | `finance_admin` or `super_admin` with `review_reconciliation` capability |
-| Required action role | None on this screen |
-| Required states | `loading`, `ready`, `empty`, `filtered_empty`, `failed`, `refreshing`, `not_authorized`, `session_expired`, `api_error` |
-| Parent screens | `AdminOverview`, `AdminFinanceSummary`, `AdminPaymentReconciliation`, `AdminPaymentReconciliationDetail`, `AdminLaunchReadiness` |
-| Related screens | `AdminWebhookEventDetail`, `ReplayWebhookModal`, `AdminPaymentReconciliation`, `AdminPaymentReconciliationDetail`, `AdminFinanceSummary`, `AdminDeliveryDetail`, `AdminAuditEvents`, `AdminIssueQueue`, `AdminSlaBreachDashboard` |
+## Screen Contract
+
+| Field                | Value                                                                                                                                                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID            | `AdminWebhookEvents`                                                                                                                                                                                                              |
+| Route                | `/admin/webhook-events`                                                                                                                                                                                                           |
+| Primary test ID      | `screen-admin-webhook-events`                                                                                                                                                                                                     |
+| Surface              | Admin web console                                                                                                                                                                                                                 |
+| Backend coverage     | `admin_webhook_events`; observes `ingest_mtn_momo_webhook` results                                                                                                                                                                |
+| Offline critical     | No                                                                                                                                                                                                                                |
+| Required read role   | `finance_admin` or `super_admin` with `review_reconciliation` capability                                                                                                                                                          |
+| Required action role | None on this screen                                                                                                                                                                                                               |
+| Required states      | `loading`, `ready`, `empty`, `filtered_empty`, `failed`, `refreshing`, `not_authorized`, `session_expired`, `api_error`                                                                                                           |
+| Parent screens       | `AdminOverview`, `AdminFinanceSummary`, `AdminPaymentReconciliation`, `AdminPaymentReconciliationDetail`, `AdminLaunchReadiness`                                                                                                  |
+| Related screens      | `AdminWebhookEventDetail`, `ReplayWebhookModal`, `AdminPaymentReconciliation`, `AdminPaymentReconciliationDetail`, `AdminFinanceSummary`, `AdminDeliveryDetail`, `AdminAuditEvents`, `AdminIssueQueue`, `AdminSlaBreachDashboard` |
 
 ## Purpose
+
 `AdminWebhookEvents` is the finance and platform observability surface for inbound provider payment callbacks. It lets authorized admins monitor verified MTN MoMo webhook records, detect unmatched payment references, find duplicate callbacks, isolate amount or state conflicts, and route finance or engineering review to the right downstream screen.
 
 The screen should answer:
+
 - `Are provider callbacks being received?`
 - `Which callbacks are stuck in manual review?`
 - `Which callbacks cannot be matched to a Kra payment?`
@@ -32,9 +35,11 @@ The screen should answer:
 This screen is a read-only monitoring and triage surface. It must not replay a webhook directly, edit provider payloads, call the inbound webhook endpoint, expose secrets, mutate payment status, or render raw provider payload values in the list.
 
 ## Strategic Role
+
 Webhook observability is a Tier 0 trust function for a delivery network that depends on mobile money. If the provider callback is missed, delayed, duplicated, or conflicts with Kra's payment record, the platform can block dispatch incorrectly, release a package without confirmed payment, or force finance into manual follow-up.
 
 The list must behave like a payment operations radar. It should surface only the signals needed for fast triage:
+
 - receipt status
 - processing status
 - provider reference
@@ -48,17 +53,21 @@ The list must behave like a payment operations radar. It should surface only the
 The UI should avoid provider-console sprawl. Finance needs a clear queue, not a raw event dump.
 
 ## Audience
+
 Primary users:
+
 - finance admins clearing reconciliation blockers
 - super admins checking launch readiness and payment integrity
 - platform operators checking callback health during incidents
 
 Secondary users:
+
 - backend engineers investigating webhook ingestion behavior
 - QA reviewers validating callback states
 - support leads checking whether a customer payment is delayed by provider signal gaps
 
 Non-users:
+
 - senders
 - receivers
 - drivers
@@ -68,21 +77,26 @@ Non-users:
 - unauthenticated provider systems
 
 ## Backend Reality
+
 Primary endpoint:
+
 ```http
 GET /v1/admin/webhook-events
 ```
 
 Operation:
+
 ```text
 admin_webhook_events
 ```
 
 Supported query parameters:
+
 - `processingStatus`
 - `limit`
 
 Supported processing statuses:
+
 - `received`
 - `processed`
 - `duplicate`
@@ -91,32 +105,39 @@ Supported processing statuses:
 - `manual_review`
 
 Supported event types:
+
 - `payment.pending`
 - `payment.confirmed`
 - `payment.failed`
 
 Provider:
+
 - `mtn_momo`
 
 Currency:
+
 - `GHS`
 
 Limit:
+
 - positive integer
 - maximum `100`
 - defaults to `50`
 
 Sort:
+
 - newest first by `receivedAt`
 - no cursor pagination exists in the current backend
 
 Auth behavior:
+
 - route is admin-scoped
 - route requires `review_reconciliation`
 - current capability matrix grants this to `finance_admin` and `super_admin`
 - other admin roles must be routed to not-authorized state
 
 Response:
+
 ```json
 {
   "generatedAt": "2026-05-16T08:20:00.000Z",
@@ -141,6 +162,7 @@ Response:
 ```
 
 Current backend limits:
+
 - No single-event read endpoint exists yet.
 - No server-side provider filter exists.
 - No server-side event type filter exists.
@@ -156,11 +178,13 @@ Current backend limits:
 - No aggregate count object is returned.
 
 Inbound callback endpoint observed by this screen:
+
 ```http
 POST /v1/webhooks/payments/mtn-momo
 ```
 
 Inbound callback rules:
+
 - provider callbacks use webhook auth, not Firebase bearer auth
 - signature validation happens before the callback is trusted
 - invalid signatures return an internal error path and must not appear as trusted event rows
@@ -170,13 +194,16 @@ Inbound callback rules:
 - amount conflicts and final-state conflicts enter manual review
 
 Therefore:
+
 - The list shows trusted stored records only.
 - The list must not display unverified callback attempts as if they were trusted webhook events.
 - The list must not let admins create or alter webhook records.
 - Replay UX belongs behind explicit future tooling, not this list.
 
 ## Source References
+
 External references used for this screen:
+
 - [MTN MoMo Callback documentation](https://momoapi.mtn.com/api-documentation/callback/): supports the provider reality that MTN MoMo payment operations are asynchronous and callbacks communicate final transaction results.
 - [MTN MoMo callback setup details](https://momoapi.mtn.com/content/html_widgets/a8e43.html): supports callback host registration, callback URL behavior, production HTTPS requirements, and the need for fallback status checks when callbacks are not received.
 - [Stripe Webhooks documentation](https://docs.stripe.com/webhooks): supports general webhook operating principles for asynchronous payment events, endpoint security, and fast acknowledgement before heavier processing.
@@ -186,6 +213,7 @@ External references used for this screen:
 - [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html): supports redaction of sensitive operational data and safe audit-oriented event presentation.
 
 Local references:
+
 - `docs/07-api/api-contracts.md`
 - `docs/07-api/webhooks-and-event-payloads.md`
 - `docs/07-api/error-codes.md`
@@ -199,9 +227,11 @@ Local references:
 - `services/api/src/payment-webhooks.ts`
 
 ## Design Thesis
+
 Design this as a high-confidence webhook operations ledger: dense, quiet, timestamp-rich, and exception-first. The screen should feel like an elite payments reliability console, with the strongest visual weight on unresolved financial risk rather than decorative charts.
 
 Visual direction:
+
 - light command-center background
 - narrow status summary strip
 - table-first information density
@@ -214,12 +244,15 @@ Visual direction:
 - no raw payload panel on the list
 
 Restraint rule:
+
 - Do not turn the page into a provider diagnostics console. Show only fields returned by `admin_webhook_events` and only actions supported by current routes.
 
 ## Product Principle
+
 The screen must protect payment correctness before speed. A provider event that cannot be safely reconciled should be loud, but a processed or duplicate event should stay quiet.
 
 Priority order:
+
 1. Manual-review callbacks.
 2. Unmatched provider references.
 3. Recently received unprocessed rows.
@@ -228,7 +261,9 @@ Priority order:
 6. Duplicate callbacks.
 
 ## Information Architecture
+
 Desktop structure:
+
 - Top admin shell and breadcrumb.
 - Page header with title, freshness, and refresh action.
 - Risk summary strip.
@@ -240,6 +275,7 @@ Desktop structure:
 - Footer notes for backend limits and safe handling.
 
 Mobile and narrow tablet structure:
+
 - Header stack.
 - Risk summary cards in two-column or single-column flow.
 - Filter drawer or stacked select controls.
@@ -248,16 +284,20 @@ Mobile and narrow tablet structure:
 - Secondary details collapse behind disclosure.
 
 ## Routing
+
 Primary route:
+
 ```text
 /admin/webhook-events
 ```
 
 Supported query state:
+
 - `processingStatus`
 - `limit`
 
 Canonical examples:
+
 ```text
 /admin/webhook-events
 /admin/webhook-events?processingStatus=manual_review
@@ -266,6 +306,7 @@ Canonical examples:
 ```
 
 Deep links from other screens:
+
 - `AdminOverview` manual-review webhook count -> `/admin/webhook-events?processingStatus=manual_review`
 - `AdminOverview` unmatched webhook count -> `/admin/webhook-events?processingStatus=unmatched`
 - `AdminFinanceSummary` webhook alert -> `/admin/webhook-events?processingStatus=manual_review`
@@ -274,6 +315,7 @@ Deep links from other screens:
 - `AdminLaunchReadiness` payment callback blocker -> `/admin/webhook-events?processingStatus=manual_review`
 
 Outbound route targets:
+
 - row `View event` -> `/admin/webhook-events/:eventId` if detail route is enabled
 - `Open payment reconciliation` -> `/admin/payment-reconciliation`
 - `Open payment detail context` -> `/admin/payment-reconciliation/:paymentId` only if that route exists in the implementation
@@ -283,25 +325,28 @@ Outbound route targets:
 Until a single-event API is added, the detail route must receive row context from navigation state, query cache, or a list-backed lookup. Direct opening of `/admin/webhook-events/:eventId` may show limited context.
 
 ## Data Contract Mapping
-| API field | UI label | Treatment |
-| --- | --- | --- |
-| `generatedAt` | Last refreshed | Header freshness timestamp |
-| `events[].eventId` | Event ID | Monospace primary row key |
-| `events[].provider` | Provider | Display `MTN MoMo` |
-| `events[].providerEventId` | Provider event ID | Optional, collapsed on narrow layouts |
-| `events[].providerReference` | Provider reference | Monospace, copyable if policy allows |
-| `events[].eventType` | Event type | Status-colored payment event chip |
-| `events[].amountGhs` | Amount | Format as `GHS 55.00` |
-| `events[].currency` | Currency | Must display only if not implied by amount |
-| `events[].occurredAt` | Provider time | Absolute timestamp with relative age |
-| `events[].receivedAt` | Received | Primary timing column |
-| `events[].processingStatus` | Processing status | Main status chip and row priority driver |
-| `events[].matchedPaymentId` | Payment ID | Monospace link if route exists |
-| `events[].matchedDeliveryId` | Delivery ID | Monospace link to delivery detail |
-| `events[].processingNotes` | Review note | Humanized internal reason |
+
+| API field                    | UI label           | Treatment                                  |
+| ---------------------------- | ------------------ | ------------------------------------------ |
+| `generatedAt`                | Last refreshed     | Header freshness timestamp                 |
+| `events[].eventId`           | Event ID           | Monospace primary row key                  |
+| `events[].provider`          | Provider           | Display `MTN MoMo`                         |
+| `events[].providerEventId`   | Provider event ID  | Optional, collapsed on narrow layouts      |
+| `events[].providerReference` | Provider reference | Monospace, copyable if policy allows       |
+| `events[].eventType`         | Event type         | Status-colored payment event chip          |
+| `events[].amountGhs`         | Amount             | Format as `GHS 55.00`                      |
+| `events[].currency`          | Currency           | Must display only if not implied by amount |
+| `events[].occurredAt`        | Provider time      | Absolute timestamp with relative age       |
+| `events[].receivedAt`        | Received           | Primary timing column                      |
+| `events[].processingStatus`  | Processing status  | Main status chip and row priority driver   |
+| `events[].matchedPaymentId`  | Payment ID         | Monospace link if route exists             |
+| `events[].matchedDeliveryId` | Delivery ID        | Monospace link to delivery detail          |
+| `events[].processingNotes`   | Review note        | Humanized internal reason                  |
 
 ## Derived Fields
+
 The frontend may derive:
+
 - total rows returned
 - count by `processingStatus`
 - count by `eventType`
@@ -314,6 +359,7 @@ The frontend may derive:
 - risk severity from `processingStatus`
 
 The frontend must not derive:
+
 - payment state mutation history not returned by the API
 - provider authenticity beyond the fact that the backend stored trusted records
 - final payment truth from webhook row alone
@@ -322,162 +368,210 @@ The frontend must not derive:
 - provider account health
 
 ## Status Taxonomy
+
 ### `received`
+
 Meaning:
+
 - The event has been durably stored but has not yet reached a final processing state.
 
 UI treatment:
+
 - neutral blue chip
 - row stays visible near top when recent
 - label `Received`
 - helper `Stored and awaiting processing result.`
 
 Operator meaning:
+
 - Watch if it remains recent.
 - Escalate only if stale beyond internal processing expectations.
 
 ### `processed`
+
 Meaning:
+
 - The callback matched a payment and the backend applied or confirmed the expected payment state.
 
 UI treatment:
+
 - quiet green chip
 - row weight low
 - label `Processed`
 - helper `Matched and processed.`
 
 Operator meaning:
+
 - No action required.
 - Available for audit trail and timeline checks.
 
 ### `duplicate`
+
 Meaning:
+
 - The callback repeated an already seen provider reference and event type.
 
 UI treatment:
+
 - muted gray chip
 - row weight low
 - label `Duplicate`
 - helper `Repeat callback ignored safely.`
 
 Operator meaning:
+
 - No finance action required unless duplicates spike.
 
 ### `unmatched`
+
 Meaning:
+
 - The callback was verified but did not match a known payment reference.
 
 UI treatment:
+
 - amber chip
 - row weight high
 - label `Unmatched`
 - helper `Verified provider reference did not match a Kra payment.`
 
 Operator meaning:
+
 - Finance must compare provider reference against payment reconciliation records.
 - Engineering may investigate callback mapping or provider reference creation.
 
 ### `accepted_pending`
+
 Meaning:
+
 - The callback indicates pending payment state and matched an existing payment.
 
 UI treatment:
+
 - blue-gray chip
 - row weight medium
 - label `Pending accepted`
 - helper `Provider still reports pending payment.`
 
 Operator meaning:
+
 - Watch for follow-up confirmed or failed callback.
 - Do not dispatch as paid on this event alone.
 
 ### `manual_review`
+
 Meaning:
+
 - The callback matched a Kra payment but conflicts with amount or final payment state.
 
 UI treatment:
+
 - strong red chip
 - row weight highest
 - label `Manual review`
 - helper from `processingNotes`.
 
 Operator meaning:
+
 - Finance review is required.
 - Delivery and payment records must be inspected before customer-facing decisions.
 
 ## Event Type Taxonomy
+
 ### `payment.pending`
+
 Display:
+
 - `Payment pending`
 
 Meaning:
+
 - Provider has not finished payment confirmation.
 
 UI tone:
+
 - neutral
 
 Primary concern:
+
 - delayed payment finality
 
 ### `payment.confirmed`
+
 Display:
+
 - `Payment confirmed`
 
 Meaning:
+
 - Provider reports successful payment.
 
 UI tone:
+
 - positive when processed
 - warning if unmatched or manual review
 
 Primary concern:
+
 - dispatch gate safety
 
 ### `payment.failed`
+
 Display:
+
 - `Payment failed`
 
 Meaning:
+
 - Provider reports failed payment.
 
 UI tone:
+
 - negative
 
 Primary concern:
+
 - avoid dispatch or settlement assumptions
 
 ## Review Reason Mapping
+
 `processingNotes` should be humanized without losing the internal code.
 
-| Note | Admin copy | Severity |
-| --- | --- | --- |
-| `provider_amount_mismatch` | Provider amount does not match Kra payment amount. | Critical |
-| `conflicting_final_payment_status` | Provider event conflicts with an already final payment state. | Critical |
-| missing | No processing note returned. | Contextual |
+| Note                               | Admin copy                                                    | Severity   |
+| ---------------------------------- | ------------------------------------------------------------- | ---------- |
+| `provider_amount_mismatch`         | Provider amount does not match Kra payment amount.            | Critical   |
+| `conflicting_final_payment_status` | Provider event conflicts with an already final payment state. | Critical   |
+| missing                            | No processing note returned.                                  | Contextual |
 
 If the note is unknown:
+
 - Show the raw short code exactly as returned.
 - Prefix with `Review note:`.
 - Do not infer a cause.
 - Route to detail or audit context.
 
 ## Risk Classification
+
 Critical:
+
 - `manual_review`
 - `unmatched` with event type `payment.confirmed`
 - stale `received` row older than the internal processing window
 
 Warning:
+
 - `unmatched` with event type `payment.pending`
 - `accepted_pending` older than payment confirmation expectation
 - high duplicate volume within returned rows
 
 Normal:
+
 - `processed`
 - `duplicate`
 - recent `received`
 
 Risk summary cards:
+
 - `Manual review`
 - `Unmatched`
 - `Received`
@@ -488,7 +582,9 @@ Risk summary cards:
 The summary strip uses returned rows only. It must not claim global totals because the endpoint returns a bounded list.
 
 ## Header
+
 Desktop header content:
+
 - Breadcrumb: `Admin / Finance / Webhook events`
 - Eyebrow: `Payment provider callbacks`
 - Title: `Webhook events`
@@ -498,18 +594,22 @@ Desktop header content:
 - Secondary link: `Payment reconciliation`
 
 Header rules:
+
 - The title remains stable across filters.
 - The active filter appears below the header, not inside the title.
 - Refresh must not clear filters.
 - Refresh must announce result count changes.
 
 Header warning banner:
+
 - Show when `manual_review` count in returned rows is greater than `0`.
 - Copy: `Manual review required for provider callbacks. Review payment and delivery records before changing customer or dispatch decisions.`
 - CTA: `Open reconciliation`
 
 ## Filter Bar
+
 Controls:
+
 - Processing status select
 - Limit select
 - Text filter on returned rows
@@ -518,10 +618,12 @@ Controls:
 - Refresh button
 
 Server-backed filters:
+
 - `processingStatus`
 - `limit`
 
 Client-side filters:
+
 - provider reference
 - event ID
 - provider event ID
@@ -531,6 +633,7 @@ Client-side filters:
 - review note
 
 Filter rules:
+
 - Server filters update the URL.
 - Client filters do not call unsupported API parameters.
 - Changing server filters resets client text filter only if the current value returns zero rows and the user chooses `Clear local filter`.
@@ -539,6 +642,7 @@ Filter rules:
 - Processing status default is all statuses.
 
 Processing status labels:
+
 - `All statuses`
 - `Received`
 - `Processed`
@@ -548,25 +652,31 @@ Processing status labels:
 - `Manual review`
 
 Event type labels:
+
 - `All event types`
 - `Payment pending`
 - `Payment confirmed`
 - `Payment failed`
 
 ## Active Filter Summary
+
 Show a compact line above the table:
+
 - `Showing 50 most recent webhook events`
 - `Filtered to manual review`
 - `Local search: MTN-REF-4010`
 - `3 events shown after local filters`
 
 Rules:
+
 - Include the word `returned` when explaining endpoint limits: `50 returned by the API`.
 - Do not say `all events` unless limit reaches a documented total, which does not exist today.
 - If local filters reduce rows, show both server count and visible count.
 
 ## Summary Strip
+
 Cards:
+
 - Manual review count
 - Unmatched count
 - Received count
@@ -575,22 +685,26 @@ Cards:
 - Latest received timestamp
 
 Card content:
+
 - label
 - value
 - short meaning
 - optional route/filter action
 
 Examples:
+
 - `Manual review` -> `2` -> `Conflicting payment signals`
 - `Unmatched` -> `4` -> `Provider references not matched`
 - `Latest received` -> `2m ago` -> `MTN MoMo callback`
 
 Card action rules:
+
 - Clicking a status card applies that server filter if supported.
 - Latest received card does not filter; it scrolls to the first row.
 - Cards are not links if count is zero.
 
 Visual rules:
+
 - manual review card uses strong red left rail
 - unmatched card uses amber left rail
 - received card uses blue left rail
@@ -598,12 +712,15 @@ Visual rules:
 - duplicate card uses muted neutral text
 
 ## Primary Table
+
 Table caption:
+
 ```text
 Verified MTN MoMo webhook events returned by the admin webhook events endpoint.
 ```
 
 Desktop columns:
+
 - Status
 - Event
 - Provider reference
@@ -614,6 +731,7 @@ Desktop columns:
 - Actions
 
 Column details:
+
 - Status: processing status chip plus event type chip.
 - Event: event ID and optional provider event ID.
 - Provider reference: monospace provider reference.
@@ -624,6 +742,7 @@ Column details:
 - Actions: view event, open reconciliation, open delivery.
 
 Table density:
+
 - Row height target: compact but readable.
 - Important identifiers are monospace.
 - Status chips use text labels, not color alone.
@@ -631,21 +750,26 @@ Table density:
 - Actions align right.
 
 ## Row Priority
+
 Sort returned rows remain in backend order. Do not reorder the table client-side by severity unless the user explicitly sorts locally.
 
 Visual priority still applies:
+
 - manual-review rows receive a red severity rail
 - unmatched rows receive an amber severity rail
 - stale received rows receive a blue warning rail
 - processed and duplicate rows remain plain
 
 If local sort is later added:
+
 - default remains backend order
 - sorted state must be clearly announced
 - sorting must not imply data outside the returned list
 
 ## Row Anatomy
+
 Each row should include:
+
 - processing status chip
 - event type chip
 - event ID
@@ -659,6 +783,7 @@ Each row should include:
 - primary action
 
 Manual-review row expanded detail:
+
 - status explanation
 - processing note humanized copy
 - matched payment ID
@@ -667,6 +792,7 @@ Manual-review row expanded detail:
 - recommended next step
 
 Unmatched row expanded detail:
+
 - provider reference
 - provider event ID if present
 - event type
@@ -675,24 +801,29 @@ Unmatched row expanded detail:
 - recommended reconciliation search
 
 Duplicate row expanded detail:
+
 - repeated event type
 - provider reference
 - received time
 - note that no second payment mutation should be inferred
 
 ## Row Actions
+
 Primary actions:
+
 - `View event`
 - `Open reconciliation`
 - `Open delivery`
 
 Secondary actions:
+
 - `Copy event ID`
 - `Copy provider reference`
 - `Copy payment ID`
 - `Copy delivery ID`
 
 Action rules:
+
 - `View event` opens `/admin/webhook-events/:eventId`.
 - If detail route cannot load directly, pass row context through navigation state or query cache.
 - `Open reconciliation` opens `/admin/payment-reconciliation`.
@@ -703,6 +834,7 @@ Action rules:
 - No action changes payment, refund, or delivery state.
 
 Disabled or omitted actions:
+
 - omit `Replay webhook`
 - omit `Mark processed`
 - omit `Ignore`
@@ -712,87 +844,110 @@ Disabled or omitted actions:
 - omit `Change payment status`
 
 ## Empty State
+
 Trigger:
+
 - API returns `events: []` with no processing-status filter.
 
 Copy:
+
 ```text
 No webhook events have been returned yet.
 Verified provider callbacks will appear here after MTN MoMo sends payment events and the backend stores them.
 ```
 
 Actions:
+
 - `Refresh`
 - `Open payment reconciliation`
 - `Review payment setup`
 
 Rules:
+
 - Do not imply provider callback setup is broken.
 - Mention that this is based on the current returned list only.
 - If launch readiness requires callback proof, link to launch readiness.
 
 ## Filtered Empty State
+
 Trigger:
+
 - API returns `events: []` for a selected processing status.
 
 Copy examples:
+
 - `No manual-review webhook events returned.`
 - `No unmatched webhook events returned.`
 - `No duplicate webhook events returned.`
 
 Actions:
+
 - `Clear status filter`
 - `Refresh`
 - `Open all webhook events`
 
 Rules:
+
 - Keep the state positive for `manual_review` and `unmatched`.
 - Do not claim there are zero across all time.
 - State that the backend returned no rows for the current filter.
 
 ## Local Search Empty State
+
 Trigger:
+
 - API returned rows but local client filters hide all rows.
 
 Copy:
+
 ```text
 No returned webhook events match the local search.
 Clear the local filter or change the server status filter.
 ```
 
 Actions:
+
 - `Clear local filter`
 - `Clear all filters`
 
 Rules:
+
 - Keep the API result count visible.
 - Do not call backend with unsupported search parameters.
 
 ## Loading State
+
 Trigger:
+
 - first request pending
 
 Layout:
+
 - page header skeleton
 - summary strip skeleton
 - table skeleton with 8 rows
 - no spinner-only screen
 
 Copy:
+
 ```text
 Loading webhook events...
 ```
 
 Rules:
+
 - Keep route shell visible.
 - Avoid layout shift between loading and ready.
 - Do not show stale rows during first load unless cache policy says previous data is safe.
 
 ## Refreshing State
+
 Trigger:
+
 - user hits refresh or query refetches in background
 
 Behavior:
+
 - keep current rows visible
 - show inline `Refreshing...` state beside the refresh button
 - disable only duplicate refresh clicks
@@ -800,39 +955,47 @@ Behavior:
 - announce updated count after completion
 
 Copy:
+
 ```text
 Webhook events refreshed. 50 rows returned.
 ```
 
 Rules:
+
 - Do not clear filters.
 - Do not clear expanded rows unless the row no longer exists.
 - If a manual-review count changes, update the summary strip and banner.
 
 ## Failed State
+
 Trigger:
+
 - request fails
 - network unavailable
 - backend returns non-success status
 
 Layout:
+
 - retain header and filters
 - show error panel where the table would appear
 - include retry action
 - include safe support copy
 
 Copy:
+
 ```text
 Webhook events could not be loaded.
 Retry, or check admin access and service health if the problem continues.
 ```
 
 Actions:
+
 - `Retry`
 - `Open finance summary`
 - `Open status dashboard` if a platform status route exists
 
 Rules:
+
 - Do not show provider secrets.
 - Do not expose raw backend stack traces.
 - Use known API error codes if returned.
@@ -840,63 +1003,78 @@ Rules:
 - For `401`, route to session-expired state.
 
 ## Not Authorized State
+
 Trigger:
+
 - authenticated user lacks `review_reconciliation`
 
 Copy:
+
 ```text
 You do not have permission to review payment webhook events.
 Ask a super admin for reconciliation access if this is required for your role.
 ```
 
 Rules:
+
 - Do not render rows from cache after authorization failure.
 - Do not render provider references.
 - Provide route back to admin overview.
 
 Visible actions:
+
 - `Back to admin overview`
 - `Open support`
 
 Hidden actions:
+
 - refresh
 - copy identifiers
 - row actions
 
 ## Session Expired State
+
 Trigger:
+
 - `401`
 - auth token expired
 - auth verifier rejects user session
 
 Copy:
+
 ```text
 Your admin session expired.
 Sign in again to view payment webhook events.
 ```
 
 Actions:
+
 - `Sign in`
 
 Rules:
+
 - Clear sensitive cached rows from visible UI.
 - Preserve intended return route after sign-in.
 
 ## API Error Mapping
-| API code | UI state | Copy | Action |
-| --- | --- | --- | --- |
-| `FORBIDDEN` | `not_authorized` | `You do not have permission to review payment webhook events.` | `Back to admin overview` |
-| `UNAUTHORIZED` | `session_expired` | `Your admin session expired.` | `Sign in` |
-| `VALIDATION_ERROR` | `api_error` | `The webhook event filter is invalid.` | `Clear filters` |
-| `PROVIDER_TIMEOUT` | `api_error` | `The external service took too long to respond.` | `Retry` |
-| `UNKNOWN_INTERNAL_ERROR` | `api_error` | `Webhook events could not be loaded.` | `Retry` |
+
+| API code                 | UI state          | Copy                                                           | Action                   |
+| ------------------------ | ----------------- | -------------------------------------------------------------- | ------------------------ |
+| `FORBIDDEN`              | `not_authorized`  | `You do not have permission to review payment webhook events.` | `Back to admin overview` |
+| `UNAUTHORIZED`           | `session_expired` | `Your admin session expired.`                                  | `Sign in`                |
+| `VALIDATION_ERROR`       | `api_error`       | `The webhook event filter is invalid.`                         | `Clear filters`          |
+| `PROVIDER_TIMEOUT`       | `api_error`       | `The external service took too long to respond.`               | `Retry`                  |
+| `UNKNOWN_INTERNAL_ERROR` | `api_error`       | `Webhook events could not be loaded.`                          | `Retry`                  |
 
 Inbound-only errors:
+
 - `WEBHOOK_SIGNATURE_INVALID` is not a list-page API error.
 - It may appear in audit or observability surfaces, but trusted event rows are written only after verification.
 
 ## Privacy And Security
+
 Sensitive data rules:
+
 - Do not show raw webhook payload in the list.
 - Do not show provider signature headers.
 - Do not show callback secrets.
@@ -907,6 +1085,7 @@ Sensitive data rules:
 - Do not infer customer phone numbers or wallet identifiers from provider references.
 
 Allowed identifiers:
+
 - event ID
 - provider event ID if returned
 - provider reference
@@ -914,16 +1093,20 @@ Allowed identifiers:
 - delivery ID
 
 Identifier display:
+
 - Use monospace.
 - Support copy only for fields returned by the API.
 - Copy success message must name the field, not repeat the value.
 
 Security banner:
+
 - If the page is viewed by `super_admin`, do not expose extra secrets.
 - Super admin sees the same safe list as finance admin.
 
 ## Accessibility
+
 Required:
+
 - one `h1`: `Webhook events`
 - table caption describing returned MTN MoMo webhook events
 - column headers with `scope="col"`
@@ -936,39 +1119,47 @@ Required:
 - skip link from header to table
 
 Status messages:
+
 - Loading completion must announce returned row count.
 - Refresh completion must announce updated row count.
 - Filter changes must announce visible row count.
 - Errors must be announced with assertive urgency only when they block the table.
 
 Focus rules:
+
 - Changing a filter keeps focus on the changed control.
 - Retry keeps focus on retry until results render, then announces status.
 - Opening row details moves focus to the detail screen heading.
 - Copy actions keep focus on the copied field action and announce success.
 
 Reduced motion:
+
 - Summary card changes fade only if motion is allowed.
 - Row insertions should avoid sliding motion.
 - Use `prefers-reduced-motion` to remove transitions.
 
 ## Responsive Behavior
+
 Desktop, `>= 1200px`:
+
 - Full table layout.
 - Sticky filter bar under header if admin shell supports sticky content.
 - Summary strip remains single row.
 
 Laptop, `900px - 1199px`:
+
 - Hide provider event ID into row disclosure.
 - Keep status, event ID, reference, amount, timing, and actions visible.
 - Actions can collapse into a row menu.
 
 Tablet, `700px - 899px`:
+
 - Use condensed table with horizontal scroll only if card layout would reduce scan speed.
 - Keep table caption and headers accessible.
 - Summary strip wraps to two rows.
 
 Mobile, `< 700px`:
+
 - Switch to event cards.
 - Cards show status, event ID, provider reference, amount, timing, and primary action.
 - Secondary identifiers live inside disclosure.
@@ -976,6 +1167,7 @@ Mobile, `< 700px`:
 - Refresh and clear filters remain thumb-reachable.
 
 Mobile card order:
+
 - status chip
 - event ID
 - event type
@@ -986,7 +1178,9 @@ Mobile card order:
 - primary action
 
 ## Visual Design
+
 Color roles:
+
 - critical red for manual review
 - amber for unmatched
 - blue for received and pending accepted
@@ -996,6 +1190,7 @@ Color roles:
 - pale surface for summary cards
 
 Typography:
+
 - Screen title large and calm.
 - Identifiers use monospace.
 - Table body uses compact but readable type.
@@ -1003,19 +1198,23 @@ Typography:
 - Amounts align consistently.
 
 Spacing:
+
 - Header has generous vertical breathing room.
 - Summary cards align to the table grid.
 - Filter bar is compact and not taller than the table header.
 - Row vertical padding stays consistent across statuses.
 
 Motion:
+
 - Refresh button shows subtle progress state.
 - Summary count changes can cross-fade.
 - Error panel appears without dramatic motion.
 - No constant animation.
 
 ## Copy System
+
 Tone:
+
 - precise
 - calm
 - finance-safe
@@ -1023,6 +1222,7 @@ Tone:
 - non-accusatory
 
 Preferred words:
+
 - `verified callback`
 - `provider reference`
 - `manual review`
@@ -1033,6 +1233,7 @@ Preferred words:
 - `matched delivery`
 
 Avoid:
+
 - blaming provider
 - implying fraud without evidence
 - saying the callback is missing unless backend proves it
@@ -1040,6 +1241,7 @@ Avoid:
 - exposing internal secrets
 
 Button copy:
+
 - `Refresh`
 - `View event`
 - `Open reconciliation`
@@ -1049,31 +1251,37 @@ Button copy:
 - `Copy provider reference`
 
 Banner copy:
+
 ```text
 Manual review required for provider callbacks.
 Review payment and delivery records before changing customer or dispatch decisions.
 ```
 
 ## Interaction Details
+
 Refresh:
+
 - calls `GET /v1/admin/webhook-events` with current server filters
 - does not change URL
 - keeps rows visible during fetch
 - announces completion
 
 Processing status filter:
+
 - updates URL
 - calls backend
 - clears expanded row state only if no longer present
 - announces new returned row count
 
 Limit filter:
+
 - updates URL
 - calls backend
 - allowed values are `25`, `50`, and `100`
 - default display is `50`
 
 Local search:
+
 - filters returned rows only
 - search fields include event ID, provider event ID, provider reference, payment ID, delivery ID, event type, processing status, and review note
 - minimum useful input is one character
@@ -1081,27 +1289,33 @@ Local search:
 - preserve original API row order
 
 Row expansion:
+
 - optional on desktop
 - recommended on tablet and mobile
 - must not fetch unsupported detail endpoint
 - must not expose raw payload
 
 Copy action:
+
 - writes text to clipboard
 - shows transient success message
 - does not send copied value to analytics
 
 ## Data Fetching Contract
+
 Hook:
+
 ```text
 useAdminWebhookEventsQuery
 ```
 
 Inputs:
+
 - `processingStatus?: WebhookProcessingStatus`
 - `limit?: number`
 
 Output:
+
 - `generatedAt`
 - `events`
 - loading state
@@ -1109,24 +1323,29 @@ Output:
 - error state
 
 Cache keys:
+
 - include `processingStatus`
 - include `limit`
 - do not include local search
 - do not include event type filter unless it becomes server-backed later
 
 Freshness:
+
 - show data age from `generatedAt`
 - consider background refresh if admin shell policy supports it
 - do not auto-refresh faster than the platform can tolerate
 - manual refresh must always be available
 
 No-store:
+
 - backend sets no-store for admin reads
 - frontend must not persist sensitive webhook rows in local storage
 - session memory cache is acceptable if cleared on sign-out or authorization failure
 
 ## Observability
+
 Frontend events:
+
 - `admin_webhook_events_viewed`
 - `admin_webhook_events_refreshed`
 - `admin_webhook_events_status_filter_changed`
@@ -1137,6 +1356,7 @@ Frontend events:
 - `admin_webhook_events_error_seen`
 
 Allowed analytics fields:
+
 - processing status filter
 - limit
 - visible row count
@@ -1147,6 +1367,7 @@ Allowed analytics fields:
 - has unmatched rows
 
 Forbidden analytics fields:
+
 - provider reference values
 - provider event ID values
 - payment ID values
@@ -1157,17 +1378,21 @@ Forbidden analytics fields:
 - customer wallet data
 
 Operational logs:
+
 - UI should rely on backend logs for ingestion details.
 - Frontend logs should capture UI failure modes only.
 - Do not duplicate sensitive provider payloads in browser logs.
 
 ## Performance
+
 Target:
+
 - first meaningful paint under normal admin shell budget
 - table interaction responsive for 100 rows
 - local filtering under 100 ms for returned rows
 
 Rules:
+
 - Avoid heavy chart libraries.
 - Avoid rendering raw JSON payloads.
 - Virtualization is not required at 100 rows.
@@ -1175,7 +1400,9 @@ Rules:
 - Keep row components simple and semantic.
 
 ## Reliability
+
 Expected failure modes:
+
 - expired admin session
 - missing reconciliation capability
 - network failure
@@ -1184,6 +1411,7 @@ Expected failure modes:
 - empty result during pilot before callbacks arrive
 
 Reliability rules:
+
 - keep the route usable when only one status filter fails by allowing clear filters
 - preserve filter URL after retry
 - never change payment interpretation on frontend alone
@@ -1191,7 +1419,9 @@ Reliability rules:
 - do not hide manual-review rows behind secondary tabs
 
 ## Edge Cases
+
 Handle:
+
 - missing `providerEventId`
 - missing `matchedPaymentId`
 - missing `matchedDeliveryId`
@@ -1205,65 +1435,76 @@ Handle:
 - repeated event IDs not expected but should not break render
 
 Clock skew:
+
 - If provider occurred time is after received time, show both timestamps and do not compute a negative lag badge.
 - Copy: `Provider timestamp is later than received timestamp.`
 
 Unsupported status query:
+
 - Clear invalid value before calling API if router validation can do so safely.
 - If API returns validation error, show `The webhook event filter is invalid.`
 
 ## State Matrix
-| State | Trigger | Primary UI | User action |
-| --- | --- | --- | --- |
-| `loading` | first fetch pending | skeleton table | wait |
-| `ready` | rows returned | summary and table | triage |
-| `empty` | no rows, no filter | empty panel | refresh |
-| `filtered_empty` | no rows for status | filtered empty panel | clear filter |
-| `failed` | request failure | error panel | retry |
-| `refreshing` | background refetch | retained rows plus progress | wait or continue |
-| `not_authorized` | 403 | permission panel | return |
-| `session_expired` | 401 | sign-in panel | sign in |
-| `api_error` | validation or server error | safe error panel | clear or retry |
+
+| State             | Trigger                    | Primary UI                  | User action      |
+| ----------------- | -------------------------- | --------------------------- | ---------------- |
+| `loading`         | first fetch pending        | skeleton table              | wait             |
+| `ready`           | rows returned              | summary and table           | triage           |
+| `empty`           | no rows, no filter         | empty panel                 | refresh          |
+| `filtered_empty`  | no rows for status         | filtered empty panel        | clear filter     |
+| `failed`          | request failure            | error panel                 | retry            |
+| `refreshing`      | background refetch         | retained rows plus progress | wait or continue |
+| `not_authorized`  | 403                        | permission panel            | return           |
+| `session_expired` | 401                        | sign-in panel               | sign in          |
+| `api_error`       | validation or server error | safe error panel            | clear or retry   |
 
 ## Navigation Contracts
+
 From row with matched delivery:
+
 - route: `/admin/deliveries/:deliveryId`
 - preserve return path: `/admin/webhook-events?...`
 - label: `Open delivery`
 
 From row with matched payment:
+
 - route: payment reconciliation detail only if implementation has a payment-specific route
 - otherwise route: `/admin/payment-reconciliation`
 - label: `Open reconciliation`
 
 From row without matched records:
+
 - route: `/admin/payment-reconciliation`
 - include provider reference in navigation state if safe
 - do not place provider reference in URL unless product explicitly approves it
 
 From row to detail:
+
 - route: `/admin/webhook-events/:eventId`
 - pass selected row context
 - detail route must handle direct load limitation
 
 ## Role Behavior
-| Role | Can view | Notes |
-| --- | --- | --- |
-| `finance_admin` | Yes | Primary workflow owner |
-| `super_admin` | Yes | Same safe data surface as finance admin |
-| `ops_admin` | No | Lacks reconciliation capability |
-| `support_admin` | No | Lacks reconciliation capability |
-| `driver` | No | Not admin |
-| `station_operator` | No | Not admin |
-| `final_mile_courier` | No | Not admin |
-| `sender` | No | Not admin |
+
+| Role                 | Can view | Notes                                   |
+| -------------------- | -------- | --------------------------------------- |
+| `finance_admin`      | Yes      | Primary workflow owner                  |
+| `super_admin`        | Yes      | Same safe data surface as finance admin |
+| `ops_admin`          | No       | Lacks reconciliation capability         |
+| `support_admin`      | No       | Lacks reconciliation capability         |
+| `driver`             | No       | Not admin                               |
+| `station_operator`   | No       | Not admin                               |
+| `final_mile_courier` | No       | Not admin                               |
+| `sender`             | No       | Not admin                               |
 
 Rules:
+
 - The admin navigation should hide this route from roles without access where possible.
 - Direct route access still depends on backend authorization.
 - A forbidden backend response must remove sensitive row content from the visible UI.
 
 ## QA Scenarios
+
 1. `finance_admin` opens `/admin/webhook-events` and sees the most recent returned rows.
 2. `super_admin` opens the route and sees the same safe fields.
 3. `ops_admin` opens the route and receives the not-authorized state.
@@ -1296,7 +1537,9 @@ Rules:
 30. Keyboard user can filter, refresh, copy, and open row actions.
 
 ## Acceptance Criteria
+
 Functional:
+
 - The screen calls only `GET /v1/admin/webhook-events`.
 - The route is `/admin/webhook-events`.
 - The root test id is `screen-admin-webhook-events`.
@@ -1309,6 +1552,7 @@ Functional:
 - The UI does not expose replay or mutation controls.
 
 Accessibility:
+
 - The page has one logical `h1`.
 - The table has a meaningful caption.
 - All status chips include text labels.
@@ -1318,12 +1562,14 @@ Accessibility:
 - Mobile card layout retains semantic grouping.
 
 Security:
+
 - Forbidden and unauthorized states clear sensitive visible content.
 - Copy analytics exclude copied values.
 - Browser storage does not persist webhook rows.
 - Super admin receives the same safe field set as finance admin.
 
 Quality:
+
 - Works with zero rows, one row, and 100 rows.
 - Works without provider event ID.
 - Works without matched payment or delivery IDs.
@@ -1332,7 +1578,9 @@ Quality:
 - Handles API validation errors from unsupported URL values.
 
 ## Component Inventory
+
 Required components:
+
 - `AdminPageShell`
 - `AdminBreadcrumb`
 - `AdminPageHeader`
@@ -1354,12 +1602,14 @@ Required components:
 - `AdminLiveRegion`
 
 Optional components:
+
 - `WebhookRowDisclosure`
 - `WebhookClockSkewNotice`
 - `WebhookStaleDataNotice`
 - `WebhookReturnedLimitNotice`
 
 Do not build:
+
 - provider payload JSON viewer on this list
 - replay modal trigger on this list
 - payment override form
@@ -1367,7 +1617,9 @@ Do not build:
 - secret visibility control
 
 ## Implementation Notes For Claude Code
+
 Build sequence:
+
 1. Add route `/admin/webhook-events` with `screen-admin-webhook-events`.
 2. Wire `useAdminWebhookEventsQuery` to `GET /v1/admin/webhook-events`.
 3. Implement query parsing for `processingStatus` and `limit`.
@@ -1383,6 +1635,7 @@ Build sequence:
 13. Add tests for states, filters, role behavior, and privacy exclusions.
 
 Implementation boundaries:
+
 - Do not implement `ReplayWebhookModal` from this list.
 - Do not add backend endpoints.
 - Do not change webhook processing rules.
@@ -1390,7 +1643,9 @@ Implementation boundaries:
 - Do not store sensitive data in local storage.
 
 ## Test Plan
+
 Unit tests:
+
 - formats processing statuses
 - formats event types
 - formats GHS amount
@@ -1401,6 +1656,7 @@ Unit tests:
 - builds API query from URL filters
 
 Component tests:
+
 - renders loading skeleton
 - renders ready table
 - renders manual-review banner
@@ -1417,6 +1673,7 @@ Component tests:
 - announces refresh result
 
 Integration tests:
+
 - finance admin can load route
 - super admin can load route
 - ops admin receives forbidden state from API
@@ -1427,6 +1684,7 @@ Integration tests:
 - row action opens event detail route with row context
 
 Visual regression:
+
 - desktop ready state with mixed statuses
 - desktop manual-review filter
 - desktop error state
@@ -1434,6 +1692,7 @@ Visual regression:
 - mobile filtered empty state
 
 Accessibility tests:
+
 - heading structure
 - table caption
 - keyboard filter flow
@@ -1442,7 +1701,9 @@ Accessibility tests:
 - contrast for chips and warning banners
 
 ## Content Checklist
+
 Before implementation is accepted:
+
 - All status labels match backend enum values.
 - All event type labels match backend enum values.
 - No unsupported replay copy appears.
@@ -1455,7 +1716,9 @@ Before implementation is accepted:
 - Duplicate rows clearly explain repeat-safe processing.
 
 ## Open Backend Gaps For Future Work
+
 Not required for this screen, but useful for later:
+
 - single webhook event read endpoint
 - cursor pagination
 - server-side provider reference search
@@ -1471,4 +1734,5 @@ Not required for this screen, but useful for later:
 These gaps must not block the current list. The current list is fully buildable from `admin_webhook_events`.
 
 ## Final Screen Contract
+
 `AdminWebhookEvents` is complete when it gives finance admins a fast, safe, accessible ledger of trusted MTN MoMo webhook events, prioritizes manual-review and unmatched records, routes investigation into reconciliation and delivery context, and refuses to expose unsupported replay, raw payload, or payment mutation controls.

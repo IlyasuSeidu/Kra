@@ -1,24 +1,27 @@
 # Admin Export Report Screen Spec
 
-## Metadata
-| Field | Value |
-| --- | --- |
-| Screen name | `AdminExportReport` |
-| Route | `/admin/exports/new` |
-| Test id | `screen-admin-export-report` |
-| Surface | Admin web console |
-| Backend coverage | Approved admin list endpoints; no dedicated export job endpoint exists yet |
-| Offline critical | No |
-| Required read role | `ops_admin`, `finance_admin`, `support_admin`, or `super_admin`, scoped by selected report type |
-| Required action role | Same as read role for selected source endpoint |
-| Required states | `loading`, `configuring`, `generating`, `ready`, `failed`, `not_authorized`, `session_expired`, `api_error` |
-| Parent screens | `AdminAnalytics`, `AdminOverview`, `AdminFinanceSummary`, `AdminAuditEvents`, `AdminDeliveryExplorer` |
-| Related screens | `AdminAnalytics`, `AdminDeliveryExplorer`, `AdminFinanceSummary`, `AdminPaymentReconciliation`, `AdminIssueQueue`, `AdminAuditEvents`, `AdminWebhookEvents`, `AdminOutboundNotifications` |
+## Screen Contract
+
+| Field                | Value                                                                                                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID            | `AdminExportReport`                                                                                                                                                                       |
+| Route                | `/admin/exports/new`                                                                                                                                                                      |
+| Primary test ID      | `screen-admin-export-report`                                                                                                                                                              |
+| Surface              | Admin web console                                                                                                                                                                         |
+| Backend coverage     | Approved admin list endpoints; no dedicated export job endpoint exists yet                                                                                                                |
+| Offline critical     | No                                                                                                                                                                                        |
+| Required read role   | `ops_admin`, `finance_admin`, `support_admin`, or `super_admin`, scoped by selected report type                                                                                           |
+| Required action role | Same as read role for selected source endpoint                                                                                                                                            |
+| Required states      | `loading`, `configuring`, `generating`, `ready`, `failed`, `not_authorized`, `session_expired`, `api_error`                                                                               |
+| Parent screens       | `AdminAnalytics`, `AdminOverview`, `AdminFinanceSummary`, `AdminAuditEvents`, `AdminDeliveryExplorer`                                                                                     |
+| Related screens      | `AdminAnalytics`, `AdminDeliveryExplorer`, `AdminFinanceSummary`, `AdminPaymentReconciliation`, `AdminIssueQueue`, `AdminAuditEvents`, `AdminWebhookEvents`, `AdminOutboundNotifications` |
 
 ## Purpose
+
 `AdminExportReport` is the controlled export builder for admin-readable operational, finance, issue, audit, webhook, and analytics reports. It lets authorized admins select an approved report type, understand exactly which endpoint and fields will be used, generate a privacy-safe file in the browser, and download the file without exposing raw payloads or unsupported data.
 
 The screen should answer:
+
 - `Which reports can I export with my role?`
 - `Which backend endpoint powers this report?`
 - `Which fields will be included?`
@@ -32,9 +35,11 @@ The screen should answer:
 This screen is not a broad database export tool. It must not expose raw audit bodies, raw webhook payloads, proof assets, full receiver phone numbers unless explicitly approved, provider secrets, private staff notes, or fields not returned by approved endpoints.
 
 ## Strategic Role
+
 Exporting is risky because it moves data out of the application boundary. A serious logistics platform needs exports for finance reviews, compliance checks, launch meetings, and operational audits, but every export must be deliberate, scoped, and traceable.
 
 The screen must make the export contract visible before generation:
+
 - report purpose
 - source endpoint
 - role access
@@ -48,19 +53,23 @@ The screen must make the export contract visible before generation:
 The user should never feel like they are pressing a mysterious `download everything` button.
 
 ## Audience
+
 Primary users:
+
 - finance admins exporting finance, refund, reconciliation, and webhook review records
 - ops admins exporting delivery and operational queue reports
 - support admins exporting issue queues and case review reports
 - super admins exporting cross-functional launch and analytics reports
 
 Secondary users:
+
 - security reviewers checking export boundaries
 - QA reviewers validating export field contracts
 - business owner reviewing pilot reports
 - engineering leads identifying future export endpoint requirements
 
 Non-users:
+
 - senders
 - receivers
 - drivers
@@ -69,9 +78,11 @@ Non-users:
 - public web visitors
 
 ## Backend Reality
+
 No dedicated export endpoint exists today.
 
 Supported current strategy:
+
 - fetch approved admin list endpoints
 - transform returned safe fields into a client-generated file
 - keep file generation local to the browser session
@@ -79,6 +90,7 @@ Supported current strategy:
 - do not call unsupported report job endpoints
 
 Approved endpoint families:
+
 - `GET /v1/admin/overview`
 - `GET /v1/admin/deliveries`
 - `GET /v1/admin/finance`
@@ -91,6 +103,7 @@ Approved endpoint families:
 Endpoint availability depends on role and existing backend guards.
 
 Current backend limits:
+
 - No server-side export job endpoint exists.
 - No asynchronous export queue exists.
 - No export history endpoint exists.
@@ -104,12 +117,15 @@ Current backend limits:
 - Some endpoints intentionally omit raw sensitive fields.
 
 Therefore:
+
 - Export scope must be labeled as `current returned rows`.
 - The UI must not claim full historical coverage unless the source endpoint guarantees it.
 - The UI must mark unsupported full exports as future backend work.
 
 ## Source References
+
 External references used for this screen:
+
 - [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html): supports treating data import and export as security-relevant events and excluding sensitive values from logs.
 - [NIST Privacy Framework](https://www.nist.gov/privacy-framework/privacy-framework): supports privacy risk management, data governance, minimization, and accountability around data handling.
 - [GOV.UK guidance on publishing files](https://www.gov.uk/guidance/how-to-publish-on-gov-uk/creating-and-updating-pages): supports clear file names and useful file metadata so exported files make sense after download.
@@ -118,6 +134,7 @@ External references used for this screen:
 - [WCAG 2.2 Status Messages](https://w3c.github.io/wcag/understanding/status-messages): supports announcing generation progress, success, and failure without unexpected focus movement.
 
 Local references:
+
 - `docs/05-design/frontend-screen-inventory.md`
 - `docs/08-security/privacy-and-data-retention.md`
 - `docs/08-security/authorization-rules.md`
@@ -133,9 +150,11 @@ Local references:
 - `docs/05-design/frontend-screen-specs/admin-web-console/36-admin-webhook-events.md`
 
 ## Design Thesis
+
 Design this as a controlled report console: serious, explicit, security-aware, and calm. It should feel like preparing a governed business record, not clicking a casual download button.
 
 Visual direction:
+
 - step-based report builder
 - left-side report type menu
 - right-side source and field contract preview
@@ -146,12 +165,15 @@ Visual direction:
 - no decorative charts
 
 Restraint rule:
+
 - Keep the user focused on choosing a report, checking the field contract, and generating a safe file. Do not add broad dashboards, unrelated filters, or unsupported file formats.
 
 ## Product Principle
+
 An export is a data release. Every export must be scoped, explainable, role-appropriate, and recoverable if generation fails.
 
 Each export must show:
+
 - report type
 - owner role
 - source endpoint
@@ -163,45 +185,59 @@ Each export must show:
 - retention warning
 
 ## Supported Report Types
+
 ### Analytics snapshot
+
 Source:
+
 - `GET /v1/admin/overview`
 
 Allowed roles:
+
 - all admin roles
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current overview snapshot
 
 Fields:
+
 - generated time
 - delivery status counts
 - payment status counts
 - operational alert counts
 
 Routes:
+
 - source screen: `/admin/analytics`
 - owner screen: `/admin`
 
 ### Delivery list report
+
 Source:
+
 - `GET /v1/admin/deliveries`
 
 Allowed roles:
+
 - all admin roles
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current returned admin delivery rows
 
 Fields:
+
 - delivery ID
 - tracking code
 - current status
@@ -211,6 +247,7 @@ Fields:
 - latest occurred time
 
 Excluded:
+
 - receiver phone
 - receiver address
 - proof assets
@@ -218,48 +255,61 @@ Excluded:
 - raw event metadata
 
 ### Finance summary report
+
 Source:
+
 - `GET /v1/admin/finance`
 
 Allowed roles:
+
 - `finance_admin`
 - `super_admin`
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current finance summary response
 
 Fields:
+
 - payment status counts
 - refund status counts
 - review counts
 - generated time
 
 Excluded:
+
 - provider secrets
 - payer phone
 - raw provider payload
 - internal stack traces
 
 ### Payment reconciliation report
+
 Source:
+
 - `GET /v1/admin/payment-reconciliation`
 
 Allowed roles:
+
 - `finance_admin`
 - `super_admin`
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current returned reconciliation rows
 
 Fields:
+
 - business date
 - provider
 - provider reference if returned by endpoint
@@ -271,25 +321,32 @@ Fields:
 - review reason
 
 Excluded:
+
 - provider secrets
 - raw provider payload
 - customer phone
 
 ### Issue queue report
+
 Source:
+
 - `GET /v1/issues`
 
 Allowed roles:
+
 - support and admin roles as allowed by backend
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current returned issue rows
 
 Fields:
+
 - issue ID
 - delivery ID
 - category
@@ -299,26 +356,33 @@ Fields:
 - updated time
 
 Excluded:
+
 - full issue description unless endpoint and policy approve
 - receiver phone
 - private customer messages
 - proof assets
 
 ### Audit events report
+
 Source:
+
 - `GET /v1/admin/audit-events`
 
 Allowed roles:
+
 - admin roles allowed by backend
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current returned audit rows
 
 Fields:
+
 - audit event ID
 - action
 - actor role
@@ -327,27 +391,34 @@ Fields:
 - target ID if returned
 
 Excluded:
+
 - raw metadata body
 - secrets
 - session tokens
 - request headers
 
 ### Webhook events report
+
 Source:
+
 - `GET /v1/admin/webhook-events`
 
 Allowed roles:
+
 - `finance_admin`
 - `super_admin`
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current returned webhook rows
 
 Fields:
+
 - event ID
 - provider
 - provider reference if returned by endpoint
@@ -359,27 +430,34 @@ Fields:
 - received time
 
 Excluded:
+
 - raw payload
 - signature material
 - provider secrets
 
 ### Outbound notifications report
+
 Source:
+
 - `GET /v1/admin/outbound-notifications`
 
 Allowed roles:
+
 - `ops_admin`
 - `support_admin`
 - `super_admin`
 
 Formats:
+
 - CSV
 - JSON
 
 Scope:
+
 - current returned notification rows
 
 Fields:
+
 - outbound notification ID
 - status
 - provider
@@ -391,13 +469,16 @@ Fields:
 - updated time
 
 Excluded:
+
 - full recipient phone
 - message body
 - provider payload
 - provider secret
 
 ## Unsupported Report Types
+
 Do not offer:
+
 - full database export
 - raw audit export
 - raw webhook payload export
@@ -412,7 +493,9 @@ Do not offer:
 If product requires these later, they need server-side export jobs, audit events, data classification, approval flow, and legal review.
 
 ## Information Architecture
+
 Desktop layout:
+
 - Admin shell and breadcrumb.
 - Header with export purpose and safety note.
 - Step 1: choose report type.
@@ -423,6 +506,7 @@ Desktop layout:
 - Failure state with retry and source screen route.
 
 Mobile layout:
+
 - Header stack.
 - Report type select.
 - Field contract accordion.
@@ -432,20 +516,26 @@ Mobile layout:
 - Safety notice.
 
 ## Step Flow
+
 ### Step 1: Choose Report
+
 Fields:
+
 - report type
 - role availability indicator
 - source endpoint
 - owner role
 
 Rules:
+
 - Unavailable reports are shown disabled with reason.
 - Disabled reason must mention role or missing backend support.
 - Default selection should match entry screen when navigation state is provided.
 
 ### Step 2: Review Scope
+
 Show:
+
 - endpoint
 - row scope
 - freshness rule
@@ -454,30 +544,38 @@ Show:
 - data sensitivity level
 
 Rules:
+
 - For capped endpoints, say `current returned rows`.
 - For snapshot endpoint, say `current snapshot`.
 - Do not say `all records` unless endpoint supports all records.
 
 ### Step 3: Choose Format
+
 Formats:
+
 - CSV
 - JSON
 
 Default:
+
 - CSV for business reports
 - JSON for technical reports only if user selects it
 
 Rules:
+
 - PDF is not supported until a document generation path exists.
 - Spreadsheet workbook is not supported until a library path is added and verified.
 - CSV uses safe column names.
 - JSON includes a metadata wrapper with generated time and source endpoint.
 
 ### Step 4: Generate
+
 Trigger:
+
 - user clicks `Generate report`
 
 Behavior:
+
 - fetch source endpoint
 - transform allowed fields only
 - build file in memory
@@ -485,24 +583,29 @@ Behavior:
 - enable download
 
 Rules:
+
 - Do not auto-download before user confirms generation.
 - Do not persist file content in local storage.
 - Do not keep file URL after user leaves route.
 - Revoke object URL when user generates a new file or leaves the route.
 
 ## File Naming
+
 Filename pattern:
+
 ```text
 kra-{report-type}-{scope}-{yyyy-mm-dd}-{hhmm}.csv
 ```
 
 Examples:
+
 ```text
 kra-deliveries-current-2026-05-21-0545.csv
 kra-webhook-events-current-2026-05-21-0545.json
 ```
 
 Rules:
+
 - lowercase
 - hyphen-separated
 - no customer names
@@ -513,38 +616,47 @@ Rules:
 - use `.csv` or `.json`
 
 ## Generating State
+
 Trigger:
+
 - source fetch and transformation in progress
 
 Copy:
+
 ```text
 Generating report...
 Keep this tab open until the file is ready.
 ```
 
 UI:
+
 - progress indicator
 - selected report summary
 - source endpoint label
 - cancel or back only if safe
 
 Rules:
+
 - Disable duplicate generation clicks.
 - Keep selected settings visible.
 - Announce progress through a status message.
 - If fetch fails, move to failed state.
 
 ## Ready State
+
 Trigger:
+
 - file blob created successfully
 
 Copy:
+
 ```text
 Report is ready.
 Review the file details before downloading.
 ```
 
 Show:
+
 - report type
 - format
 - filename
@@ -555,105 +667,131 @@ Show:
 - excluded field notice
 
 Actions:
+
 - `Download report`
 - `Generate again`
 - `Open source screen`
 
 Rules:
+
 - Download button appears only after file is created.
 - Ready state must not expose hidden fields in preview.
 - File content remains in browser memory only.
 
 ## Failed State
+
 Trigger:
+
 - source fetch fails
 - authorization fails
 - transformation fails
 - file creation fails
 
 Copy:
+
 ```text
 Report could not be generated.
 Retry, or open the source screen to review the data directly.
 ```
 
 Actions:
+
 - `Retry`
 - `Change report`
 - `Open source screen`
 
 Rules:
+
 - Do not expose stack traces.
 - Do not leave a stale download button visible.
 - Keep selected report settings intact.
 - For authorization failure, switch to not-authorized state.
 
 ## Not Authorized State
+
 Trigger:
+
 - user selects a report they cannot access
 - source endpoint returns forbidden
 
 Copy:
+
 ```text
 You do not have permission to export this report.
 Choose a report available to your role, or ask a super admin to review access.
 ```
 
 Actions:
+
 - `Choose another report`
 - `Back to admin overview`
 
 Rules:
+
 - Do not fetch forbidden data again until selection changes.
 - Do not preserve generated content after access failure.
 
 ## Session Expired State
+
 Trigger:
+
 - source endpoint returns unauthorized
 
 Copy:
+
 ```text
 Your admin session expired.
 Sign in again to generate this report.
 ```
 
 Actions:
+
 - `Sign in`
 
 Rules:
+
 - Clear generated content.
 - Clear object URL.
 - Preserve selected report settings only if safe after reauthentication.
 
 ## API Error State
+
 Trigger:
+
 - validation error
 - unsupported source state
 - source endpoint unavailable
 
 Copy:
+
 ```text
 The report source is not available right now.
 Use the source screen while the export flow is unavailable.
 ```
 
 Actions:
+
 - `Open source screen`
 - `Retry`
 
 ## Report Field Contract Preview
+
 The preview must show two lists before generation:
+
 - Included fields
 - Excluded fields
 
 Rules:
+
 - Included list must match actual output columns.
 - Excluded list must name sensitive categories, not values.
 - The user can expand technical field names.
 - Field lists are static per report type unless backend contract changes.
 
 ## Output Rules
+
 CSV:
+
 - one header row
 - UTF-8
 - comma separated
@@ -663,6 +801,7 @@ CSV:
 - prefix formula-like cell values with safe text handling
 
 Formula-risk prefixes:
+
 - `=`
 - `+`
 - `-`
@@ -671,6 +810,7 @@ Formula-risk prefixes:
 - carriage return
 
 JSON:
+
 - top-level metadata object
 - `generatedAt`
 - `reportType`
@@ -680,6 +820,7 @@ JSON:
 - safe fields only
 
 No output:
+
 - raw proof assets
 - binary files
 - provider signatures
@@ -688,13 +829,16 @@ No output:
 - session tokens
 
 ## Privacy And Security
+
 Export warnings:
+
 - Generated files may contain operational or financial data.
 - Do not download on shared or public devices unless required.
 - Store reports only in approved business locations.
 - Delete local copies when no longer needed.
 
 Security controls:
+
 - role gate before source fetch
 - source endpoint authorization remains source of truth
 - field allowlist per report type
@@ -705,12 +849,15 @@ Security controls:
 - no sensitive analytics values
 
 Audit note:
+
 - The current backend has no export audit endpoint.
 - The frontend should emit privacy-safe analytics for export start, success, and failure.
 - Future server-side export must create audit events.
 
 ## Accessibility
+
 Required:
+
 - one `h1`: `Export report`
 - step labels announced clearly
 - selected report state conveyed by text and control state
@@ -721,33 +868,40 @@ Required:
 - keyboard can complete the full flow
 
 Status messages:
+
 - `Generating report`
 - `Report is ready`
 - `Report could not be generated`
 - `Report download started`
 
 Focus rules:
+
 - changing report keeps focus on report control
 - generate keeps focus on button until state changes
 - ready state moves focus to ready heading only if generation was user-triggered
 - failed state moves focus to error heading
 
 ## Responsive Behavior
+
 Desktop, `>= 1200px`:
+
 - report type rail on left
 - field contract and generation panel on right
 - ready file card in right panel
 
 Laptop, `900px - 1199px`:
+
 - report type grid above field contract
 - generation panel below
 
 Tablet, `700px - 899px`:
+
 - report type select
 - accordions for scope and fields
 - sticky generate action if not covering content
 
 Mobile, `< 700px`:
+
 - single-column step cards
 - report type select
 - field lists collapsed by default
@@ -755,24 +909,28 @@ Mobile, `< 700px`:
 - ready card with clear download button
 
 ## Role Availability Matrix
-| Report | ops admin | finance admin | support admin | super admin |
-| --- | --- | --- | --- | --- |
-| Analytics snapshot | Yes | Yes | Yes | Yes |
-| Delivery list | Yes | Yes | Yes | Yes |
-| Finance summary | No | Yes | No | Yes |
-| Payment reconciliation | No | Yes | No | Yes |
-| Issue queue | Yes, if backend allows | Yes, if backend allows | Yes | Yes |
-| Audit events | Yes, if backend allows | Yes, if backend allows | Yes, if backend allows | Yes |
-| Webhook events | No | Yes | No | Yes |
-| Outbound notifications | Yes | No | Yes | Yes |
+
+| Report                 | ops admin              | finance admin          | support admin          | super admin |
+| ---------------------- | ---------------------- | ---------------------- | ---------------------- | ----------- |
+| Analytics snapshot     | Yes                    | Yes                    | Yes                    | Yes         |
+| Delivery list          | Yes                    | Yes                    | Yes                    | Yes         |
+| Finance summary        | No                     | Yes                    | No                     | Yes         |
+| Payment reconciliation | No                     | Yes                    | No                     | Yes         |
+| Issue queue            | Yes, if backend allows | Yes, if backend allows | Yes                    | Yes         |
+| Audit events           | Yes, if backend allows | Yes, if backend allows | Yes, if backend allows | Yes         |
+| Webhook events         | No                     | Yes                    | No                     | Yes         |
+| Outbound notifications | Yes                    | No                     | Yes                    | Yes         |
 
 Rules:
+
 - The UI may show role-specific disabled reports.
 - Backend authorization remains final.
 - If the matrix and backend disagree, backend wins and the UI shows not-authorized.
 
 ## Observability
+
 Frontend events:
+
 - `admin_export_report_viewed`
 - `admin_export_report_type_selected`
 - `admin_export_report_format_selected`
@@ -783,6 +941,7 @@ Frontend events:
 - `admin_export_report_not_authorized`
 
 Allowed analytics fields:
+
 - report type
 - format
 - role class
@@ -792,6 +951,7 @@ Allowed analytics fields:
 - result state
 
 Forbidden analytics fields:
+
 - delivery ID
 - tracking code
 - payment ID
@@ -805,7 +965,9 @@ Forbidden analytics fields:
 - filename if it ever contains sensitive values
 
 ## Performance
+
 Rules:
+
 - Fetch only the selected source endpoint.
 - Do not fetch all report sources at route load.
 - Do not generate more rows than the endpoint returns.
@@ -814,12 +976,15 @@ Rules:
 - Revoke object URLs.
 
 UI targets:
+
 - report type selection instant
 - generation progress visible within one frame after click
 - generated file metadata visible before download
 
 ## Edge Cases
+
 Handle:
+
 - zero returned rows
 - missing optional fields
 - forbidden source endpoint
@@ -834,6 +999,7 @@ Handle:
 - public-device warning dismissed then report changed
 
 ## QA Scenarios
+
 1. Admin opens `/admin/exports/new` and sees report type choices.
 2. Report type list reflects role availability.
 3. Selecting delivery report shows `/v1/admin/deliveries` as source.
@@ -861,7 +1027,9 @@ Handle:
 25. Browser download failure shows a recovery state.
 
 ## Acceptance Criteria
+
 Functional:
+
 - Route is `/admin/exports/new`.
 - Root test id is `screen-admin-export-report`.
 - Uses only approved admin list endpoints.
@@ -873,6 +1041,7 @@ Functional:
 - Handles failed, unauthorized, and expired states.
 
 Security:
+
 - Exports use allowlisted fields.
 - Raw payloads are excluded.
 - Provider secrets are excluded.
@@ -882,12 +1051,14 @@ Security:
 - Analytics exclude sensitive values.
 
 Accessibility:
+
 - Full flow is keyboard usable.
 - Generation and ready states are announced.
 - Field contract is readable by assistive technology.
 - Download button has clear accessible name.
 
 Quality:
+
 - Works with zero rows.
 - Works with role-restricted reports.
 - Works with source endpoint failure.
@@ -895,7 +1066,9 @@ Quality:
 - Does not imply full historical export when source endpoint is capped.
 
 ## Component Inventory
+
 Required components:
+
 - `AdminPageShell`
 - `AdminBreadcrumb`
 - `AdminExportHeader`
@@ -912,12 +1085,14 @@ Required components:
 - `AdminLiveRegion`
 
 Optional components:
+
 - `ReportFieldDisclosure`
 - `ReportPublicDeviceWarning`
 - `ReportSourceRouteLink`
 - `ReportFilenamePreview`
 
 Do not build:
+
 - server export job UI
 - export history list
 - raw audit export
@@ -928,7 +1103,9 @@ Do not build:
 - scheduled report form
 
 ## Implementation Notes For Claude Code
+
 Build sequence:
+
 1. Add route `/admin/exports/new`.
 2. Add report type configuration with endpoint, roles, fields, exclusions, and formats.
 3. Render selection and field contract.
@@ -944,6 +1121,7 @@ Build sequence:
 13. Add tests for every report type and field exclusion.
 
 Implementation boundaries:
+
 - Do not add backend endpoints.
 - Do not fetch all sources upfront.
 - Do not include sensitive fields not explicitly allowed.
@@ -951,7 +1129,9 @@ Implementation boundaries:
 - Do not implement PDF or workbook output.
 
 ## Test Plan
+
 Unit tests:
+
 - report type role availability
 - endpoint selection
 - field allowlist transform
@@ -963,6 +1143,7 @@ Unit tests:
 - analytics sanitizer
 
 Component tests:
+
 - configuring state
 - generating state
 - ready state
@@ -974,6 +1155,7 @@ Component tests:
 - disabled report reason
 
 Integration tests:
+
 - delivery export happy path
 - finance export role-gated path
 - payment reconciliation export happy path
@@ -984,6 +1166,7 @@ Integration tests:
 - source endpoint failure path
 
 Accessibility tests:
+
 - heading structure
 - report selector keyboard flow
 - generate live-region update
@@ -992,7 +1175,9 @@ Accessibility tests:
 - error focus behavior
 
 ## Content Checklist
+
 Before implementation is accepted:
+
 - Every report has source endpoint.
 - Every report has role rule.
 - Every report has included fields.
@@ -1005,7 +1190,9 @@ Before implementation is accepted:
 - Ready state shows file metadata before download.
 
 ## Open Backend Gaps For Future Work
+
 Not required for current export builder:
+
 - server-side export job endpoint
 - export audit events
 - export history endpoint
@@ -1020,4 +1207,5 @@ Not required for current export builder:
 These gaps should be listed as future work, not hidden behind inactive buttons.
 
 ## Final Screen Contract
+
 `AdminExportReport` is complete when authorized admins can select an approved report, review source and field boundaries, generate a CSV or JSON file from current returned rows, download it safely, and recover from failures without leaking sensitive data or implying unsupported full-system export capability.

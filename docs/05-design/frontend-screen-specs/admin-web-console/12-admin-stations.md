@@ -1,33 +1,38 @@
 # Admin Stations Screen Spec
 
-## Metadata
-| Field | Value |
-| --- | --- |
-| Screen name | `AdminStations` |
-| Route | `/admin/stations` |
-| Test id | `screen-admin-stations` |
-| Surface | Admin web console |
-| Backend coverage | `admin_stations`, optional `admin_launch_readiness`, route actions to `admin_update_station_status` and `admin_update_station_validation` owner screens |
-| Offline critical | No |
-| Required read role | `ops_admin`, `support_admin`, `finance_admin`, or `super_admin` |
-| Required mutation role | `ops_admin` or `super_admin` through `override_queue_state` capability |
-| Required states | `loading`, `ready`, `empty`, `filtered_empty`, `launch_blocked`, `all_ready`, `partial_launch_context`, `not_authorized`, `session_expired`, `stale`, `refreshing`, `api_error` |
-| Parent screens | `AdminOverview`, `AdminLaunchReadiness`, protected admin shell |
-| Related screens | `AdminStationDetail`, `AdminStationValidation`, `AdminStationStatusOverride`, `AdminStationCapacity`, `AdminBlockedDeliveryQueue`, `AdminIssueQueue`, `AdminLaunchReadinessDetail`, `AdminStaffActivityLog`, `AdminAuditEvents` |
+## Screen Contract
+
+| Field                  | Value                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID              | `AdminStations`                                                                                                                                                                                                                 |
+| Route                  | `/admin/stations`                                                                                                                                                                                                               |
+| Primary test ID        | `screen-admin-stations`                                                                                                                                                                                                         |
+| Surface                | Admin web console                                                                                                                                                                                                               |
+| Backend coverage       | `admin_stations`, optional `admin_launch_readiness`, route actions to `admin_update_station_status` and `admin_update_station_validation` owner screens                                                                         |
+| Offline critical       | No                                                                                                                                                                                                                              |
+| Required read role     | `ops_admin`, `support_admin`, `finance_admin`, or `super_admin`                                                                                                                                                                 |
+| Required mutation role | `ops_admin` or `super_admin` through `override_queue_state` capability                                                                                                                                                          |
+| Required states        | `loading`, `ready`, `empty`, `filtered_empty`, `launch_blocked`, `all_ready`, `partial_launch_context`, `not_authorized`, `session_expired`, `stale`, `refreshing`, `api_error`                                                 |
+| Parent screens         | `AdminOverview`, `AdminLaunchReadiness`, protected admin shell                                                                                                                                                                  |
+| Related screens        | `AdminStationDetail`, `AdminStationValidation`, `AdminStationStatusOverride`, `AdminStationCapacity`, `AdminBlockedDeliveryQueue`, `AdminIssueQueue`, `AdminLaunchReadinessDetail`, `AdminStaffActivityLog`, `AdminAuditEvents` |
 
 ## Purpose
+
 This screen is the admin station command list. It shows every configured launch station, its operational status, intake status, service availability, active queue count, issue count, validation readiness, and go-live eligibility.
 
 The screen should help admins answer whether stations are ready to receive, store, hand off, and dispatch packages without hiding validation blockers. It should not become a deep station editor; detailed station work belongs in station detail, validation, and status override screens.
 
 ## Backend Reality
+
 The current backend has a concrete station list endpoint:
+
 - `GET /v1/admin/stations`
 - Operation key: `admin_stations`
 - Admin auth required.
 - Response includes all configured stations, including generated default records when a station has no stored override.
 
 The backend also exposes station mutation endpoints:
+
 - `POST /v1/admin/stations/:id/status`
 - `POST /v1/admin/stations/:id/validation`
 
@@ -36,17 +41,22 @@ Those mutation endpoints require `override_queue_state` capability. In the curre
 This list screen should primarily route to the proper owner flows. If it opens station status or validation modals, those modals must follow their own dedicated specs and backend transition rules.
 
 ## Primary Users
+
 Primary:
+
 - `ops_admin` monitoring station readiness, blockers, queue pressure, and validation progress.
 - `super_admin` reviewing network readiness and making high-impact station decisions.
 
 Secondary:
+
 - `support_admin` checking station issue pressure before triage.
 - `finance_admin` checking station readiness before launch, refund, or reconciliation context.
 - Claude Code implementing the admin console later.
 
 ## User Goal
+
 Admins use this screen to answer:
+
 - `Which stations are active, paused, open, or restricted?`
 - `Which stations are go-live eligible?`
 - `Which station has validation blockers?`
@@ -59,7 +69,9 @@ Admins use this screen to answer:
 The screen should create operational clarity in seconds.
 
 ## Entry Points
+
 The screen can open from:
+
 - `AdminOverview` station card.
 - `AdminLaunchReadiness` station validation blocker.
 - `AdminLaunchReadinessDetail` station owner action.
@@ -70,13 +82,16 @@ The screen can open from:
 - Direct route `/admin/stations`.
 
 The screen must not open from:
+
 - Sender station selection.
 - Public service area pages.
 - Staff mobile station views.
 - Receiver tracking routes.
 
 ## Scope
+
 In scope:
+
 - Station list.
 - Readiness summary.
 - Validation summary.
@@ -91,6 +106,7 @@ In scope:
 - Loading, empty, stale, partial, and error states.
 
 Out of scope:
+
 - Inline station status mutation.
 - Inline station validation mutation.
 - Deep station queue details.
@@ -104,9 +120,11 @@ Out of scope:
 - Capacity forecasting beyond returned counts.
 
 ## Design Thesis
+
 The screen should feel like an airport operations board for launch stations: compact, structured, status-forward, and calm. It should make station readiness legible without turning every station into a noisy card.
 
 Visual direction:
+
 - Use a crisp white canvas with graphite typography and restrained status color.
 - Use a readiness band above the table.
 - Use station rows with a left status rail.
@@ -116,10 +134,13 @@ Visual direction:
 - Use red for blocked readiness, amber for in-progress validation or restricted intake, blue for neutral station context, and green for go-live eligible.
 
 Restraint rule:
+
 - No maps, no large cards for every station, no decorative station photos, no animated gauges, and no readiness score invented by the frontend.
 
 ## Research Inputs
+
 External research used for this screen:
+
 - [Google SRE monitoring distributed systems](https://sre.google/sre-book/monitoring-distributed-systems/): supports clear operational health signals and avoiding dashboards that hide actionability.
 - [Atlassian incident management handbook](https://www.atlassian.com/incident-management): supports status clarity, ownership, triage, and escalation paths.
 - [IBM Carbon data table](https://carbondesignsystem.com/components/data-table/usage/): supports dense enterprise station rows, row actions, sorting, and filtering.
@@ -129,27 +150,34 @@ External research used for this screen:
 - [WCAG focus appearance](https://www.w3.org/WAI/WCAG22/Understanding/focus-appearance.html): supports visible focus in dense admin tables.
 
 How the research affects the screen:
+
 - Operational monitoring guidance shapes readiness signals into action-oriented states, not decorative metrics.
 - Incident-management guidance shapes station blockers into ownership paths.
 - Data-table references shape row density and keyboard access.
 - Summary-box and WCAG references shape notices, announcements, and focus behavior.
 
 ## Data Contract
+
 ### Station List
+
 Request:
+
 ```http
 GET /v1/admin/stations
 ```
 
 Operation:
+
 ```text
 admin_stations
 ```
 
 Auth:
+
 - Admin read access.
 
 Response fields:
+
 - `generatedAt`
 - `stations[].stationId`
 - `stations[].name`
@@ -176,6 +204,7 @@ Response fields:
 - `stations[].updatedAt`
 
 Rules:
+
 - Use `validation.goLiveEligible` as the station-level readiness authority.
 - Use `validation.blockers` as backend-owned blocker copy.
 - Do not derive blocker text from frontend-only copy.
@@ -183,17 +212,21 @@ Rules:
 - Do not show station validation note in analytics.
 
 ### Optional Launch Readiness
+
 Request:
+
 ```http
 GET /v1/admin/launch-readiness
 ```
 
 Purpose:
+
 - Provide system-level launch gate context above the station table.
 - Compare station list readiness to launch-readiness blockers.
 - Route to `AdminLaunchReadinessDetail` for system blockers.
 
 Fields used:
+
 - `status`
 - `goLiveEligible`
 - `blockers`
@@ -201,11 +234,13 @@ Fields used:
 - `systemChecks.stationValidation.totalStations`
 
 Rules:
+
 - The station list can work without launch readiness data.
 - If launch readiness fails, show station rows and a partial context notice.
 - Do not block station list rendering on launch readiness.
 
 ## Station Readiness Model
+
 Use backend fields directly.
 
 Station readiness states:
@@ -222,6 +257,7 @@ Station readiness states:
 | `queue_pressure` | `activeQueueCount > threshold` | Active queue needs review |
 
 Thresholds:
+
 - Do not invent hard capacity thresholds unless product policy exists.
 - For this screen, `activeQueueCount > 0` is visible but not automatically critical.
 - If the UI needs a pressure accent, use:
@@ -230,7 +266,9 @@ Thresholds:
   - `11+`: elevated workload label until a formal capacity policy exists.
 
 ## Validation Rules
+
 Backend readiness facts:
+
 - Dry-run business days must be `2`.
 - Controlled pilot-volume business days must be `3`.
 - All checklist values must be true.
@@ -239,6 +277,7 @@ Backend readiness facts:
 - Unresolved P1 issue confirmation keeps validation blocked.
 
 Checklist labels:
+
 - `activeOperatorsCanSignIn`: Active operators can sign in.
 - `intakeDispatchReceiptAudited`: Intake, dispatch, and destination receipt audited.
 - `scanOrManualFallbackTested`: Scan or manual fallback tested.
@@ -247,29 +286,35 @@ Checklist labels:
 - `openingHoursStorageAndHandoffConfirmed`: Opening hours, storage, and handoff confirmed.
 
 Rules:
+
 - The frontend can show incomplete checklist items.
 - The frontend must not override `goLiveEligible`.
 - The frontend must not mark a station ready when backend says blocked.
 - Manual blockers display as backend-owned blocker text.
 
 ## Role And Permissions
-| Role | Can read list | Can open detail | Can open validation edit | Can open status override | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `ops_admin` | Yes | Yes | Yes | Yes | Has `override_queue_state` |
-| `support_admin` | Yes | Yes | No | No | Can use issue and station context |
-| `finance_admin` | Yes | Yes | No | No | Read-only for finance context |
-| `super_admin` | Yes | Yes | Yes | Yes | Full station management |
+
+| Role            | Can read list | Can open detail | Can open validation edit | Can open status override | Notes                             |
+| --------------- | ------------- | --------------- | ------------------------ | ------------------------ | --------------------------------- |
+| `ops_admin`     | Yes           | Yes             | Yes                      | Yes                      | Has `override_queue_state`        |
+| `support_admin` | Yes           | Yes             | No                       | No                       | Can use issue and station context |
+| `finance_admin` | Yes           | Yes             | No                       | No                       | Read-only for finance context     |
+| `super_admin`   | Yes           | Yes             | Yes                      | Yes                      | Full station management           |
 
 Rules:
+
 - Hide mutation entry points when role lacks capability.
 - Do not rely on client role checks only; backend must authorize mutations.
 - If a mutation owner screen returns `FORBIDDEN`, refetch session and show a permission error.
 
 ## Layout
+
 ### Desktop
+
 Use a 12-column layout.
 
 Top zone:
+
 - Breadcrumbs.
 - Page title `Stations`.
 - Generated timestamp.
@@ -277,6 +322,7 @@ Top zone:
 - Launch readiness context pill when available.
 
 Readiness summary:
+
 - Total stations.
 - Go-live eligible stations.
 - Blocked validation stations.
@@ -286,6 +332,7 @@ Readiness summary:
 - Active queue total.
 
 Filter bar:
+
 - Search.
 - Readiness filter.
 - Operating status filter.
@@ -296,6 +343,7 @@ Filter bar:
 - Reset button.
 
 Main table columns:
+
 - Station.
 - Readiness.
 - Operating.
@@ -307,16 +355,19 @@ Main table columns:
 - Action.
 
 Right rail:
+
 - Launch readiness summary.
 - Validation rules.
 - Quick links to launch readiness, blocked queue, issue queue, and audit events.
 
 ### Tablet
+
 - Summary metrics wrap into two rows.
 - Table hides validation detail until row expansion.
 - Filters wrap.
 
 ### Mobile
+
 - One-column station cards.
 - Readiness first.
 - Station ID and name second.
@@ -325,13 +376,17 @@ Right rail:
 - Actions last.
 
 Rules:
+
 - No horizontal table scrolling on mobile.
 - Cards must preserve all labels.
 - Action buttons must be full width.
 
 ## Components
+
 ### `AdminStationsPage`
+
 Responsibilities:
+
 - Fetch station list.
 - Optionally fetch launch readiness.
 - Manage filters, search, sort, and refresh.
@@ -339,14 +394,18 @@ Responsibilities:
 - Render route-level states.
 
 Queries:
+
 - `useAdminStationsQuery`
 - Optional `useAdminLaunchReadinessQuery`
 
 Test id:
+
 - `screen-admin-stations`
 
 ### `StationReadinessSummary`
+
 Metrics:
+
 - Total stations.
 - Go-live eligible.
 - Validation blocked.
@@ -357,15 +416,19 @@ Metrics:
 - Total open issue count.
 
 Rules:
+
 - Metrics derive from loaded station rows.
 - Clicking a metric applies the corresponding filter.
 - Do not call backend on metric click.
 
 Test id:
+
 - `admin-stations-readiness-summary`
 
 ### `StationFilterBar`
+
 Controls:
+
 - Search by station name, station ID, city.
 - Readiness filter.
 - Operating status filter.
@@ -375,11 +438,13 @@ Controls:
 - Reset.
 
 Rules:
+
 - Search is local only.
 - Search does not include validation notes or blocker text.
 - Active filters appear as removable chips.
 
 Test ids:
+
 - `admin-stations-search`
 - `admin-stations-readiness-filter`
 - `admin-stations-operating-filter`
@@ -389,7 +454,9 @@ Test ids:
 - `admin-stations-reset`
 
 ### `StationTable`
+
 Columns:
+
 - Station.
 - Readiness.
 - Operating.
@@ -401,48 +468,59 @@ Columns:
 - Action.
 
 Station cell:
+
 - Name.
 - City.
 - Station ID.
 
 Readiness cell:
+
 - Go-live eligible label.
 - Validation status.
 - Blocker count.
 
 Services cell:
+
 - `Standard`
 - `Express`
 - `Doorstep`
 
 Validation cell:
+
 - Dry-run days.
 - Pilot-volume days.
 - Scan fallback percentage.
 - Checklist progress.
 
 Action cell:
+
 - Primary action.
 - Secondary action menu.
 
 Test ids:
+
 - `admin-stations-table`
 - `admin-stations-row`
 - `admin-stations-primary-action`
 
 ### `StationMobileCardList`
+
 Purpose:
+
 - Mobile rendering of station rows.
 
 Rules:
+
 - Same row model as table.
 - Readiness and blocker count must remain visible.
 - Validation details can collapse but must be available.
 
 Test id:
+
 - `admin-stations-mobile-list`
 
 ### `StationRowActions`
+
 Primary action mapping:
 | Condition | Primary action | Target |
 | --- | --- | --- |
@@ -453,23 +531,29 @@ Primary action mapping:
 | Station ready | `Open station detail` | `/admin/stations/:stationId` |
 
 Secondary actions:
+
 - `Open station detail`.
 - `Open launch readiness`.
 - `Open audit events`.
 
 Rules:
+
 - Hide validation and status mutation entry points for roles without `override_queue_state`.
 - If query-param filtering is not implemented on target routes, route to the parent and let that screen handle unsupported params safely.
 - Do not mutate directly from the station row.
 
 Test id:
+
 - `admin-stations-row-actions`
 
 ### `LaunchContextPanel`
+
 Purpose:
+
 - Connect station list to launch readiness.
 
 Content:
+
 - Launch readiness status.
 - Ready station count.
 - Total station count.
@@ -477,14 +561,18 @@ Content:
 - Link to launch readiness detail.
 
 Rules:
+
 - If launch readiness fails, show `Launch readiness context unavailable` and keep station list visible.
 - Do not duplicate every launch blocker when station rows already show station validation blockers.
 
 Test id:
+
 - `admin-stations-launch-context`
 
 ## Data Loading Strategy
+
 Initial load:
+
 1. Fetch `admin_stations`.
 2. Fetch `admin_launch_readiness` in parallel when this screen includes launch context.
 3. Render shell with skeleton rows.
@@ -493,6 +581,7 @@ Initial load:
 6. If station list returns `FORBIDDEN`, clear data and show not authorized.
 
 Refresh:
+
 - Refetch station list and launch readiness.
 - Keep current filters and sort.
 - Mark rows stale while refreshing.
@@ -500,23 +589,28 @@ Refresh:
 - Announce loaded station count after completion.
 
 Caching:
+
 - Use authenticated admin query cache.
 - Invalidate station list after station status or validation mutation owner screen succeeds.
 - Clear cache on sign-out.
 - Do not persist validation notes or blockers in local storage.
 
 ## Search, Filter, Sort
+
 Search fields:
+
 - Station ID.
 - Name.
 - City.
 
 Do not search:
+
 - Validation note.
 - Manual blocker text.
 - Internal issue text.
 
 Readiness filters:
+
 - All.
 - Go-live eligible.
 - Validation blocked.
@@ -529,6 +623,7 @@ Readiness filters:
 - Queue activity.
 
 Sort options:
+
 - Readiness risk.
 - Station name A-Z.
 - City A-Z.
@@ -538,6 +633,7 @@ Sort options:
 - Validation progress.
 
 Default sort:
+
 1. Validation blocked.
 2. Paused.
 3. Restricted intake.
@@ -547,83 +643,108 @@ Default sort:
 7. Name A-Z.
 
 Rules:
+
 - All filters are local.
 - Filters are reversible.
 - Reset clears search and filters and restores default sort.
 
 ## Empty And Error States
+
 ### Loading
+
 UI:
+
 - Skeleton summary strip.
 - Skeleton table rows.
 - Announce `Loading stations`.
 
 ### Empty
+
 Trigger:
+
 - `admin_stations` returns zero stations.
 
 Title:
+
 ```text
 No stations configured
 ```
 
 Body:
+
 ```text
 Station data is required before launch readiness can be reviewed.
 ```
 
 Actions:
+
 - `Refresh`
 - `Open launch readiness`
 
 ### Filtered Empty
+
 Title:
+
 ```text
 No stations match these filters
 ```
 
 Actions:
+
 - `Reset filters`
 
 ### Partial Launch Context
+
 Trigger:
+
 - `admin_stations` succeeds but launch readiness fails.
 
 UI:
+
 - Show station list.
 - Show banner `Launch readiness context unavailable`.
 - Keep refresh action.
 
 ### Not Authorized
+
 Title:
+
 ```text
 You do not have access to station management
 ```
 
 Body:
+
 ```text
 Use an authorized admin account to review station readiness.
 ```
 
 Actions:
+
 - `Back to admin overview`
 
 ### API Error
+
 Title:
+
 ```text
 Stations could not load
 ```
 
 Body:
+
 ```text
 Station readiness data did not respond. Refresh before making launch decisions.
 ```
 
 Actions:
+
 - `Refresh`
 
 ## Privacy And Security
+
 Never show:
+
 - Operator personal data.
 - Sender data.
 - Receiver data.
@@ -633,6 +754,7 @@ Never show:
 - Internal validation note in analytics.
 
 Allowed display:
+
 - Station ID.
 - Station name.
 - City.
@@ -644,13 +766,16 @@ Allowed display:
 - Validation note in station row expansion only when returned by backend.
 
 Analytics forbidden:
+
 - Validation note.
 - Manual blocker text.
 - Any future operator name.
 - Any future phone or email.
 
 ## Analytics
+
 Events:
+
 - `admin_stations_viewed`
 - `admin_stations_refreshed`
 - `admin_stations_filtered`
@@ -660,6 +785,7 @@ Events:
 - `admin_stations_launch_context_opened`
 
 Required properties:
+
 - `visible_count`
 - `total_count`
 - `go_live_eligible_count`
@@ -671,6 +797,7 @@ Required properties:
 - `sort`
 
 Row action properties:
+
 - `stationId`
 - `readiness_state`
 - `operatingStatus`
@@ -680,6 +807,7 @@ Row action properties:
 - `action`
 
 Do not send:
+
 - `note`
 - `blockers`
 - operator data
@@ -687,36 +815,44 @@ Do not send:
 - payment data
 
 ## Accessibility
+
 Structure:
+
 - One `h1`: `Stations`.
 - Summary metrics are buttons only when they filter rows.
 - Table headers are semantic.
 - Mobile cards include visible labels.
 
 Announcements:
+
 - Load complete announces station count.
 - Filter changes announce visible station count.
 - Refresh start and completion use polite status.
 - API error uses assertive status.
 
 Keyboard:
+
 - Filter controls reachable in logical order.
 - Table row actions reachable without hover.
 - Enter on a focused row opens primary action.
 - Action menu items use standard menu keyboard behavior.
 
 Focus:
+
 - Visible focus for all controls.
 - Focus must remain stable after refresh.
 - Mutation owner screens or modals must return focus to row action after close.
 
 Color:
+
 - Status must not rely on color alone.
 - Every status pill includes text.
 - Contrast meets WCAG AA.
 
 ## Performance
+
 Targets:
+
 - Render station shell immediately.
 - Render up to all configured launch stations without virtualization.
 - Filter and sort within 100 ms for expected station count.
@@ -724,13 +860,16 @@ Targets:
 - Avoid polling.
 
 Data:
+
 - One station list request.
 - Optional one launch readiness request.
 - Manual refresh only.
 - Invalidate list after station mutation owner screen succeeds.
 
 ## Testing Requirements
+
 Unit tests:
+
 - Readiness state derivation.
 - Validation progress derivation.
 - Role action visibility.
@@ -740,6 +879,7 @@ Unit tests:
 - Launch context partial-state handling.
 
 Integration tests:
+
 - Loads station rows from `admin_stations`.
 - Shows generated default station data correctly.
 - Shows validation blockers.
@@ -751,6 +891,7 @@ Integration tests:
 - Handles station list authorization failure.
 
 Accessibility tests:
+
 - Heading order.
 - Summary metric button labels.
 - Table headers.
@@ -759,6 +900,7 @@ Accessibility tests:
 - Mobile card labels.
 
 Visual regression states:
+
 - All stations ready.
 - Mixed validation states.
 - Paused station.
@@ -769,6 +911,7 @@ Visual regression states:
 - Mobile station cards.
 
 ## Implementation Checklist
+
 - Create route `/admin/stations`.
 - Use protected admin shell.
 - Fetch `admin_stations`.
@@ -784,7 +927,9 @@ Visual regression states:
 - Add tests listed above.
 
 ## Do Not Build
+
 Do not build:
+
 - Inline station status mutation inside the row.
 - Inline validation mutation inside the row.
 - A frontend-only readiness score.
@@ -797,7 +942,9 @@ Do not build:
 - Backend query params not supported by `admin_stations`.
 
 ## Acceptance Criteria
+
 The screen is complete when:
+
 - `/admin/stations` renders with test id `screen-admin-stations`.
 - It reads station rows from `admin_stations`.
 - It displays readiness, status, services, active queues, issue counts, validation progress, and blockers.
@@ -810,4 +957,5 @@ The screen is complete when:
 - It passes accessibility and responsive checks.
 
 ## Claude Code Build Brief
+
 Build `AdminStations` as a serious station readiness command list for `/admin/stations`. Use `admin_stations` as the source of truth, optionally load launch readiness context, and show each station's readiness, queue pressure, issue pressure, status, service availability, and validation evidence. Keep mutations in dedicated station status or validation owner flows, hide those entry points from roles without `override_queue_state`, and never invent frontend readiness scores.
