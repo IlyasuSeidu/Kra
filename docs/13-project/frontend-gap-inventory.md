@@ -26,6 +26,8 @@ Rules used for this scan:
 | Frontend metadata consistency gaps                         | 0                                             |
 | Route-map classification gaps                              | 0                                             |
 | Public web routes added from app metadata                  | 4                                             |
+| Admin routed specs normalized to screen-contract metadata  | 31                                            |
+| Mobile role-shell aliases normalized to canonical IDs      | 6                                             |
 | Backend-confirmed contract gaps                            | Listed below                                  |
 
 ## What Is Not A Gap
@@ -39,16 +41,18 @@ Rules used for this scan:
 
 ## Resolved Frontend Inventory Gaps
 
-| Gap ID     | Priority | Original Gap                                                                      | Evidence                                                                                                                          | Resolution                                                                                                                     |
-| ---------- | -------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| FE-GAP-001 | P2       | `PublicServiceAreas` existing spec omitted route metadata.                        | `docs/05-design/frontend-screen-specs/public-web/03-public-service-areas.md` maps to `/service-areas`.                            | Resolved with canonical route metadata.                                                                                        |
-| FE-GAP-002 | P2       | Existing public web metadata included routes missing from inventory.              | `apps/web/src/index.ts` listed `/business`, `/coverage`, `/partners`, and `/about`.                                               | Resolved by adding `PublicBusiness`, `PublicCoverage`, `PublicPartners`, and `PublicAbout` to inventory, route map, and specs. |
-| FE-GAP-003 | P2       | Existing public web metadata omitted canonical public routes.                     | `apps/web/src/index.ts` omitted `/service-areas`, `/trust-and-custody`, `/delivery-policy`, `/refund-policy`, and `/maintenance`. | Resolved by aligning `apps/web/src/index.ts` to the canonical public route set.                                                |
-| FE-GAP-004 | P1       | Auth/account screens had specs with routes, but the exact route map omitted them. | Inventory listed auth/account screens and specs defined route/test IDs.                                                           | Resolved with an Auth And Utility Routes section in the exact route map.                                                       |
+| Gap ID     | Priority | Original Gap                                                                       | Evidence                                                                                                                                               | Resolution                                                                                                                     |
+| ---------- | -------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| FE-GAP-001 | P2       | `PublicServiceAreas` existing spec omitted route metadata.                         | `docs/05-design/frontend-screen-specs/public-web/03-public-service-areas.md` maps to `/service-areas`.                                                 | Resolved with canonical route metadata.                                                                                        |
+| FE-GAP-002 | P2       | Existing public web metadata included routes missing from inventory.               | `apps/web/src/index.ts` listed `/business`, `/coverage`, `/partners`, and `/about`.                                                                    | Resolved by adding `PublicBusiness`, `PublicCoverage`, `PublicPartners`, and `PublicAbout` to inventory, route map, and specs. |
+| FE-GAP-003 | P2       | Existing public web metadata omitted canonical public routes.                      | `apps/web/src/index.ts` omitted `/service-areas`, `/trust-and-custody`, `/delivery-policy`, `/refund-policy`, and `/maintenance`.                      | Resolved by aligning `apps/web/src/index.ts` to the canonical public route set.                                                |
+| FE-GAP-004 | P1       | Auth/account screens had specs with routes, but the exact route map omitted them.  | Inventory listed auth/account screens and specs defined route/test IDs.                                                                                | Resolved with an Auth And Utility Routes section in the exact route map.                                                       |
+| FE-GAP-005 | P1       | Routed admin specs 10-40 used older `Screen name` and `Test id` metadata labels.   | Metadata audit could not prove `AdminManualCustodyException` through `AdminSettings` by `Screen ID`/`Primary test ID`.                                 | Resolved by normalizing all 31 routed admin specs to the canonical screen-contract table format.                               |
+| FE-GAP-006 | P1       | Mobile role-shell metadata used aggregate aliases instead of canonical screen IDs. | `apps/mobile/src/index.ts` listed `CreateDelivery`, `TrackingTimeline`, `SupportThread`, `DriverHandoff`, `StationIntake`, and `CourierFailureReason`. | Resolved by replacing aliases with existing canonical inventory screen IDs and updating `screen-list.md`.                      |
 
 ## Current Frontend Inventory Status
 
-No current frontend inventory route is missing a corresponding spec, and no public web route in `apps/web/src/index.ts` is outside the canonical inventory.
+No current frontend inventory route is missing a corresponding spec, no public web route in `apps/web/src/index.ts` is outside the canonical inventory, and no mobile role-shell entry points at a non-canonical screen alias.
 
 ## Backend-Confirmed Contract Gaps
 

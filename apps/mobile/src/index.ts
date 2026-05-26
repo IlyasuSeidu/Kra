@@ -1,11 +1,23 @@
 export const mobileImplementationStatus = "contract_only" as const;
 
 export const mobileRoleShells = {
-  sender: ["SenderHome", "CreateDelivery", "TrackingTimeline", "SupportThread"],
-  driver: ["DriverHome", "DriverManifest", "DriverRoute", "DriverHandoff"],
+  sender: [
+    "SenderHome",
+    "CreateDeliveryStart",
+    "CreateDeliveryStations",
+    "CreateReceiverDetails",
+    "CreatePackageDetails",
+    "CreateDeliveryOptions",
+    "QuoteReview",
+    "DeliverySummary",
+    "SenderTrackingTimeline",
+    "SenderSupportThread"
+  ],
+  driver: ["DriverHome", "DriverManifest", "DriverRoute", "DriverDestinationHandoff"],
   station_operator: [
     "StationOverview",
-    "StationIntake",
+    "StationIntakeQueue",
+    "StationPackageIntake",
     "StationOutboundQueue",
     "StationDestinationReceipt"
   ],
@@ -13,6 +25,6 @@ export const mobileRoleShells = {
     "CourierHome",
     "CourierAssignmentDetail",
     "CourierProofCapture",
-    "CourierFailureReason"
+    "CourierFailedAttempt"
   ]
 } as const;

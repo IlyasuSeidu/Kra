@@ -1,24 +1,27 @@
 # Admin Analytics Screen Spec
 
-## Metadata
-| Field | Value |
-| --- | --- |
-| Screen name | `AdminAnalytics` |
-| Route | `/admin/analytics` |
-| Test id | `screen-admin-analytics` |
-| Surface | Admin web console |
-| Backend coverage | `admin_overview`; KPI definitions from analytics docs |
-| Offline critical | No |
-| Required read role | `ops_admin`, `finance_admin`, `support_admin`, or `super_admin` |
-| Required action role | None on this screen |
-| Required states | `loading`, `ready`, `empty`, `partial_data`, `stale`, `refreshing`, `not_authorized`, `session_expired`, `api_error` |
-| Parent screens | `AdminOverview`, `AdminLaunchReadiness`, `AdminSlaBreachDashboard`, `AdminFinanceSummary` |
-| Related screens | `AdminOverview`, `AdminLaunchReadiness`, `AdminDeliveryExplorer`, `AdminSlaBreachDashboard`, `AdminFinanceSummary`, `AdminPaymentReconciliation`, `AdminWebhookEvents`, `AdminIssueQueue`, `AdminExportReport` |
+## Screen Contract
+
+| Field                | Value                                                                                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID            | `AdminAnalytics`                                                                                                                                                                                               |
+| Route                | `/admin/analytics`                                                                                                                                                                                             |
+| Primary test ID      | `screen-admin-analytics`                                                                                                                                                                                       |
+| Surface              | Admin web console                                                                                                                                                                                              |
+| Backend coverage     | `admin_overview`; KPI definitions from analytics docs                                                                                                                                                          |
+| Offline critical     | No                                                                                                                                                                                                             |
+| Required read role   | `ops_admin`, `finance_admin`, `support_admin`, or `super_admin`                                                                                                                                                |
+| Required action role | None on this screen                                                                                                                                                                                            |
+| Required states      | `loading`, `ready`, `empty`, `partial_data`, `stale`, `refreshing`, `not_authorized`, `session_expired`, `api_error`                                                                                           |
+| Parent screens       | `AdminOverview`, `AdminLaunchReadiness`, `AdminSlaBreachDashboard`, `AdminFinanceSummary`                                                                                                                      |
+| Related screens      | `AdminOverview`, `AdminLaunchReadiness`, `AdminDeliveryExplorer`, `AdminSlaBreachDashboard`, `AdminFinanceSummary`, `AdminPaymentReconciliation`, `AdminWebhookEvents`, `AdminIssueQueue`, `AdminExportReport` |
 
 ## Purpose
+
 `AdminAnalytics` is the pilot KPI review surface for Kra admins. It gathers the currently implemented `admin_overview` snapshot, documented KPI targets, SLO expectations, and launch reporting rules into one honest analytics workspace.
 
 The screen should answer:
+
 - `Is the pilot operating inside the approved KPI targets?`
 - `Which KPI groups are measurable today from implemented backend data?`
 - `Which KPI groups are documented but waiting for dedicated metric endpoints?`
@@ -31,9 +34,11 @@ The screen should answer:
 This screen is a read-only executive and operations analytics surface. It must not mutate delivery state, approve refunds, change pricing, edit KPI targets, export data directly, or invent trend values from unavailable endpoints.
 
 ## Strategic Role
+
 Admin overview is the operating pulse. `AdminAnalytics` is the structured KPI review room. It translates the pulse into pilot management questions without pretending that every KPI is already measurable through a backend endpoint.
 
 The screen must separate:
+
 - implemented metrics from `GET /v1/admin/overview`
 - targets from KPI and success-metric documents
 - SLOs from platform reliability docs
@@ -42,19 +47,23 @@ The screen must separate:
 That separation is essential. A serious analytics screen is not a decorative chart wall; it is a governed decision surface.
 
 ## Audience
+
 Primary users:
+
 - super admins reviewing pilot health
 - ops admins reviewing reliability and speed signals
 - finance admins reviewing payment and webhook signals
 - support admins reviewing issue pressure signals
 
 Secondary users:
+
 - business owner reviewing route expansion readiness
 - QA reviewers validating metric boundaries
 - engineering leads reviewing observability gaps
 - Claude Code implementing the frontend later
 
 Non-users:
+
 - senders
 - receivers
 - drivers
@@ -63,22 +72,27 @@ Non-users:
 - public web visitors
 
 ## Backend Reality
+
 Implemented endpoint:
+
 ```http
 GET /v1/admin/overview
 ```
 
 Operation:
+
 ```text
 admin_overview
 ```
 
 Auth:
+
 - admin-scoped
 - accepts authenticated admin roles
 - current route guard uses `requireAdmin`
 
 Response:
+
 ```json
 {
   "generatedAt": "2026-05-16T09:00:00.000Z",
@@ -103,6 +117,7 @@ Response:
 ```
 
 Implemented fields:
+
 - `generatedAt`
 - `deliveryStatusCounts`
 - `paymentStatusCounts`
@@ -111,6 +126,7 @@ Implemented fields:
 - `operationalAlerts.manualReviewWebhookEvents`
 
 Current backend limits:
+
 - No dedicated analytics endpoint exists.
 - No time-series endpoint exists.
 - No route KPI endpoint exists.
@@ -124,13 +140,16 @@ Current backend limits:
 - No chart-ready history is returned.
 
 Therefore:
+
 - The screen can render current snapshot analytics from `admin_overview`.
 - The screen can render documented KPI targets as target cards.
 - The screen can mark non-measurable KPIs as `Endpoint required`.
 - The screen must not draw historical charts unless data is supplied later.
 
 ## Source References
+
 External references used for this screen:
+
 - [USWDS Data visualizations](https://designsystem.digital.gov/components/data-visualizations/): supports accessible chart labels, tabular alternatives, and responsible use of visual data.
 - [Google Cloud Monitoring Dashboards overview](https://docs.cloud.google.com/monitoring/dashboards): supports dashboard design choices, grouping, avoiding performance issues, and choosing tables, scorecards, gauges, and charts by data shape.
 - [Google Cloud Monitoring charts and tables](https://cloud.google.com/monitoring/charts): supports chart, table, gauge, and scorecard distinctions for recent values versus time-series data.
@@ -140,6 +159,7 @@ External references used for this screen:
 - [Google SRE Workbook, Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/): supports SLO-backed alert thinking and avoiding noisy non-actionable signals.
 
 Local references:
+
 - `docs/05-design/frontend-screen-inventory.md`
 - `docs/05-design/frontend-screen-specs/admin-web-console/02-admin-overview.md`
 - `docs/11-analytics/kpis.md`
@@ -154,9 +174,11 @@ Local references:
 - `services/api/src/app.ts`
 
 ## Design Thesis
+
 Design this as a pilot performance board: quiet, executive-grade, target-led, and brutally honest about data completeness. The page should feel like a serious operating review deck inside the admin console, not a colorful vanity analytics page.
 
 Visual direction:
+
 - editorial dashboard layout
 - target cards first
 - current backend snapshot second
@@ -168,12 +190,15 @@ Visual direction:
 - high-contrast status accents
 
 Restraint rule:
+
 - Do not draw trend lines, route rankings, station rankings, or growth curves without implemented data. Use `Endpoint required` and route to the appropriate owner screen instead.
 
 ## Product Principle
+
 Every number must have a source and an owner.
 
 Each metric must identify:
+
 - source: backend endpoint or local document
 - measurement window
 - owner role
@@ -185,7 +210,9 @@ Each metric must identify:
 If any of these are unknown, the UI must say so.
 
 ## Information Architecture
+
 Desktop structure:
+
 - Admin shell and breadcrumb.
 - Page header with freshness and refresh.
 - Pilot KPI health strip.
@@ -198,6 +225,7 @@ Desktop structure:
 - Owner review cadence section.
 
 Mobile structure:
+
 - Header stack.
 - KPI health cards in one column.
 - Snapshot cards.
@@ -206,6 +234,7 @@ Mobile structure:
 - Owner routes.
 
 Recommended sections:
+
 1. `Pilot health`
 2. `Current snapshot`
 3. `Reliability KPIs`
@@ -216,7 +245,9 @@ Recommended sections:
 8. `Measurement gaps`
 
 ## Routing
+
 Primary route:
+
 ```text
 /admin/analytics
 ```
@@ -224,6 +255,7 @@ Primary route:
 No route query parameters are required for v1.
 
 Optional future query parameters:
+
 - `group=reliability`
 - `group=speed`
 - `group=trust`
@@ -235,6 +267,7 @@ Optional future query parameters:
 Do not implement optional query parameters until the corresponding UI behavior and data are ready.
 
 Entry routes:
+
 - admin shell navigation
 - `AdminOverview` analytics link
 - `AdminLaunchReadiness` KPI review link
@@ -242,6 +275,7 @@ Entry routes:
 - `AdminFinanceSummary` finance KPI link
 
 Exit routes:
+
 - `/admin`
 - `/admin/deliveries`
 - `/admin/sla-breaches`
@@ -252,16 +286,18 @@ Exit routes:
 - `/admin/exports/new`
 
 ## Data Contract Mapping
-| API field | Analytics usage | Treatment |
-| --- | --- | --- |
-| `generatedAt` | Snapshot freshness | Header and stale warning |
-| `deliveryStatusCounts` | Delivery mix and risk cards | Current snapshot only |
-| `paymentStatusCounts` | Payment mix cards | Current snapshot only |
-| `operationalAlerts.openIssueLikeDeliveries` | Support/ops pressure | Alert card and issue route |
-| `operationalAlerts.unmatchedWebhookEvents` | Finance webhook risk | Alert card and webhook route |
-| `operationalAlerts.manualReviewWebhookEvents` | Finance review risk | Alert card and webhook route |
+
+| API field                                     | Analytics usage             | Treatment                    |
+| --------------------------------------------- | --------------------------- | ---------------------------- |
+| `generatedAt`                                 | Snapshot freshness          | Header and stale warning     |
+| `deliveryStatusCounts`                        | Delivery mix and risk cards | Current snapshot only        |
+| `paymentStatusCounts`                         | Payment mix cards           | Current snapshot only        |
+| `operationalAlerts.openIssueLikeDeliveries`   | Support/ops pressure        | Alert card and issue route   |
+| `operationalAlerts.unmatchedWebhookEvents`    | Finance webhook risk        | Alert card and webhook route |
+| `operationalAlerts.manualReviewWebhookEvents` | Finance review risk         | Alert card and webhook route |
 
 Derived from current snapshot:
+
 - total deliveries represented by status counts
 - delivered count
 - issue-like delivery count
@@ -273,6 +309,7 @@ Derived from current snapshot:
 - unmatched webhook count
 
 Must not derive:
+
 - delivery completion rate if denominator semantics are not guaranteed
 - lost package rate
 - failed handoff rate
@@ -287,13 +324,17 @@ Must not derive:
 Those require dedicated source data.
 
 ## KPI Groups
+
 ### Reliability
+
 Documented KPIs:
+
 - delivery completion rate, target `>= 97%`
 - lost package rate, target `<= 0.5%`
 - failed handoff rate, target `<= 1%`
 
 Current screen behavior:
+
 - show targets
 - show owner `ops_admin`
 - show measurement window `weekly`
@@ -301,17 +342,21 @@ Current screen behavior:
 - show current delivery status mix as supporting context
 
 Primary routes:
+
 - `/admin/deliveries`
 - `/admin/sla-breaches`
 - `/admin/issues`
 
 ### Speed
+
 Documented KPIs:
+
 - dispatch turnaround compliance, target `>= 90%`
 - on-time destination receipt confirmation, target `>= 95%`
 - median support acknowledgement time, target `< 15 minutes`
 
 Current screen behavior:
+
 - show targets
 - show owner roles
 - show measurement window
@@ -319,30 +364,37 @@ Current screen behavior:
 - route to SLA breach dashboard and issue queue
 
 Primary routes:
+
 - `/admin/sla-breaches`
 - `/admin/issues`
 
 ### Trust
+
 Documented KPIs:
+
 - dispute rate, target `<= 3%`
 - refund resolution within policy window, target `>= 90%`
 - proof capture completion rate, target `>= 98%`
 - successful receipt generation, target `100%`
 
 Current screen behavior:
+
 - show targets
 - show finance and ops owners
 - use current payment status counts and webhook alert counts as supporting context
 - avoid exact trust KPI claims without dedicated data
 
 Primary routes:
+
 - `/admin/finance`
 - `/admin/payment-reconciliation`
 - `/admin/webhook-events`
 - `/admin/issues`
 
 ### Growth
+
 Documented KPIs:
+
 - repeat sender rate
 - active station count
 - delivery volume per route
@@ -350,17 +402,21 @@ Documented KPIs:
 - revenue per completed delivery
 
 Current screen behavior:
+
 - show as documented targets or monitored goals where targets exist
 - mark current value as `Endpoint required`
 - route to export flow if a manual analysis is needed
 
 Primary routes:
+
 - `/admin/exports/new`
 - `/admin/deliveries`
 - `/admin/settings`
 
 ## Pilot Health Strip
+
 Cards:
+
 - `Delivery snapshot`
 - `Payment snapshot`
 - `Issue pressure`
@@ -368,62 +424,76 @@ Cards:
 - `Data coverage`
 
 Delivery snapshot:
+
 - current total from `deliveryStatusCounts`
 - top risk states if present: `issue_reported`, `on_hold`, `delivery_failed`
 - route to delivery explorer
 
 Payment snapshot:
+
 - current total from `paymentStatusCounts`
 - confirmed, pending, failed values when present
 - route to finance summary
 
 Issue pressure:
+
 - value from `openIssueLikeDeliveries`
 - route to issue queue or SLA breach dashboard
 
 Webhook review:
+
 - unmatched plus manual-review values
 - route to webhook events
 
 Data coverage:
+
 - value label: `Current snapshot only`
 - body: `Trends and exact KPI rates require dedicated analytics endpoints.`
 - route to measurement gaps
 
 ## Current Snapshot Section
+
 Purpose:
+
 - show implemented backend facts from `admin_overview`
 
 Cards:
+
 - Delivery status mix
 - Payment status mix
 - Operational alerts
 - Snapshot freshness
 
 Delivery status mix:
+
 - render as stacked bar or compact table
 - always include text table alternative
 - count total returned statuses
 - sort by product lifecycle order, not alphabetically
 
 Payment status mix:
+
 - render as status cards or compact bar
 - include confirmed, pending, failed, refunded, refund pending if present
 - do not convert to success rate unless denominator semantics are approved
 
 Operational alerts:
+
 - open issue-like deliveries
 - unmatched webhook events
 - manual-review webhook events
 - each card routes to owner screen
 
 Snapshot freshness:
+
 - show generated timestamp
 - show relative age
 - show stale warning if older than admin refresh target
 
 ## KPI Target Matrix
+
 Columns:
+
 - KPI
 - Target
 - Owner
@@ -434,12 +504,14 @@ Columns:
 - Route
 
 Current value states:
+
 - numeric value
 - `Current snapshot only`
 - `Endpoint required`
 - `Not measured in v1`
 
 Status labels:
+
 - `On track`
 - `Watch`
 - `Action needed`
@@ -447,179 +519,225 @@ Status labels:
 - `Documented target`
 
 Rules:
+
 - `On track`, `Watch`, and `Action needed` require a real current value and target comparison.
 - If there is no real current value, use `Not measurable yet`.
 - Do not use green for a target-only row.
 - Do not hide unsupported KPIs.
 
 ## Data Coverage Notice
+
 Always show a compact coverage notice near the top:
+
 ```text
 This analytics screen uses the current admin overview snapshot and documented KPI targets. Trend lines, route rankings, station rankings, and exact KPI rates require future analytics endpoints.
 ```
 
 Rules:
+
 - Keep the notice visible in ready state.
 - It can be collapsed after the user reads it, but should remain accessible.
 - It must reappear after a major data-contract change.
 
 ## Empty State
+
 Trigger:
+
 - overview endpoint returns empty status arrays and zero operational alerts
 
 Copy:
+
 ```text
 No operational snapshot values are available yet.
 KPI targets are documented, but current values will appear after delivery, payment, and webhook data is recorded.
 ```
 
 Actions:
+
 - `Refresh`
 - `Open admin overview`
 - `Open delivery explorer`
 
 Rules:
+
 - Still show KPI target matrix.
 - Mark current values as unavailable.
 - Do not imply the pilot is healthy because there are no rows.
 
 ## Partial Data State
+
 Trigger:
+
 - overview returns one metric family but not another
 - data arrays are empty for one section
 - derived status totals are zero but alerts exist
 
 Copy:
+
 ```text
 Some analytics values are unavailable in the current snapshot.
 Use the available values for orientation and open owner screens for row-level review.
 ```
 
 Rules:
+
 - Render available sections.
 - Mark missing sections clearly.
 - Do not block the page if one family is empty.
 
 ## Loading State
+
 Trigger:
+
 - first `admin_overview` request pending
 
 Layout:
+
 - header skeleton
 - health strip skeleton
 - target matrix skeleton
 - snapshot chart skeleton
 
 Copy:
+
 ```text
 Loading analytics snapshot...
 ```
 
 Rules:
+
 - Do not show chart axes without values.
 - Do not animate counters.
 - Preserve page layout.
 
 ## Refreshing State
+
 Trigger:
+
 - manual refresh or background refetch
 
 Behavior:
+
 - keep current values visible
 - show `Refreshing analytics...`
 - keep focus on refresh button
 - announce completion and generated time
 
 Copy after completion:
+
 ```text
 Analytics snapshot refreshed.
 ```
 
 Rules:
+
 - Do not clear KPI group selection.
 - Do not clear expanded sections.
 - Do not treat older generated time as success without stale notice.
 
 ## Stale State
+
 Trigger:
+
 - `generatedAt` exceeds admin dashboard freshness threshold
 
 Recommended threshold:
+
 - use admin dashboard refresh cadence from dashboard metrics: `5 minutes`
 
 Copy:
+
 ```text
 This analytics snapshot may be stale.
 Refresh before making launch or staffing decisions.
 ```
 
 Actions:
+
 - `Refresh`
 
 Rules:
+
 - Stale values remain visible.
 - Stale state must not hide critical counts.
 - Stale warning must be announced if it appears after refresh.
 
 ## API Error State
+
 Trigger:
+
 - overview request fails
 - backend returns non-success response
 
 Copy:
+
 ```text
 Analytics could not be loaded.
 Retry, or use the admin overview and owner screens while this dashboard is unavailable.
 ```
 
 Actions:
+
 - `Retry`
 - `Open admin overview`
 - `Open export report`
 
 Rules:
+
 - Do not show stale values as current unless they are labeled stale.
 - Do not expose backend stack traces.
 - Do not block navigation to owner screens.
 
 ## Not Authorized State
+
 Trigger:
+
 - authenticated user is not an admin
 - backend returns forbidden
 
 Copy:
+
 ```text
 You do not have permission to view admin analytics.
 Use the role-specific app for your account.
 ```
 
 Actions:
+
 - `Back to home`
 
 Rules:
+
 - No metrics remain visible.
 - Do not preserve cached analytics values after authorization failure.
 
 ## Session Expired State
+
 Trigger:
+
 - backend returns unauthorized
 - admin session expires
 
 Copy:
+
 ```text
 Your admin session expired.
 Sign in again to view analytics.
 ```
 
 Actions:
+
 - `Sign in`
 
 Rules:
+
 - Clear visible analytics values.
 - Preserve intended return route.
 
 ## Visualization Rules
+
 Allowed current visualizations:
+
 - scorecards
 - compact stacked bars
 - status tables
@@ -628,6 +746,7 @@ Allowed current visualizations:
 - data coverage callouts
 
 Avoid until endpoints exist:
+
 - time-series line charts
 - route ranking charts
 - station ranking charts
@@ -637,6 +756,7 @@ Avoid until endpoints exist:
 - revenue charts
 
 Chart rules:
+
 - Every chart has a text equivalent.
 - Every chart has a data source label.
 - Every chart has a measurement window label.
@@ -645,7 +765,9 @@ Chart rules:
 - Do not show a chart if a table is clearer.
 
 ## Role Personalization
+
 `ops_admin` emphasis:
+
 - reliability KPIs
 - speed KPIs
 - delivery snapshot
@@ -653,44 +775,51 @@ Chart rules:
 - SLA breach route
 
 `finance_admin` emphasis:
+
 - trust KPIs
 - payment snapshot
 - webhook review
 - refund and reconciliation routes
 
 `support_admin` emphasis:
+
 - issue pressure
 - support acknowledgement target
 - customer trust signals
 - issue queue route
 
 `super_admin` emphasis:
+
 - all KPI groups
 - data coverage
 - launch readiness
 - export report
 
 Rules:
+
 - Personalization changes ordering and emphasis only.
 - It must not hide critical cross-functional alerts.
 - It must not bypass backend authorization.
 
 ## Owner Routes
-| Signal | Owner | Route |
-| --- | --- | --- |
-| delivery risk | `ops_admin` | `/admin/deliveries` |
-| SLA breach risk | `ops_admin` | `/admin/sla-breaches` |
-| open issue-like deliveries | `support_admin` | `/admin/issues` |
-| payment risk | `finance_admin` | `/admin/finance` |
-| reconciliation risk | `finance_admin` | `/admin/payment-reconciliation` |
-| unmatched webhook events | `finance_admin` | `/admin/webhook-events?processingStatus=unmatched` |
-| manual-review webhook events | `finance_admin` | `/admin/webhook-events?processingStatus=manual_review` |
-| export-needed analysis | `super_admin` or owner | `/admin/exports/new` |
+
+| Signal                       | Owner                  | Route                                                  |
+| ---------------------------- | ---------------------- | ------------------------------------------------------ |
+| delivery risk                | `ops_admin`            | `/admin/deliveries`                                    |
+| SLA breach risk              | `ops_admin`            | `/admin/sla-breaches`                                  |
+| open issue-like deliveries   | `support_admin`        | `/admin/issues`                                        |
+| payment risk                 | `finance_admin`        | `/admin/finance`                                       |
+| reconciliation risk          | `finance_admin`        | `/admin/payment-reconciliation`                        |
+| unmatched webhook events     | `finance_admin`        | `/admin/webhook-events?processingStatus=unmatched`     |
+| manual-review webhook events | `finance_admin`        | `/admin/webhook-events?processingStatus=manual_review` |
+| export-needed analysis       | `super_admin` or owner | `/admin/exports/new`                                   |
 
 ## Privacy And Analytics
+
 This is an analytics screen, but it still must be privacy safe.
 
 Do not send to product analytics:
+
 - delivery IDs
 - tracking codes
 - payment IDs
@@ -702,6 +831,7 @@ Do not send to product analytics:
 - route-specific sensitive records
 
 Allowed analytics payload fields:
+
 - role class
 - selected KPI group
 - snapshot age bucket
@@ -713,6 +843,7 @@ Allowed analytics payload fields:
 - has issue risk
 
 Frontend events:
+
 - `admin_analytics_viewed`
 - `admin_analytics_refreshed`
 - `admin_analytics_kpi_group_selected`
@@ -721,12 +852,15 @@ Frontend events:
 - `admin_analytics_error_seen`
 
 Rules:
+
 - Analytics events must not block UI.
 - Analytics events must not include exact sensitive IDs.
 - If exact counts are sensitive in a future deployment, bucket them before logging.
 
 ## Accessibility
+
 Required:
+
 - one `h1`: `Analytics`
 - clear section headings
 - semantic tables for KPI matrix
@@ -738,32 +872,39 @@ Required:
 - status labels include text
 
 Status messages:
+
 - refresh completion announces `Analytics snapshot refreshed`
 - stale warning announces once when it appears
 - errors announce assertively only when values cannot render
 
 Chart alternatives:
+
 - stacked bars have adjacent count table
 - scorecards include labels, values, owner, and source
 - target matrix is the source of truth for screen readers
 
 ## Responsive Behavior
+
 Desktop, `>= 1200px`:
+
 - KPI health strip in one row
 - snapshot and target matrix side by side where useful
 - owner routes in right rail
 
 Laptop, `900px - 1199px`:
+
 - health strip wraps to two rows
 - target matrix remains full width
 - owner rail becomes horizontal card group
 
 Tablet, `700px - 899px`:
+
 - section cards stack
 - charts use simplified bars
 - KPI matrix becomes horizontally scrollable only if labels remain accessible
 
 Mobile, `< 700px`:
+
 - one-column layout
 - KPI group accordions
 - matrix rows become cards
@@ -771,7 +912,9 @@ Mobile, `< 700px`:
 - refresh remains near header
 
 ## Performance
+
 Rules:
+
 - Fetch `admin_overview` only once per route load unless refreshing.
 - Avoid heavy chart libraries for current data shape.
 - Prefer CSS bars and tables.
@@ -780,24 +923,27 @@ Rules:
 - Do not load all admin lists to approximate missing KPIs.
 
 Target:
+
 - first meaningful dashboard content from cached shell quickly
 - overview fetch visible within admin read SLO expectations
 - no blocking third-party analytics calls
 
 ## Error And Empty Matrix
-| State | Trigger | UI | Action |
-| --- | --- | --- | --- |
-| `loading` | first fetch pending | skeleton dashboard | wait |
-| `ready` | snapshot returned | analytics board | review |
-| `empty` | no snapshot values | target matrix plus empty copy | refresh |
-| `partial_data` | some values unavailable | partial board plus notice | route to owner |
-| `stale` | old generated time | stale banner | refresh |
-| `refreshing` | refetch active | retained values plus progress | wait |
-| `not_authorized` | forbidden | permission state | back |
-| `session_expired` | unauthorized | sign-in state | sign in |
-| `api_error` | request failure | error panel | retry |
+
+| State             | Trigger                 | UI                            | Action         |
+| ----------------- | ----------------------- | ----------------------------- | -------------- |
+| `loading`         | first fetch pending     | skeleton dashboard            | wait           |
+| `ready`           | snapshot returned       | analytics board               | review         |
+| `empty`           | no snapshot values      | target matrix plus empty copy | refresh        |
+| `partial_data`    | some values unavailable | partial board plus notice     | route to owner |
+| `stale`           | old generated time      | stale banner                  | refresh        |
+| `refreshing`      | refetch active          | retained values plus progress | wait           |
+| `not_authorized`  | forbidden               | permission state              | back           |
+| `session_expired` | unauthorized            | sign-in state                 | sign in        |
+| `api_error`       | request failure         | error panel                   | retry          |
 
 ## QA Scenarios
+
 1. Any admin role can open `/admin/analytics`.
 2. Non-admin user cannot see analytics values.
 3. The page calls only `GET /v1/admin/overview`.
@@ -825,7 +971,9 @@ Target:
 25. Mobile layout converts matrix rows to readable cards.
 
 ## Acceptance Criteria
+
 Functional:
+
 - Route is `/admin/analytics`.
 - Root test id is `screen-admin-analytics`.
 - Uses `useAdminOverviewQuery` or equivalent `admin_overview` query.
@@ -837,6 +985,7 @@ Functional:
 - Routes every risk signal to a real owner screen.
 
 Accessibility:
+
 - One page heading.
 - KPI matrix is semantic.
 - Chart alternatives exist.
@@ -845,11 +994,13 @@ Accessibility:
 - Keyboard can reach all KPI group controls and owner routes.
 
 Privacy:
+
 - No sensitive IDs in analytics events.
 - No row-level data is fetched to approximate unavailable KPIs.
 - Authorization failure clears visible metrics.
 
 Quality:
+
 - Handles empty values.
 - Handles partial values.
 - Handles stale snapshot.
@@ -857,7 +1008,9 @@ Quality:
 - Avoids unsupported trend charts.
 
 ## Component Inventory
+
 Required components:
+
 - `AdminPageShell`
 - `AdminBreadcrumb`
 - `AdminAnalyticsHeader`
@@ -877,6 +1030,7 @@ Required components:
 - `AdminLiveRegion`
 
 Optional components:
+
 - `KpiGroupTabs`
 - `KpiGroupAccordion`
 - `SnapshotFreshnessBadge`
@@ -884,6 +1038,7 @@ Optional components:
 - `MetricConfidenceBadge`
 
 Do not build:
+
 - time-series chart without time-series data
 - route ranking without route data
 - station ranking without station KPI endpoint
@@ -892,7 +1047,9 @@ Do not build:
 - export generation inside this route
 
 ## Implementation Notes For Claude Code
+
 Build sequence:
+
 1. Add route `/admin/analytics`.
 2. Wire `admin_overview` query.
 3. Render page header, freshness, and refresh.
@@ -907,6 +1064,7 @@ Build sequence:
 12. Add accessibility and responsive tests.
 
 Implementation boundaries:
+
 - Do not add backend endpoints.
 - Do not compute exact KPI rates without approved denominators.
 - Do not fetch all list endpoints to build analytics in the browser.
@@ -914,7 +1072,9 @@ Implementation boundaries:
 - Do not implement target editing.
 
 ## Test Plan
+
 Unit tests:
+
 - maps overview fields to snapshot cards
 - derives delivery and payment totals
 - maps KPI target constants
@@ -924,6 +1084,7 @@ Unit tests:
 - sanitizes analytics payloads
 
 Component tests:
+
 - renders loading state
 - renders ready state
 - renders empty state
@@ -936,6 +1097,7 @@ Component tests:
 - renders role emphasis ordering
 
 Integration tests:
+
 - admin role loads analytics
 - non-admin cannot view metrics
 - refresh calls overview once
@@ -945,6 +1107,7 @@ Integration tests:
 - export-needed gap routes to export flow
 
 Visual regression:
+
 - desktop ready state
 - desktop partial data state
 - desktop KPI matrix
@@ -952,6 +1115,7 @@ Visual regression:
 - mobile empty state
 
 Accessibility tests:
+
 - heading order
 - matrix semantics
 - chart alternatives
@@ -960,7 +1124,9 @@ Accessibility tests:
 - contrast for status badges
 
 ## Content Checklist
+
 Before implementation is accepted:
+
 - The page never says unsupported KPI current values are measured.
 - Every KPI has target, owner, cadence, source, and current-value state.
 - Current overview values show generated time.
@@ -971,7 +1137,9 @@ Before implementation is accepted:
 - Owner routes are real.
 
 ## Open Backend Gaps For Future Work
+
 Not required for current analytics screen:
+
 - dedicated admin analytics endpoint
 - date range query
 - time-series metric endpoint
@@ -987,4 +1155,5 @@ Not required for current analytics screen:
 These gaps must be visible on the screen as measurement gaps, not hidden as design omissions.
 
 ## Final Screen Contract
+
 `AdminAnalytics` is complete when it gives admins a premium, accessible, source-labeled pilot KPI dashboard that uses implemented overview metrics, shows approved targets, routes every weak signal to an owner screen, and clearly marks every unsupported KPI or trend as requiring a future analytics endpoint.

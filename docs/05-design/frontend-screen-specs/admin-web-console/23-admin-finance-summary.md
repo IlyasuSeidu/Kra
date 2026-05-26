@@ -1,12 +1,12 @@
 # Admin Finance Summary Screen Spec
 
-## Metadata
+## Screen Contract
 
 | Field                  | Value                                                                                                                                                                                                                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Screen name            | `AdminFinanceSummary`                                                                                                                                                                                                                                                           |
+| Screen ID              | `AdminFinanceSummary`                                                                                                                                                                                                                                                           |
 | Route                  | `/admin/finance`                                                                                                                                                                                                                                                                |
-| Test id                | `screen-admin-finance-summary`                                                                                                                                                                                                                                                  |
+| Primary test ID        | `screen-admin-finance-summary`                                                                                                                                                                                                                                                  |
 | Surface                | Admin web console                                                                                                                                                                                                                                                               |
 | Backend coverage       | `admin_finance`; links to `admin_payment_reconciliation`, refund review, refund settlement, pricing rules, and audit screens                                                                                                                                                    |
 | Offline critical       | No                                                                                                                                                                                                                                                                              |

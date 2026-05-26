@@ -1,24 +1,27 @@
 # Admin Issue Detail Screen Spec
 
-## Metadata
-| Field | Value |
-| --- | --- |
-| Screen name | `AdminIssueDetail` |
-| Route | `/admin/issues/:issueId` |
-| Test id | `screen-admin-issue-detail` |
-| Surface | Admin web console |
-| Backend coverage | `get_issue`, `escalate_issue`, `resolve_issue`; supporting reads from `get_delivery`, `get_delivery_timeline`, `list_issues`, and `admin_audit_events` where available |
-| Offline critical | No |
-| Required read role | `ops_admin`, `support_admin`, `finance_admin`, `super_admin`, or scoped authenticated actor allowed by delivery access |
-| Required action role | `ops_admin`, `support_admin`, or `super_admin` depending on capability and transition |
-| Required states | `loading`, `ready`, `not_found`, `delivery_missing`, `action_unavailable`, `review`, `confirm_escalation`, `confirm_resolution`, `submitting`, `saved`, `transition_rejected`, `not_authorized`, `session_expired`, `stale_issue`, `api_error` |
-| Parent screens | `AdminIssueQueue`, `AdminBlockedDeliveryQueue`, `AdminDeliveryDetail`, `AdminManualCustodyException`, `AdminRefundEvidenceReview`, `AdminLaunchReadinessDetail` |
-| Related screens | `AdminIssueQueue`, `AdminManualCustodyException`, `AdminBlockedDeliveryQueue`, `AdminDeliveryDetail`, `AdminCustodyChain`, `AdminRefundEvidenceReview`, `AdminPaymentReconciliation`, `AdminAuditEvents`, `AdminStaffActivityLog`, `SenderSupportThread`, `OpsIssueCreate` |
+## Screen Contract
+
+| Field                | Value                                                                                                                                                                                                                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen ID            | `AdminIssueDetail`                                                                                                                                                                                                                                                         |
+| Route                | `/admin/issues/:issueId`                                                                                                                                                                                                                                                   |
+| Primary test ID      | `screen-admin-issue-detail`                                                                                                                                                                                                                                                |
+| Surface              | Admin web console                                                                                                                                                                                                                                                          |
+| Backend coverage     | `get_issue`, `escalate_issue`, `resolve_issue`; supporting reads from `get_delivery`, `get_delivery_timeline`, `list_issues`, and `admin_audit_events` where available                                                                                                     |
+| Offline critical     | No                                                                                                                                                                                                                                                                         |
+| Required read role   | `ops_admin`, `support_admin`, `finance_admin`, `super_admin`, or scoped authenticated actor allowed by delivery access                                                                                                                                                     |
+| Required action role | `ops_admin`, `support_admin`, or `super_admin` depending on capability and transition                                                                                                                                                                                      |
+| Required states      | `loading`, `ready`, `not_found`, `delivery_missing`, `action_unavailable`, `review`, `confirm_escalation`, `confirm_resolution`, `submitting`, `saved`, `transition_rejected`, `not_authorized`, `session_expired`, `stale_issue`, `api_error`                             |
+| Parent screens       | `AdminIssueQueue`, `AdminBlockedDeliveryQueue`, `AdminDeliveryDetail`, `AdminManualCustodyException`, `AdminRefundEvidenceReview`, `AdminLaunchReadinessDetail`                                                                                                            |
+| Related screens      | `AdminIssueQueue`, `AdminManualCustodyException`, `AdminBlockedDeliveryQueue`, `AdminDeliveryDetail`, `AdminCustodyChain`, `AdminRefundEvidenceReview`, `AdminPaymentReconciliation`, `AdminAuditEvents`, `AdminStaffActivityLog`, `SenderSupportThread`, `OpsIssueCreate` |
 
 ## Purpose
+
 `AdminIssueDetail` is the controlled admin case screen for one support or operational issue. It lets authorized admins inspect the issue record, understand delivery context, route to specialist evidence, escalate when the case needs higher attention, and move the issue through backend-supported resolution states with required notes.
 
 The screen should answer:
+
 - `What issue is this?`
 - `What delivery does it affect?`
 - `What is the current status, severity, and category?`
@@ -32,51 +35,62 @@ The screen should answer:
 This screen is not a chat thread. It is not a customer reply composer. It must not approve refunds, settle refunds, override custody, upload proof, change payment status, or edit delivery state. It owns only the backend issue actions that are already exposed: escalation and status resolution.
 
 ## Backend Reality
+
 Primary read endpoint:
+
 ```http
 GET /v1/issues/:id
 ```
 
 Operation:
+
 ```text
 get_issue
 ```
 
 Escalation endpoint:
+
 ```http
 POST /v1/issues/:id/escalate
 ```
 
 Operation:
+
 ```text
 escalate_issue
 ```
 
 Capability:
+
 ```text
 escalate_case
 ```
 
 Resolve endpoint:
+
 ```http
 POST /v1/issues/:id/resolve
 ```
 
 Operation:
+
 ```text
 resolve_issue
 ```
 
 Capabilities accepted by service:
+
 - `manage_issue_thread`
 - `resolve_operational_issue`
 
 Route param:
+
 ```text
 issueId
 ```
 
 Issue response fields:
+
 - `issueId`
 - `deliveryId`
 - `status`
@@ -99,6 +113,7 @@ Issue response fields:
 - `updatedAt`
 
 Supported statuses:
+
 - `open`
 - `in_review`
 - `escalated`
@@ -106,11 +121,13 @@ Supported statuses:
 - `closed`
 
 Supported severities:
+
 - `p1`
 - `p2`
 - `p3`
 
 Supported categories:
+
 - `delay`
 - `damage`
 - `loss`
@@ -119,7 +136,9 @@ Supported categories:
 - `other`
 
 ## Escalation Contract
+
 Request:
+
 ```json
 {
   "reasonCode": "sla_breach",
@@ -128,6 +147,7 @@ Request:
 ```
 
 Supported reason codes:
+
 - `sender_request`
 - `sla_breach`
 - `payment_dispute`
@@ -136,11 +156,13 @@ Supported reason codes:
 - `management_attention`
 
 Validation:
+
 - `reasonCode` is required.
 - `note` is required.
 - `note` must be trimmed and `5..400` characters.
 
 Backend behavior:
+
 - Requires admin principal.
 - Requires escalation capability.
 - Fetches issue.
@@ -152,6 +174,7 @@ Backend behavior:
 - Updates `updatedAt`.
 
 Frontend guardrails:
+
 - Show escalation only to roles with `escalate_case`.
 - Do not offer escalation for `closed`.
 - Do not offer escalation for `resolved` unless product explicitly adds reopen behavior later.
@@ -160,7 +183,9 @@ Frontend guardrails:
 - Always include `Idempotency-Key`.
 
 ## Resolution Contract
+
 Request for moving to review:
+
 ```json
 {
   "nextStatus": "in_review",
@@ -169,6 +194,7 @@ Request for moving to review:
 ```
 
 Request for resolving:
+
 ```json
 {
   "nextStatus": "resolved",
@@ -178,6 +204,7 @@ Request for resolving:
 ```
 
 Request for closing:
+
 ```json
 {
   "nextStatus": "closed",
@@ -187,11 +214,13 @@ Request for closing:
 ```
 
 Supported `nextStatus` values:
+
 - `in_review`
 - `resolved`
 - `closed`
 
 Supported resolution codes:
+
 - `station_confirmed`
 - `delivery_completed`
 - `refund_approved`
@@ -200,6 +229,7 @@ Supported resolution codes:
 - `policy_denied`
 
 Validation:
+
 - `nextStatus` is required.
 - `note` is required.
 - `note` must be trimmed and `5..400` characters.
@@ -207,11 +237,13 @@ Validation:
 - `resolutionCode` is optional when `nextStatus` is `in_review`.
 
 Backend transition rules:
+
 - `in_review` is allowed only from `open`.
 - `resolved` is rejected if current status is `closed`.
 - `closed` is allowed only from `resolved`.
 
 Backend behavior:
+
 - Requires admin principal.
 - Requires issue management capability.
 - Fetches issue.
@@ -224,6 +256,7 @@ Backend behavior:
 - Updates `updatedAt`.
 
 Frontend guardrails:
+
 - Show `Start review` only when status is `open`.
 - Show `Resolve issue` when status is `open`, `in_review`, or `escalated`.
 - Show `Close issue` only when status is `resolved`.
@@ -233,29 +266,34 @@ Frontend guardrails:
 - Refetch issue after success.
 
 ## Role And Capability Matrix
-| Role | Can read admin detail | Can escalate | Can start review | Can resolve | Can close |
-| --- | --- | --- | --- | --- | --- |
-| `ops_admin` | Yes | Yes | Yes | Yes | Yes |
-| `support_admin` | Yes | Yes | Yes | Yes | Yes |
-| `finance_admin` | Yes | No | No | No | No |
-| `super_admin` | Yes | Yes | Yes | Yes | Yes |
-| `sender` | Only through scoped support screen, not admin shell | No | No | No | No |
-| `driver` | Only through scoped operational surfaces | No | No | No | No |
-| `station_operator` | Only through scoped operational surfaces | No | No | No | No |
-| `final_mile_courier` | Only through scoped operational surfaces | No | No | No | No |
+
+| Role                 | Can read admin detail                               | Can escalate | Can start review | Can resolve | Can close |
+| -------------------- | --------------------------------------------------- | ------------ | ---------------- | ----------- | --------- |
+| `ops_admin`          | Yes                                                 | Yes          | Yes              | Yes         | Yes       |
+| `support_admin`      | Yes                                                 | Yes          | Yes              | Yes         | Yes       |
+| `finance_admin`      | Yes                                                 | No           | No               | No          | No        |
+| `super_admin`        | Yes                                                 | Yes          | Yes              | Yes         | Yes       |
+| `sender`             | Only through scoped support screen, not admin shell | No           | No               | No          | No        |
+| `driver`             | Only through scoped operational surfaces            | No           | No               | No          | No        |
+| `station_operator`   | Only through scoped operational surfaces            | No           | No               | No          | No        |
+| `final_mile_courier` | Only through scoped operational surfaces            | No           | No               | No          | No        |
 
 If a role cannot act:
+
 - Show read-only mode.
 - Explain which role owns action.
 - Keep evidence and route actions visible where access allows.
 
 ## Context Reality
+
 The route provides only:
+
 ```text
 issueId
 ```
 
 Primary flow:
+
 1. Fetch `get_issue`.
 2. If issue returns `deliveryId`, fetch `get_delivery`.
 3. If delivery returns, fetch `get_delivery_timeline`.
@@ -264,26 +302,32 @@ Primary flow:
 6. Fetch audit events for delivery target if needed.
 
 If linked delivery is missing:
+
 - Show `delivery_missing`.
 - Keep issue record visible.
 - Disable delivery-dependent actions.
 - Allow escalation or resolution only if the action does not require delivery evidence for the chosen reason and role policy allows it.
 
 If issue is not found:
+
 - Show `not_found`.
 - Offer route back to `AdminIssueQueue`.
 
 If issue changes during action:
+
 - Show `stale_issue`.
 - Refetch and require the reviewer to re-open the action panel.
 
 ## Primary Users
+
 Primary:
+
 - `support_admin` managing support cases.
 - `ops_admin` managing operational, custody, delay, loss, or damage cases.
 - `super_admin` handling escalated or sensitive cases.
 
 Secondary:
+
 - `finance_admin` reading payment and refund issues before finance action.
 - QA validating issue lifecycle.
 - Security reviewer validating role boundaries.
@@ -291,12 +335,15 @@ Secondary:
 - Claude Code implementing the admin console later.
 
 Non-users:
+
 - Public tracking users.
 - Sender app users in this admin route.
 - Driver or courier issue reporters outside admin shell.
 
 ## User Intent Model
+
 Admins open this screen to:
+
 - Understand the issue.
 - Check related delivery evidence.
 - Decide whether to start review.
@@ -309,9 +356,11 @@ Admins open this screen to:
 The page must focus the user on safe case decisions, not loose note-taking.
 
 ## UX Thesis
+
 This screen should feel like an incident case file with controlled action zones.
 
 Design priorities:
+
 - Issue facts first.
 - Linked delivery evidence second.
 - Allowed action controls clearly separated from evidence.
@@ -321,6 +370,7 @@ Design priorities:
 - High-risk categories route to specialist evidence before action.
 
 The screen must avoid:
+
 - Chat-style reply feed.
 - Unbounded comments.
 - Unclear state transitions.
@@ -329,7 +379,9 @@ The screen must avoid:
 - Custody override controls.
 
 ## Design Inspiration And Evidence
+
 Use these external standards as design inputs:
+
 - [GOV.UK Error summary](https://design-system.service.gov.uk/components/error-summary/) for validation on escalation and resolution forms.
 - [GOV.UK Warning text](https://design-system.service.gov.uk/components/warning-text/) for high-risk transition warnings.
 - [GOV.UK Summary list](https://design-system.service.gov.uk/components/summary-list/) for case facts and delivery facts.
@@ -340,6 +392,7 @@ Use these external standards as design inputs:
 - [W3C WCAG 2.2 status messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html) for announcing saves, refreshes, and validation outcomes.
 
 Kra-specific sources:
+
 - `docs/05-design/frontend-screen-inventory.md`
 - `docs/03-business/refund-and-dispute-rules.md`
 - `docs/03-business/delivery-lifecycle.md`
@@ -351,7 +404,9 @@ Kra-specific sources:
 - `docs/05-design/frontend-screen-specs/admin-web-console/28-admin-refund-evidence-review.md`
 
 ## Information Architecture
+
 Page sections:
+
 - Case header.
 - Status and action rail.
 - Issue facts.
@@ -363,23 +418,28 @@ Page sections:
 - Save and error feedback.
 
 Desktop layout:
+
 - Header full width.
 - Left column: issue facts and delivery evidence.
 - Right rail: status, role permissions, and actions.
 - Lower full-width area: related issues and audit.
 
 Tablet layout:
+
 - Header full width.
 - Action rail moves below issue facts.
 - Evidence route cards become two-column grid.
 
 Mobile web fallback:
+
 - Single column.
 - Sticky bottom action bar only when an action is allowed.
 - Action forms open in full-screen modal or sheet.
 
 ## First Viewport
+
 The first viewport must show:
+
 - Title: `Issue detail`.
 - Issue ID.
 - Status badge.
@@ -394,6 +454,7 @@ The first viewport must show:
 - Read-only explanation if no action is allowed.
 
 Example:
+
 ```text
 Issue detail
 ISS-1001
@@ -406,7 +467,9 @@ Updated 20 May 2026, 10:00
 ```
 
 ## Case Header
+
 Header fields:
+
 - Issue ID.
 - Summary.
 - Status.
@@ -419,6 +482,7 @@ Header fields:
 - Current action availability.
 
 Header actions:
+
 - `Back to issue queue`.
 - `Open delivery`.
 - `Open audit events`.
@@ -427,7 +491,9 @@ Header actions:
 Header must not include mutation buttons unless the role and status allow them. Even when allowed, mutation buttons should live in the action rail to separate evidence from action.
 
 ## Issue Facts Card
+
 Show:
+
 - Issue ID.
 - Delivery ID.
 - Status.
@@ -450,15 +516,18 @@ Show:
 - Resolution note.
 
 Copy actions:
+
 - Copy issue ID.
 - Copy delivery ID.
 
 Copy success must announce through live region.
 
 ## Delivery Context Card
+
 Fetch delivery detail after issue load.
 
 Show:
+
 - Delivery ID.
 - Tracking code.
 - Origin station.
@@ -474,11 +543,13 @@ Show:
 - Final proof summary if present.
 
 If delivery is missing:
+
 ```text
 The issue was found, but its linked delivery could not be loaded.
 ```
 
 Delivery route actions:
+
 - `Open delivery detail`.
 - `Open custody chain`.
 - `Open blocked delivery queue`.
@@ -486,14 +557,17 @@ Delivery route actions:
 - `Open payment reconciliation` for payment issue when payment ID is known from context.
 
 If payment ID is not known:
+
 ```text
 Payment ID is not part of this issue record. Open delivery or reconciliation context first.
 ```
 
 ## Timeline Context
+
 Fetch delivery timeline when delivery ID is known.
 
 Show compact evidence:
+
 - Latest delivery event.
 - Latest handoff event.
 - Latest issue event.
@@ -501,24 +575,30 @@ Show compact evidence:
 - Any handoff or proof gap relevant to category.
 
 For category `handoff`:
+
 - Highlight handoff entries.
 - Link to `AdminManualCustodyException`.
 
 For category `loss`:
+
 - Highlight last known custody segment.
 - Link to custody chain and manual custody exception.
 
 For category `damage`:
+
 - Highlight condition metadata where available.
 - Link to custody and delivery detail.
 
 For category `payment`:
+
 - Highlight payment status and finance route actions.
 
 Do not require timeline to load before showing issue facts.
 
 ## Action Rail
+
 Action rail states:
+
 - `No action allowed`
 - `Can start review`
 - `Can escalate`
@@ -528,6 +608,7 @@ Action rail states:
 - `Read-only finance`
 
 Primary actions by status:
+
 - `open`: `Start review`, `Escalate`, `Resolve`
 - `in_review`: `Escalate`, `Resolve`
 - `escalated`: `Resolve`
@@ -535,24 +616,29 @@ Primary actions by status:
 - `closed`: no mutation action
 
 Role rules:
+
 - `finance_admin`: read-only action rail.
 - `ops_admin`: escalation and resolution actions.
 - `support_admin`: escalation and resolution actions.
 - `super_admin`: escalation and resolution actions.
 
 Action rail must show disabled explanations:
+
 - `Finance can review this issue but cannot change issue status.`
 - `Closed issues cannot be changed from this screen.`
 - `Only resolved issues can be closed.`
 - `Only open issues can move to in review.`
 
 ## Start Review Flow
+
 Backend call:
+
 ```http
 POST /v1/issues/:id/resolve
 ```
 
 Request:
+
 ```json
 {
   "nextStatus": "in_review",
@@ -561,18 +647,22 @@ Request:
 ```
 
 Allowed when:
+
 - Current status is `open`.
 - Role can manage issue thread or resolve operational issue.
 
 Form fields:
+
 - Note.
 
 Validation:
+
 - Note required.
 - Note length `5..400`.
 - Note must be specific to review start.
 
 Review step:
+
 - Show issue ID.
 - Show current status.
 - Show next status.
@@ -580,18 +670,22 @@ Review step:
 - Confirm with `Start review`.
 
 Success:
+
 - Status becomes `in_review`.
 - Show saved banner.
 - Refetch issue.
 - Invalidate issue list.
 
 ## Escalate Flow
+
 Backend call:
+
 ```http
 POST /v1/issues/:id/escalate
 ```
 
 Request:
+
 ```json
 {
   "reasonCode": "management_attention",
@@ -600,16 +694,19 @@ Request:
 ```
 
 Allowed when:
+
 - Role can escalate.
 - Issue is not `resolved`.
 - Issue is not `closed`.
 - Issue is not already `escalated`.
 
 Fields:
+
 - Escalation reason.
 - Note.
 
 Reason labels:
+
 - `sender_request`: `Sender requested escalation`
 - `sla_breach`: `SLA breach`
 - `payment_dispute`: `Payment dispute`
@@ -618,11 +715,13 @@ Reason labels:
 - `management_attention`: `Management attention`
 
 Validation:
+
 - Reason required.
 - Note required.
 - Note length `5..400`.
 
 Review step:
+
 - Show current issue state.
 - Show escalation reason.
 - Show note.
@@ -630,6 +729,7 @@ Review step:
 - Confirm with `Escalate issue`.
 
 Success:
+
 - Status becomes `escalated`.
 - `escalatedAt` appears.
 - `escalatedByActorId` appears if returned.
@@ -637,12 +737,15 @@ Success:
 - Invalidate issue and issue list.
 
 ## Resolve Flow
+
 Backend call:
+
 ```http
 POST /v1/issues/:id/resolve
 ```
 
 Request:
+
 ```json
 {
   "nextStatus": "resolved",
@@ -652,15 +755,18 @@ Request:
 ```
 
 Allowed when:
+
 - Role can manage issue thread or resolve operational issue.
 - Issue status is `open`, `in_review`, or `escalated`.
 - Issue status is not `closed`.
 
 Fields:
+
 - Resolution code.
 - Note.
 
 Resolution labels:
+
 - `station_confirmed`: `Station confirmed`
 - `delivery_completed`: `Delivery completed`
 - `refund_approved`: `Refund approved`
@@ -669,17 +775,20 @@ Resolution labels:
 - `policy_denied`: `Policy denied`
 
 Validation:
+
 - Resolution code required.
 - Note required.
 - Note length `5..400`.
 
 Policy hints:
+
 - `refund_approved` must route finance to refund review or refund evidence if payment context is needed.
 - `policy_denied` must be supported by issue notes and evidence.
 - `delivery_completed` should link to delivery proof where available.
 - `station_confirmed` should link to station or custody evidence where available.
 
 Review step:
+
 - Show issue ID.
 - Show current status.
 - Show next status `resolved`.
@@ -688,18 +797,22 @@ Review step:
 - Confirm with `Resolve issue`.
 
 Success:
+
 - Status becomes `resolved`.
 - Resolution code and note are visible.
 - `resolvedAt` and `resolvedByActorId` appear if returned.
 - Invalidate issue, issue list, and delivery context.
 
 ## Close Flow
+
 Backend call:
+
 ```http
 POST /v1/issues/:id/resolve
 ```
 
 Request:
+
 ```json
 {
   "nextStatus": "closed",
@@ -709,33 +822,40 @@ Request:
 ```
 
 Allowed when:
+
 - Role can manage issue thread or resolve operational issue.
 - Current status is `resolved`.
 
 Fields:
+
 - Resolution code.
 - Note.
 
 Validation:
+
 - Resolution code required even when a previous resolution code exists.
 - Note required.
 - Note length `5..400`.
 
 Review step:
+
 - Show resolved evidence.
 - Show close note.
 - Confirm with `Close issue`.
 
 Success:
+
 - Status becomes `closed`.
 - `closedAt` and `closedByActorId` appear if returned.
 - Issue becomes read-only.
 - Invalidate issue and issue list.
 
 ## Validation UX
+
 Use an error summary at the top of the action panel when validation fails.
 
 Validation errors:
+
 - `Choose an escalation reason.`
 - `Enter a note.`
 - `Note must be at least 5 characters.`
@@ -744,6 +864,7 @@ Validation errors:
 - `This issue changed. Refresh before acting.`
 
 Validation behavior:
+
 - Move focus to error summary.
 - Link each error to its field.
 - Keep typed values.
@@ -751,9 +872,11 @@ Validation behavior:
 - Disable confirm action only after showing clear reason.
 
 ## Confirmation UX
+
 Every mutation needs review and confirmation.
 
 Confirmation content:
+
 - Issue ID.
 - Current status.
 - Next status.
@@ -763,63 +886,77 @@ Confirmation content:
 - Idempotency statement.
 
 Escalation warning:
+
 ```text
 Escalation marks this issue for higher attention and changes its status to escalated.
 ```
 
 Resolution warning:
+
 ```text
 Resolution records an outcome on this issue. Review the delivery and evidence before continuing.
 ```
 
 Close warning:
+
 ```text
 Closing finalizes a resolved issue. Reopening is not available in the current backend.
 ```
 
 Buttons:
+
 - Primary: action-specific label.
 - Secondary: `Cancel`.
 
 ## Success And Failure States
+
 Saved banner:
+
 ```text
 Issue updated.
 ```
 
 Escalated success:
+
 ```text
 Issue escalated. The case now needs higher attention.
 ```
 
 Resolved success:
+
 ```text
 Issue resolved. The outcome is now recorded.
 ```
 
 Closed success:
+
 ```text
 Issue closed. No further issue actions are available here.
 ```
 
 Transition rejected:
+
 ```text
 The issue status changed before this action completed. Refresh and review the current state.
 ```
 
 Mutation failure:
+
 ```text
 Kra could not update this issue. Retry after checking the current status.
 ```
 
 Failure behavior:
+
 - Keep form values.
 - Show server error.
 - Refetch issue if error indicates invalid transition.
 - Do not assume mutation succeeded.
 
 ## Evidence Routes
+
 Route cards:
+
 - `Open delivery detail`
 - `Open custody chain`
 - `Open custody exception`
@@ -831,6 +968,7 @@ Route cards:
 - `Open related issues`
 
 Route rules:
+
 - Custody exception route appears for `handoff`, `loss`, or `damage`.
 - Refund routes appear for `payment` or rows whose resolution code is `refund_approved`.
 - Payment reconciliation requires known payment ID.
@@ -839,13 +977,16 @@ Route rules:
 - Delivery detail requires delivery ID.
 
 If payment ID is missing:
+
 - Disable payment and refund routes.
 - Explain source gap.
 
 ## Related Issues
+
 Fetch `list_issues?deliveryId=:deliveryId&limit=100`.
 
 Show:
+
 - Issue ID.
 - Status.
 - Severity.
@@ -855,6 +996,7 @@ Show:
 - Current issue marker.
 
 Use cases:
+
 - Detect duplicates.
 - Avoid closing one issue while related P1 remains open.
 - Find payment/refund companions.
@@ -863,13 +1005,16 @@ Use cases:
 Do not merge issues because backend has no merge endpoint.
 
 ## Audit Trail
+
 Fetch audit events when admin access allows.
 
 Targets:
+
 - `issueId`
 - `deliveryId`
 
 Show:
+
 - Action.
 - Actor.
 - Actor role.
@@ -878,17 +1023,21 @@ Show:
 - Metadata summary.
 
 Security:
+
 - Collapse raw metadata.
 - Do not expose secrets.
 - Do not send audit metadata to analytics.
 
 Audit empty copy:
+
 ```text
 No audit events were returned for this issue.
 ```
 
 ## Read-Only Boundary
+
 This screen must never include:
+
 - Customer reply composer.
 - Free-form internal comments unrelated to a backend mutation.
 - Refund approval form.
@@ -905,18 +1054,22 @@ This screen must never include:
 - Issue assignment control unless backend adds assignment.
 
 Allowed mutations:
+
 - `escalate_issue`.
 - `resolve_issue`.
 
 Only show allowed mutations when role and status allow them.
 
 ## Data Fetching Contract
+
 Initial fetch:
+
 ```http
 GET /v1/issues/:issueId
 ```
 
 Supporting reads:
+
 ```http
 GET /v1/deliveries/:deliveryId
 GET /v1/deliveries/:deliveryId/timeline
@@ -926,12 +1079,14 @@ GET /v1/admin/audit-events?targetType=delivery&targetId=:deliveryId
 ```
 
 Mutation requests:
+
 ```http
 POST /v1/issues/:issueId/escalate
 POST /v1/issues/:issueId/resolve
 ```
 
 Do not call:
+
 ```http
 POST /v1/payments/refund
 POST /v1/payments/refund/settle
@@ -941,15 +1096,18 @@ POST /v1/admin/stations/:id/status
 ```
 
 After mutation success:
+
 - Refetch `get_issue`.
 - Invalidate `list_issues`.
 - Invalidate `get_delivery` when resolution may affect delivery context.
 - Invalidate audit events if audit writes are visible.
 
 ## Idempotency
+
 Both `escalate_issue` and `resolve_issue` are idempotent routes.
 
 Frontend requirements:
+
 - Generate one idempotency key per user-confirmed action.
 - Reuse the same key during retry of the same submitted action.
 - Generate a new key only when the user changes action payload.
@@ -957,7 +1115,9 @@ Frontend requirements:
 - Disable primary confirm button while submitting.
 
 ## Cache And Freshness
+
 Freshness:
+
 - Show cached issue immediately if available.
 - Refetch on route entry.
 - Mark stale after `60s`.
@@ -965,12 +1125,15 @@ Freshness:
 - If backend response differs from local issue state, show `stale_issue`.
 
 Stale copy:
+
 ```text
 This issue changed since you opened it. Review the latest status before acting.
 ```
 
 ## Visual Design System
+
 Art direction:
+
 - Incident case file.
 - Evidence-rich, action-controlled.
 - Strong status rail.
@@ -978,6 +1141,7 @@ Art direction:
 - Risk color reserved for severity and destructive transitions.
 
 Color tokens:
+
 - `--issue-detail-bg`: `#F4F1EA`
 - `--issue-detail-surface`: `#FFFCF5`
 - `--issue-detail-raised`: `#FFFFFF`
@@ -992,12 +1156,14 @@ Color tokens:
 - `--issue-detail-focus`: `#F6C84C`
 
 Typography:
+
 - Use admin console type system.
 - If no committed type system exists yet, use `IBM Plex Sans` for interface and `IBM Plex Mono` for IDs.
 - Notes should use readable body text, not code font.
 - IDs and timestamps use tabular numerals.
 
 Spacing:
+
 - Page max width: `1440px`.
 - Header padding: `32px`.
 - Card padding: `24px`.
@@ -1006,12 +1172,15 @@ Spacing:
 - Modal max width: `640px`.
 
 Motion:
+
 - Minimal page load fade.
 - No motion on status change except saved banner.
 - Respect reduced motion.
 
 ## Component Inventory
+
 Required components:
+
 - `AdminIssueDetailPage`
 - `IssueDetailHeader`
 - `IssueStatusRail`
@@ -1033,6 +1202,7 @@ Required components:
 - `IssueSavedBanner`
 
 Shared components may be reused:
+
 - Admin shell.
 - Summary card.
 - Table.
@@ -1044,9 +1214,11 @@ Shared components may be reused:
 - Copy button.
 
 ## Accessibility Requirements
+
 The page must meet WCAG 2.2 AA.
 
 Required:
+
 - Main `h1` is `Issue detail`.
 - Issue ID appears near the heading.
 - Status, severity, and category are text.
@@ -1062,13 +1234,16 @@ Required:
 - Read-only reason is visible and announced.
 
 Keyboard behavior:
+
 - `Tab` moves through header, facts, routes, action rail, related issues, and audit.
 - `Enter` activates buttons and links.
 - `Escape` closes modals.
 - Focus moves to saved banner only when the action completes and the user needs confirmation.
 
 ## Privacy And Security
+
 Do:
+
 - Show only fields returned by authorized APIs.
 - Show reporter actor ID only for roles allowed by admin policy.
 - Protect issue descriptions from analytics.
@@ -1077,6 +1252,7 @@ Do:
 - Use idempotency keys for mutations.
 
 Do not:
+
 - Store issue notes in local storage.
 - Send note text to analytics.
 - Expose receiver phone.
@@ -1087,7 +1263,9 @@ Do not:
 - Submit unsupported payload fields.
 
 ## Analytics
+
 Track:
+
 - `admin_issue_detail_viewed`
 - `admin_issue_detail_route_clicked`
 - `admin_issue_detail_action_opened`
@@ -1098,6 +1276,7 @@ Track:
 - `admin_issue_detail_stale_seen`
 
 Properties:
+
 - `issueStatus`
 - `issueSeverity`
 - `issueCategory`
@@ -1107,6 +1286,7 @@ Properties:
 - `deliveryContextLoaded`
 
 Never track:
+
 - Issue ID.
 - Delivery ID.
 - Reporter actor ID.
@@ -1119,35 +1299,44 @@ Never track:
 - Provider reference.
 
 ## Performance
+
 Targets:
+
 - Issue facts visible under `1.5s`.
 - Supporting delivery evidence loads independently.
 - Action rail visible as soon as issue is loaded.
 - Mutation confirmation opens under `100ms`.
 
 Optimization:
+
 - Do not block issue facts on delivery timeline.
 - Do not fetch audit before issue facts.
 - Do not fetch unrelated payment records unless user opens a finance route.
 - Keep previous issue visible while refreshing.
 
 ## Responsive Requirements
+
 Desktop:
+
 - Two-column case layout with sticky action rail.
 - Related issues and audit below.
 
 Tablet:
+
 - Action rail below facts.
 - Route cards two columns.
 
 Mobile:
+
 - Single column.
 - Action buttons in sticky bottom bar when allowed.
 - Modals become full-screen sheets.
 - Related issue rows become cards.
 
 ## Copy System
+
 Voice:
+
 - Specific.
 - Calm.
 - Evidence-led.
@@ -1155,6 +1344,7 @@ Voice:
 - No blame language.
 
 Preferred terms:
+
 - `issue`
 - `case`
 - `status`
@@ -1165,6 +1355,7 @@ Preferred terms:
 - `closed`
 
 Avoid:
+
 - `fixed` unless resolution code supports it.
 - `guilty`
 - `fraud` unless reason code is `fraud_review`.
@@ -1172,7 +1363,9 @@ Avoid:
 - `permanent` except when describing current lack of reopen endpoint.
 
 ## Acceptance Criteria
+
 Functional:
+
 - Route renders with `data-testid="screen-admin-issue-detail"`.
 - Route reads `issueId` from URL.
 - Screen calls `get_issue`.
@@ -1193,6 +1386,7 @@ Functional:
 - Screen never calls refund, payment, delivery, custody, proof, station, or user mutations.
 
 Accessibility:
+
 - Forms are labeled.
 - Error summary links to fields.
 - Modals trap and restore focus.
@@ -1200,12 +1394,15 @@ Accessibility:
 - Buttons have specific accessible names.
 
 Security:
+
 - Unauthorized action controls do not render.
 - Sensitive notes are not tracked.
 - Unsupported fields are not submitted.
 
 ## Test Matrix
+
 Unit tests:
+
 - Maps role and status to allowed actions.
 - Hides actions for `finance_admin`.
 - Allows `Start review` only from `open`.
@@ -1223,6 +1420,7 @@ Unit tests:
 - Builds route actions from issue and delivery context.
 
 Integration tests:
+
 - Loads issue detail.
 - Handles issue not found.
 - Handles linked delivery missing.
@@ -1237,6 +1435,7 @@ Integration tests:
 - Keeps form values after server error.
 
 End-to-end tests:
+
 - `e2e-admin-issue-detail-start-review`: Support admin moves open issue to in review.
 - `e2e-admin-issue-detail-escalate`: Ops admin escalates an active issue.
 - `e2e-admin-issue-detail-resolve`: Support admin resolves an issue with resolution code.
@@ -1245,6 +1444,7 @@ End-to-end tests:
 - `e2e-admin-issue-detail-transition-rejected`: Stale status produces refresh path.
 
 Visual tests:
+
 - Open issue.
 - Escalated issue.
 - Resolved issue.
@@ -1257,9 +1457,11 @@ Visual tests:
 - Reduced-motion mode.
 
 ## Implementation Notes For Claude Code
+
 Build this as the issue action owner screen for `/admin/issues/:issueId`.
 
 Use existing hooks where available:
+
 - `useGetIssueQuery`
 - `useEscalateIssueMutation`
 - `useResolveIssueMutation`
@@ -1271,6 +1473,7 @@ Use existing hooks where available:
 If hooks do not exist, create them using existing API client conventions. Do not add new backend endpoints from frontend code.
 
 Recommended files:
+
 - `apps/admin/src/routes/admin-issue-detail.tsx`
 - `apps/admin/src/features/issues/AdminIssueDetail.tsx`
 - `apps/admin/src/features/issues/issueDetailModel.ts`
@@ -1283,6 +1486,7 @@ Recommended files:
 - `apps/admin/src/features/issues/components/RelatedIssuesTable.tsx`
 
 Model helpers:
+
 - `deriveIssueActionAvailability`
 - `buildEscalateIssuePayload`
 - `buildStartReviewPayload`
@@ -1297,7 +1501,9 @@ Model helpers:
 Do not couple action panels directly to raw route params. Normalize the loaded issue, role, and related context into an `IssueDetailViewModel`.
 
 ## Open Backend Gaps
+
 Current backend supports detail actions, but these gaps should remain visible:
+
 - No issue comments endpoint.
 - No assignee field.
 - No issue reopen endpoint.
@@ -1312,4 +1518,5 @@ Current backend supports detail actions, but these gaps should remain visible:
 Frontend must not hide these gaps with local-only state that appears saved.
 
 ## Final Instruction To Claude Code
+
 Build `AdminIssueDetail` as the controlled issue action screen. Load `get_issue`, show issue and delivery evidence, route to specialist records, and allow only `escalate_issue` and `resolve_issue` actions where role and current status permit. Every mutation needs validation, review, confirmation, idempotency, success refetch, and clear stale-state handling. Do not add chat replies, notes outside backend mutation payloads, refund execution, payment editing, custody override, proof upload, or unsupported issue lifecycle controls.

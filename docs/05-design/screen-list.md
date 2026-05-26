@@ -11,13 +11,18 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Onboarding
 - Sign In
 - Dashboard
-- Create Delivery
+- Create Delivery Start
+- Create Delivery Stations
+- Create Receiver Details
+- Create Package Details
+- Create Delivery Options
+- Quote Review
 - Delivery Summary
 - Payment Method
-- Tracking
-- History
-- Receipt Detail
-- Support Thread
+- Sender Tracking Timeline
+- Sender Delivery History
+- Sender Receipt Detail
+- Sender Support Thread
 
 ## Public
 
@@ -45,7 +50,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Assigned Run Detail
 - Manifest
 - Route
-- Handoff Confirmation
+- Destination Handoff
 - Earnings
 - Support
 
@@ -53,7 +58,8 @@ This file remains as the compact legacy screen summary. Claude Code should build
 
 - Sign In
 - Dashboard
-- Intake
+- Intake Queue
+- Package Intake
 - Outbound Queue
 - Driver Assignment
 - Destination Receipt
@@ -69,7 +75,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Assignment Detail
 - Route
 - Proof Capture
-- Failure Reason
+- Failed Attempt
 - Earnings
 
 ## Admin
@@ -118,13 +124,18 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `SenderOnboarding`
 - `SenderSignIn`
 - `SenderHome`
-- `CreateDelivery`
+- `CreateDeliveryStart`
+- `CreateDeliveryStations`
+- `CreateReceiverDetails`
+- `CreatePackageDetails`
+- `CreateDeliveryOptions`
+- `QuoteReview`
 - `DeliverySummary`
 - `PaymentMethod`
-- `TrackingTimeline`
-- `DeliveryHistory`
-- `ReceiptDetail`
-- `SupportThread`
+- `SenderTrackingTimeline`
+- `SenderDeliveryHistory`
+- `SenderReceiptDetail`
+- `SenderSupportThread`
 
 ### Driver
 
@@ -133,7 +144,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `AssignedRunDetail`
 - `DriverManifest`
 - `DriverRoute`
-- `DriverHandoff`
+- `DriverDestinationHandoff`
 - `DriverEarnings`
 - `DriverSupport`
 
@@ -141,7 +152,8 @@ This file remains as the compact legacy screen summary. Claude Code should build
 
 - `StationSignIn`
 - `StationOverview`
-- `StationIntake`
+- `StationIntakeQueue`
+- `StationPackageIntake`
 - `StationOutboundQueue`
 - `StationDriverAssignment`
 - `StationDestinationReceipt`
@@ -157,7 +169,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `CourierAssignmentDetail`
 - `CourierRoute`
 - `CourierProofCapture`
-- `CourierFailureReason`
+- `CourierFailedAttempt`
 - `CourierEarnings`
 
 ### Admin
