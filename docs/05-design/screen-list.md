@@ -19,9 +19,17 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Quote Review
 - Delivery Summary
 - Payment Method
+- Payment Processing
+- Payment Result
+- Payment Provider Return
+- Payment Failed Recovery
+- Sender Delivery Detail
 - Sender Tracking Timeline
 - Sender Delivery History
 - Sender Receipt Detail
+- Sender Receipt Share
+- Sender Refund Status
+- Sender Issue Create
 - Sender Support Thread
 
 ## Public
@@ -132,9 +140,17 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `QuoteReview`
 - `DeliverySummary`
 - `PaymentMethod`
+- `PaymentProcessing`
+- `PaymentResult`
+- `PaymentProviderReturn`
+- `PaymentFailedRecovery`
+- `SenderDeliveryDetail`
 - `SenderTrackingTimeline`
 - `SenderDeliveryHistory`
 - `SenderReceiptDetail`
+- `SenderReceiptShare`
+- `SenderRefundStatus`
+- `SenderIssueCreate`
 - `SenderSupportThread`
 
 ### Driver
