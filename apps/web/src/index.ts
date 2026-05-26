@@ -191,12 +191,47 @@ export const landingSections: LandingSection[] = [
   }
 ];
 
+export const webDomainLifecycleGroups = {
+  public_web: [
+    "PublicLanding",
+    "PublicHowItWorks",
+    "PublicServiceAreas",
+    "PublicCoverage",
+    "PublicPricingExplainer",
+    "PublicTrustCustody",
+    "PublicBusiness",
+    "PublicPartners",
+    "PublicAbout",
+    "PublicSupportEntry"
+  ],
+  public_policy: [
+    "PublicDeliveryPolicy",
+    "PublicRefundPolicy",
+    "PublicPrivacy",
+    "PublicTerms",
+    "PublicMaintenance"
+  ],
+  public_tracking: ["PublicTrackingEntry"],
+  receiver_tracking: [
+    "ReceiverTrackingLanding",
+    "ReceiverPhoneChallenge",
+    "ReceiverOtpVerify",
+    "ReceiverTrackingTimeline",
+    "ReceiverArrivalInstructions",
+    "ReceiverFailedAttempt",
+    "ReceiverRefusalInfo",
+    "TrackingLinkExpired",
+    "TrackingAccessDenied"
+  ]
+} as const;
+
 export const publicSurface = {
   app: "web",
   implementationStatus: "contract_only",
   pages: publicPages,
   receiverPublicFlow,
   landingSections,
+  domainLifecycleGroups: webDomainLifecycleGroups,
   seoBaseline: {
     siteName: "Kra",
     locale: "en-GH"

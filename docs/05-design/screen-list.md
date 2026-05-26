@@ -10,6 +10,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 
 - Onboarding
 - Sign In
+- Auth Recovery
 - Dashboard
 - Create Delivery Start
 - Create Delivery Stations
@@ -28,9 +29,13 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Sender Delivery History
 - Sender Receipt Detail
 - Sender Receipt Share
+- Cancel Delivery Request
 - Sender Refund Status
 - Sender Issue Create
 - Sender Support Thread
+- Sender Notifications
+- Sender Profile
+- Sender Settings
 
 ## Public
 
@@ -63,17 +68,42 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Tracking Link Expired
 - Tracking Access Denied
 
+## Auth And Account
+
+- Role Selection
+- Invite Acceptance
+- Staff Account Activation
+- Passwordless Phone Login
+- Session Expired
+- Account Locked
+- Permission Denied
+
+## Operations Shared
+
+- Role-Aware Home
+- Staff Delivery Detail
+- Scan Package
+- Custody Chain
+- Offline Outbox
+- Failed Action Recovery
+- Staff Issue Creation
+- Staff Support
+
 ## Driver
 
 - Sign In
 - Dashboard
+- Assigned Runs
 - Assigned Run Detail
+- Accept Run
 - Manifest
 - Origin Pickup Scan
 - Custody Accepted
 - Route
+- Mark In Transit
 - Destination Arrival
 - Destination Handoff
+- History
 - Earnings
 - Support
 
@@ -83,14 +113,20 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - Dashboard
 - Intake Queue
 - Package Intake
+- Intake Confirmation
+- Package Label Print
+- Package Label Reprint
 - Outbound Queue
 - Driver Assignment
+- Dispatch Readiness
 - Driver Pickup Scan Review
 - Inbound Queue
 - Destination Receipt
+- Condition Check
 - Final-Mile Queue
 - Final-Mile Assignment
 - Handoff Log
+- Blocked Queue
 - Reports
 - Support
 
@@ -98,31 +134,111 @@ This file remains as the compact legacy screen summary. Claude Code should build
 
 - Sign In
 - Home
+- Assignments
 - Assignment Detail
 - Accept Assignment Scan
 - Custody Accepted
 - Out For Delivery
 - Route
 - Proof Capture
+- OTP Completion
+- Signature Proof
+- Photo Proof
 - Failed Attempt
 - Return To Station
 - Completed Jobs
 - Earnings
+- Issues
 
 ## Admin
 
+- Sign In
 - Overview
+- Launch Readiness
+- Launch Readiness Detail
 - Delivery Explorer
 - Delivery Detail
 - Package Detail
+- Package Label Registry
 - Custody Chain
 - Manual Custody Exception
+- Blocked Delivery Queue
+- Stations
 - Station Detail
+- Station Validation
+- Station Status Override
+- Station Capacity
+- Users
 - User Detail
+- User Access
+- Staff Activity Log
+- Pricing Rules
+- Pricing Rule Edit
 - Finance Summary
+- Payment Reconciliation
+- Payment Reconciliation Detail
+- Refund Review
+- Refund Settlement
+- Refund Evidence Review
 - Issue Queue
+- Issue Detail
+- SLA Breach Dashboard
 - Audit Events
+- Audit Event Detail
+- Outbound Notifications
+- Notification Detail
+- Webhook Events
+- Webhook Event Detail
+- Analytics
+- Export Report
 - Settings
+
+## Shared Operational Modals
+
+- Confirm Destructive Action
+- Cancel Delivery Reason
+- Scan Package
+- Wrong Package Scanned
+- Package Label Already Used
+- Accept Custody
+- Reject Assignment
+- Failed Delivery Reason
+- Upload Proof
+- Verify OTP
+- Escalate Issue
+- Resolve Issue
+- Refund Decision
+- Refund Settlement
+- Station Status Override
+- Station Validation
+- Pricing Rule Update
+- Suspend Or Reactivate User
+- Retry Notification
+- Replay Webhook
+- Export Report
+- Audit Sensitive Action Acknowledgement
+
+## Shared Screen States
+
+- Loading
+- Empty
+- Error
+- Offline
+- Stale Data
+- Not Authorized
+- Session Expired
+- Blocked By Payment
+- Blocked By Issue
+- Manual Review Required
+- Scan Mismatch
+- Duplicate Package Label
+- Custody Not Confirmed
+- OTP Required
+- Proof Required
+- Payment Under Review
+- Refund Pending
+- Webhook Conflict
+- Rate Limited
 
 ## Approved Launch Screen Inventory
 
@@ -170,6 +286,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 
 - `SenderOnboarding`
 - `SenderSignIn`
+- `SenderAuthRecovery`
 - `SenderHome`
 - `CreateDeliveryStart`
 - `CreateDeliveryStations`
@@ -188,21 +305,40 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `SenderDeliveryHistory`
 - `SenderReceiptDetail`
 - `SenderReceiptShare`
+- `CancelDeliveryRequest`
 - `SenderRefundStatus`
 - `SenderIssueCreate`
 - `SenderSupportThread`
+- `SenderNotifications`
+- `SenderProfile`
+- `SenderSettings`
+
+### Operations Shared
+
+- `OpsRoleHome`
+- `OpsDeliveryDetail`
+- `OpsScanPackage`
+- `OpsCustodyChain`
+- `OpsOfflineOutbox`
+- `OpsActionRecovery`
+- `OpsIssueCreate`
+- `OpsSupport`
 
 ### Driver
 
 - `DriverSignIn`
 - `DriverHome`
+- `AssignedRuns`
 - `AssignedRunDetail`
+- `DriverAcceptRun`
 - `DriverManifest`
 - `DriverOriginPickupScan`
 - `DriverCustodyAccepted`
 - `DriverRoute`
+- `DriverMarkInTransit`
 - `DriverDestinationArrival`
 - `DriverDestinationHandoff`
+- `DriverHistory`
 - `DriverEarnings`
 - `DriverSupport`
 
@@ -212,14 +348,20 @@ This file remains as the compact legacy screen summary. Claude Code should build
 - `StationOverview`
 - `StationIntakeQueue`
 - `StationPackageIntake`
+- `StationIntakeConfirmation`
+- `PackageLabelPrint`
+- `PackageLabelReprint`
 - `StationOutboundQueue`
 - `StationDriverAssignment`
+- `StationDispatchReadiness`
 - `StationDriverPickupScan`
 - `StationInboundQueue`
 - `StationDestinationReceipt`
+- `StationConditionCheck`
 - `StationFinalMileQueue`
 - `StationFinalMileAssignment`
 - `StationHandoffLog`
+- `StationBlockedQueue`
 - `StationReports`
 - `StationSupport`
 
@@ -227,31 +369,121 @@ This file remains as the compact legacy screen summary. Claude Code should build
 
 - `CourierSignIn`
 - `CourierHome`
+- `CourierAssignments`
 - `CourierAssignmentDetail`
 - `CourierAcceptAssignmentScan`
 - `CourierCustodyAccepted`
 - `CourierOutForDelivery`
 - `CourierRoute`
 - `CourierProofCapture`
+- `CourierOtpCompletion`
+- `CourierSignatureProof`
+- `CourierPhotoProof`
 - `CourierFailedAttempt`
 - `CourierReturnToStation`
 - `CourierCompletedJobs`
 - `CourierEarnings`
+- `CourierIssues`
 
 ### Admin
 
+- `AdminSignIn`
 - `AdminOverview`
+- `AdminLaunchReadiness`
+- `AdminLaunchReadinessDetail`
 - `AdminDeliveryExplorer`
 - `AdminDeliveryDetail`
 - `AdminPackageDetail`
+- `AdminPackageLabelRegistry`
 - `AdminCustodyChain`
 - `AdminManualCustodyException`
+- `AdminBlockedDeliveryQueue`
+- `AdminStations`
 - `AdminStationDetail`
+- `AdminStationValidation`
+- `AdminStationStatusOverride`
+- `AdminStationCapacity`
+- `AdminUsers`
 - `AdminUserDetail`
+- `AdminUserAccess`
+- `AdminStaffActivityLog`
+- `AdminPricingRules`
+- `AdminPricingRuleEdit`
 - `AdminFinanceSummary`
+- `AdminPaymentReconciliation`
+- `AdminPaymentReconciliationDetail`
+- `AdminRefundReview`
+- `AdminRefundSettlement`
+- `AdminRefundEvidenceReview`
 - `AdminIssueQueue`
+- `AdminIssueDetail`
+- `AdminSlaBreachDashboard`
 - `AdminAuditEvents`
+- `AdminAuditEventDetail`
+- `AdminOutboundNotifications`
+- `AdminNotificationDetail`
+- `AdminWebhookEvents`
+- `AdminWebhookEventDetail`
+- `AdminAnalytics`
+- `AdminExportReport`
 - `AdminSettings`
+
+### Auth And Account
+
+- `AuthRoleSelection`
+- `InviteAcceptance`
+- `StaffAccountActivation`
+- `PasswordlessPhoneLogin`
+- `SessionExpired`
+- `AccountLocked`
+- `PermissionDenied`
+
+### Shared Operational Modals
+
+- `ConfirmDestructiveActionModal`
+- `CancelDeliveryReasonModal`
+- `ScanPackageModal`
+- `WrongPackageScannedModal`
+- `PackageLabelAlreadyUsedModal`
+- `AcceptCustodyModal`
+- `RejectAssignmentModal`
+- `FailedDeliveryReasonModal`
+- `UploadProofModal`
+- `VerifyOtpModal`
+- `EscalateIssueModal`
+- `ResolveIssueModal`
+- `RefundDecisionModal`
+- `RefundSettlementModal`
+- `StationStatusOverrideModal`
+- `StationValidationModal`
+- `PricingRuleUpdateModal`
+- `SuspendReactivateUserModal`
+- `RetryNotificationModal`
+- `ReplayWebhookModal`
+- `ExportReportModal`
+- `AuditSensitiveActionAckModal`
+
+### Shared Screen States
+
+- `loading`
+- `empty`
+- `error`
+- `offline`
+- `stale_data`
+- `not_authorized`
+- `session_expired`
+- `blocked_by_payment`
+- `blocked_by_issue`
+- `manual_review_required`
+- `scan_mismatch`
+- `duplicate_package_label`
+- `custody_not_confirmed`
+- `otp_required`
+- `proof_required`
+- `payment_under_review`
+- `refund_pending`
+- `webhook_conflict`
+- `rate_limited`
 
 ## Required UI States
 
@@ -266,6 +498,7 @@ This file remains as the compact legacy screen summary. Claude Code should build
 ## Workflow Coverage Rule
 
 - The launch screen set covers:
+  - auth and account access
   - sender booking and payment
   - public receiver tracking and verification
   - sender tracking timeline
@@ -276,6 +509,9 @@ This file remains as the compact legacy screen summary. Claude Code should build
   - operational custody chain and handoff evidence
   - admin custody audit and exception review
   - admin issue and payment review
+  - notifications, webhook visibility, and retry constraints
+  - offline action recovery and shared failure states
+  - public web acquisition, policy, support, tracking, and maintenance
 
 ## Baseline Status
 

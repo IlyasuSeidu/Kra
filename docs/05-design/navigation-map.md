@@ -83,11 +83,31 @@
 
 ## Approved Launch Navigation
 
+### Domain Enforcement Order
+
+- `Auth/account access`
+- `Sender booking lifecycle`
+- `Station operations`
+- `Driver lifecycle`
+- `Final-mile courier lifecycle`
+- `Issues, support, and disputes`
+- `Notifications`
+- `Admin operations`
+- `Offline and recovery`
+- `Public web`
+
 ### Sender
 
 - `Home`
 - `Create`
+- `Quote`
+- `Payment`
+- `Delivery detail`
+- `Track`
 - `History`
+- `Notifications`
+- `Profile`
+- `Settings`
 - `Support`
 
 ### Receiver Public Flow
@@ -102,9 +122,13 @@
 
 - `Home`
 - `Assigned Runs`
+- `Accept run`
+- `Manifest`
 - `Origin pickup scan`
 - `Custody accepted`
+- `Mark in transit`
 - `Destination arrival`
+- `Destination handoff`
 - `History`
 - `Earnings`
 - `Support`
@@ -112,12 +136,18 @@
 ### Station
 
 - `Overview`
+- `Intake`
 - `Outbound`
 - `Inbound`
 - `Handoffs`
+- `Assignment`
+- `Dispatch readiness`
 - `Driver pickup scan`
 - `Destination receipt`
+- `Condition check`
 - `Final-mile queue`
+- `Blocked queue`
+- `Reports`
 - `Support`
 
 ### Doorstep
@@ -125,7 +155,12 @@
 - `Home`
 - `Assigned`
 - `Accept assignment scan`
+- `Custody accepted`
 - `Out for delivery`
+- `Route`
+- `Proof`
+- `Failed attempt`
+- `Return to station`
 - `Completed`
 - `Earnings`
 - `Issues`
@@ -133,13 +168,19 @@
 ### Admin
 
 - `Overview`
+- `Launch readiness`
 - `Deliveries`
 - `Custody`
 - `Stations`
+- `Users`
+- `Pricing`
 - `Finance`
 - `Issues`
 - `Audit`
-- `Users`
+- `Notifications`
+- `Webhooks`
+- `Analytics`
+- `Export`
 - `Settings`
 
 ## Hidden In Pilot
@@ -148,6 +189,7 @@
 - Public ratings tab does not exist.
 - Advanced analytics tabs remain admin-only.
 - Receiver public tracking routes are deep links and must not appear in authenticated side navigation.
+- Admin export and advanced analytics remain governed screens, even when visible in metadata.
 
 ## Screen Inventory Mapping Rule
 
@@ -155,6 +197,8 @@
 - No orphan screens may exist outside the navigation or deep-link system.
 - Public web routes in `apps/web/src/index.ts` must map to `frontend-screen-inventory.md` and a public-web screen spec.
 - Receiver public routes in `apps/web/src/index.ts` must map to `frontend-screen-inventory.md` and a receiver-public-flow screen spec.
+- Mobile role shells in `apps/mobile/src/index.ts` must include every routed sender, driver, station, courier, auth, and shared operations screen.
+- Admin surfaces in `apps/admin/src/index.ts` must include every routed admin screen.
 - Tracking and custody routes must never expose internal event, actor, payment provider, or audit fields to public receiver routes.
 
 ## Baseline Status
